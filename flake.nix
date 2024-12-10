@@ -44,6 +44,7 @@
         buildInputs = (with pkgs; [
           pythonPackages.python
           pythonPackages.venvShellHook
+          hatch
           stdenv.cc
           stdenv.cc.cc.lib
           openssl
