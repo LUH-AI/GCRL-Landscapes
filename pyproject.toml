@@ -26,13 +26,21 @@ classifiers = [
 ]
 dependencies = [
   "gymnasium",
-  "ogbench",
+  "ogbench @ git+https://github.com/CrunchyFlakes/ogbench",
+  "tqdm",
+  "flax>=0.8.4",
+  "numpy",
+  "jax[cuda12]",
+  "wandb",
 ]
 
 [project.urls]
 Documentation = "https://github.com/LUH-AI/GCRL-Landscapes#readme"
 Issues = "https://github.com/LUH-AI/GCRL-Landscapes/issues"
 Source = "https://github.com/LUH-AI/GCRL-Landscapes"
+
+[tool.hatch.metadata]
+allow-direct-references = true
 
 [tool.hatch.version]
 path = "src/gcrl_landscapes/__about__.py"
