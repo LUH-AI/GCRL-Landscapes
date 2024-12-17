@@ -44,6 +44,8 @@
         buildInputs = (with pkgs; [
           pythonPackages.python
           pythonPackages.venvShellHook
+          pythonPackages.mujoco
+          glxinfo
           hatch
           stdenv.cc
           stdenv.cc.cc.lib
