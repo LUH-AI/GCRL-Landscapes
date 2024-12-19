@@ -10,14 +10,15 @@ from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
 from ml_collections import ConfigDict
-from typing import Callable, Any
-from .util.data import EvaluationResult
+from typing import Callable, Any, Optional
+from .util.data import EvaluationResult, restore_agent
 import os
 import warnings
 
 
 def train(
     agent_class: Callable[[Any, gym.Env, int], EvaluationResult],
+    agent_path: Optional[Path],
     env: gym.Env,
     train_dataset: GCDataset,
     val_dataset: GCDataset,
@@ -56,6 +57,8 @@ def train(
         example_batch["actions"],
         config,
     )
+    if agent_path:
+        agent = restore_agent(agent, agent_path)
 
     save_dir = log_dir / datetime.now().strftime("%Y-%m-%dT%H:%M")
     os.makedirs(save_dir)
