@@ -14,8 +14,9 @@ if __name__ == "__main__":
     config = get_config()
     save_at_steps = [500]
 
-    train(
+    evaluation_results, models = train(
         agent_class=agent_class,
+        agent_path=None,
         env=env,
         train_dataset=GCDataset(Dataset.create(**train_dataset), config),
         val_dataset=GCDataset(Dataset.create(**val_dataset), config),
