@@ -14,7 +14,7 @@ from typing import Callable
 import os
 
 
-def train(agent_class, env: gym.Env, train_dataset: GCDataset, val_dataset: GCDataset, train_steps: int, eval_interval: int, evaluate: Callable, config: ConfigDict, save_at_steps: list[int] = [], log_interval: int = 5000, eval_episodes: int = 20, log_dir: Path = Path("./logs"), seed: int = 0):
+def train(agent_class: Callable, env: gym.Env, train_dataset: GCDataset, val_dataset: GCDataset, train_steps: int, eval_at_steps: list[int], evaluate: Callable, config: ConfigDict, save_at_steps: list[int] = [], log_interval: int = 5000, eval_episodes: int = 20, log_dir: Path = Path("./logs"), seed: int = 0):
     """ Train Loop for a single configuration for n train_steps
     This code is adapted from [ogbench](https://github.com/seohongpark/ogbench)
 
@@ -65,7 +65,7 @@ def train(agent_class, env: gym.Env, train_dataset: GCDataset, val_dataset: GCDa
             train_logger.log(train_metrics, step=i)
 
         # Evaluate agent.
-        if i == 1 or i % eval_interval == 0:
+        if i in eval_at_steps:
             eval_agent = agent
             eval_metrics = {}
             overall_metrics = defaultdict(list)
