@@ -10,12 +10,28 @@ from datetime import datetime
 from pathlib import Path
 from collections import defaultdict
 from ml_collections import ConfigDict
-from typing import Callable
+from typing import Callable, Any
+from .util.data import EvaluationResult
 import os
+import warnings
 
 
-def train(agent_class: Callable, env: gym.Env, train_dataset: GCDataset, val_dataset: GCDataset, train_steps: int, eval_at_steps: list[int], evaluate: Callable, config: ConfigDict, save_at_steps: list[int] = [], log_interval: int = 5000, eval_episodes: int = 20, log_dir: Path = Path("./logs"), seed: int = 0):
-    """ Train Loop for a single configuration for n train_steps
+def train(
+    agent_class: Callable[[Any, gym.Env, int], EvaluationResult],
+    env: gym.Env,
+    train_dataset: GCDataset,
+    val_dataset: GCDataset,
+    train_steps: int,
+    eval_at_steps: list[int],
+    evaluate: Callable,
+    config: ConfigDict,
+    save_at_steps: list[int] = [],
+    log_interval: int = 5000,
+    eval_episodes: int = 20,
+    log_dir: Path = Path("./logs"),
+    seed: int = 0,
+) -> tuple[list[dict], list[Path]]:
+    """Train Loop for a single configuration for n train_steps
     This code is adapted from [ogbench](https://github.com/seohongpark/ogbench)
 
     Args:
@@ -29,15 +45,15 @@ def train(agent_class: Callable, env: gym.Env, train_dataset: GCDataset, val_dat
     np.random.seed(seed)
 
     example_batch = train_dataset.sample(1)
-    if config['discrete']:
+    if config["discrete"]:
         # Fill with the maximum action to let the agent know the action space size.
-        example_batch['actions'] = np.full_like(example_batch['actions'], env.action_space.n - 1)  # type: ignore
+        example_batch["actions"] = np.full_like(example_batch["actions"], env.action_space.n - 1)  # type: ignore
 
     # [TODO: implement restoring trained agents when starting next phase]
     agent = agent_class.create(
         seed,
-        example_batch['observations'],
-        example_batch['actions'],
+        example_batch["observations"],
+        example_batch["actions"],
         config,
     )
 
@@ -49,18 +65,20 @@ def train(agent_class: Callable, env: gym.Env, train_dataset: GCDataset, val_dat
     last_time = time.time()
     for i in tqdm.tqdm(range(1, train_steps + 1), smoothing=0.1, dynamic_ncols=True):
         # Update agent.
-        batch = train_dataset.sample(config['batch_size'])
+        batch = train_dataset.sample(config["batch_size"])
         agent, update_info = agent.update(batch)
 
         # Log metrics.
         if i % log_interval == 0 or i == 1:
-            train_metrics = {f'training/{k}': v for k, v in update_info.items()}
+            train_metrics = {f"training/{k}": v for k, v in update_info.items()}
             if val_dataset is not None:
-                val_batch = val_dataset.sample(config['batch_size'])
+                val_batch = val_dataset.sample(config["batch_size"])
                 _, val_info = agent.total_loss(val_batch, grad_params=None)
-                train_metrics.update({f'validation/{k}': v for k, v in val_info.items()})
-            train_metrics['time/epoch_time'] = (time.time() - last_time) / log_interval
-            train_metrics['time/total_time'] = time.time() - first_time
+                train_metrics.update(
+                    {f"validation/{k}": v for k, v in val_info.items()}
+                )
+            train_metrics["time/epoch_time"] = (time.time() - last_time) / log_interval
+            train_metrics["time/total_time"] = time.time() - first_time
             last_time = time.time()
             train_logger.log(train_metrics, step=i)
 
@@ -69,7 +87,7 @@ def train(agent_class: Callable, env: gym.Env, train_dataset: GCDataset, val_dat
             eval_agent = agent
             eval_metrics = {}
             overall_metrics = defaultdict(list)
-            task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, 'task_infos') else env.task_infos  # type: ignore
+            task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, "task_infos") else env.task_infos  # type: ignore
             num_tasks = len(task_infos)
             eval_info, eval_metrics, trajs, renders = evaluate(
                 eval_agent,
@@ -89,3 +107,8 @@ def train(agent_class: Callable, env: gym.Env, train_dataset: GCDataset, val_dat
 
     train_logger.close()
     eval_logger.close()
+
+    warnings.warn(
+        "The return values of the train function are not yet implemented and only return placeholders"
+    )
+    return [], []
