@@ -45,6 +45,7 @@
           pythonPackages.python
           pythonPackages.venvShellHook
           pythonPackages.mujoco
+          pythonPackages.black
           glxinfo
           hatch
           stdenv.cc
