@@ -11,7 +11,6 @@ if __name__ == "__main__":
     env, train_dataset, val_dataset = ogbench.make_env_and_datasets("humanoidmaze-large-navigate-v0")  # type: ignore
     train_steps = 1000
     eval_at_steps = [500]
-    evaluate = lambda a, b, c: ([], {}, [], [])
     config = get_config()
     save_at_steps = [500]
 
@@ -24,7 +23,9 @@ if __name__ == "__main__":
         config=config,
         train_steps=train_steps,
         eval_at_steps=eval_at_steps,
-        evaluate=evaluate,
+        evaluate=evaluate_wrapper,
         save_at_steps=save_at_steps,
-        eval_episodes=1
+        eval_episodes=1,
     )
+    print(evaluation_results)
+    print(models)
