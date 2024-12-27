@@ -14,6 +14,7 @@ from typing import Callable, Any, Optional
 from .util.data import EvaluationResult, restore_agent
 import os
 import warnings
+from typing import Any
 
 
 def train(
@@ -24,7 +25,7 @@ def train(
     val_dataset: GCDataset,
     train_steps: int,
     eval_at_steps: list[int],
-    evaluate: Callable,
+    evaluate: Callable[[Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]],
     config: ConfigDict,
     save_at_steps: list[int] = [],
     log_interval: int = 5000,
@@ -88,7 +89,6 @@ def train(
         # Evaluate agent.
         if i in eval_at_steps:
             eval_agent = agent
-            eval_metrics = {}
             overall_metrics = defaultdict(list)
             task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, "task_infos") else env.task_infos  # type: ignore
             num_tasks = len(task_infos)
@@ -96,6 +96,7 @@ def train(
                 eval_agent,
                 env,
                 eval_episodes,
+                config,
             )
 
             if len(renders) > 0:

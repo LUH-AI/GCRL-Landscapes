@@ -1,4 +1,5 @@
 from training import train
+from evaluate import evaluate_wrapper
 import ogbench
 from ogbench.impls.utils.datasets import GCDataset, Dataset
 from ogbench.impls.agents.crl import CRLAgent, get_config
@@ -25,4 +26,5 @@ if __name__ == "__main__":
         eval_at_steps=eval_at_steps,
         evaluate=evaluate,
         save_at_steps=save_at_steps,
+        eval_episodes=1
     )
