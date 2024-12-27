@@ -11,7 +11,7 @@ from pathlib import Path
 from collections import defaultdict
 from ml_collections import ConfigDict
 from typing import Callable, Any, Optional
-from .util.data import EvaluationResult, restore_agent
+from util.data import EvaluationResult, restore_agent
 import os
 import warnings
 from typing import Any
@@ -25,7 +25,9 @@ def train(
     val_dataset: GCDataset,
     train_steps: int,
     eval_at_steps: list[int],
-    evaluate: Callable[[Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]],
+    evaluate: Callable[
+        [Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]
+    ],
     config: ConfigDict,
     save_at_steps: list[int] = [],
     log_interval: int = 5000,
