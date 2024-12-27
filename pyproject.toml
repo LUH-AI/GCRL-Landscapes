@@ -26,6 +26,7 @@ classifiers = [
 ]
 dependencies = [
   "gymnasium",
+  "gymnasium[mujoco]",
   "ogbench @ git+https://github.com/CrunchyFlakes/ogbench",
   "tqdm",
   "flax>=0.8.4",
