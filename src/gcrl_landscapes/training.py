@@ -63,6 +63,8 @@ def train(
     if agent_path:
         agent = restore_agent(agent, agent_path)
 
+    metrics: list[dict[str, np.floating]] = []
+    agent_paths: list[Path] = []
     save_dir = log_dir / datetime.now().strftime("%Y-%m-%dT%H:%M")
     os.makedirs(save_dir)
     train_logger = CsvLogger(save_dir / "train_log.csv")
@@ -95,20 +97,19 @@ def train(
             task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, "task_infos") else env.task_infos  # type: ignore
             num_tasks = len(task_infos)
             eval_info, eval_metrics, trajs, renders = evaluate(
-                eval_agent,
-                env,
-                eval_episodes,
-                config,
+                eval_agent, env, eval_episodes, config, metrics=["success"]
             )
 
             if len(renders) > 0:
                 pass
                 # [TODO: pass to wandb]
 
+            metrics.append(eval_metrics)
             eval_logger.log(eval_metrics, step=i)
 
         # Save agent.
         if i in save_at_steps:
+            agent_paths.append(save_dir / f"agent_{i}.pkl")
             save_agent(agent, save_dir, i)
 
     train_logger.close()
@@ -117,4 +118,4 @@ def train(
     warnings.warn(
         "The return values of the train function are not yet implemented and only return placeholders"
     )
-    return [], []
+    return metrics, agent_paths
