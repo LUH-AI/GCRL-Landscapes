@@ -1,20 +1,69 @@
 import tqdm
 import numpy as np
 from ogbench.impls.utils.datasets import GCDataset
-from ogbench.impls.utils.log_utils import CsvLogger, setup_wandb, get_wandb_video
+from ogbench.impls.utils.log_utils import CsvLogger
 from ogbench.impls.utils.flax_utils import save_agent
 import gymnasium as gym
 import random
 import time
 from datetime import datetime
 from pathlib import Path
-from collections import defaultdict
 from ml_collections import ConfigDict
 from typing import Callable, Any, Optional
 from util.data import EvaluationResult, restore_agent
 import os
 import warnings
-from typing import Any
+
+
+def run_phase(
+    configs: list[ConfigDict],
+    phase_steps: int,
+    agent_class: Callable[[Any, gym.Env, int], EvaluationResult],
+    agent_path: Optional[Path],
+    env: gym.Env,
+    train_dataset: GCDataset,
+    val_dataset: GCDataset,
+    train_steps: int,
+    eval_at_steps: list[int],
+    evaluate: Callable[
+        [Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]
+    ],
+    save_at_steps: list[int] = [],
+    log_interval: int = 5000,
+    eval_episodes: int = 20,
+    log_dir: Path = Path("./logs"),
+    seed: int = 0,
+) -> tuple[tuple[ConfigDict, Path], dict[ConfigDict, tuple[list[dict], list[Path]]]]:
+    if phase_steps not in eval_at_steps:
+        eval_at_steps.append(phase_steps)
+    if phase_steps not in save_at_steps:
+        save_at_steps.append(phase_steps)
+
+    results = {
+        config: train(
+            agent_class=agent_class,
+            agent_path=agent_path,
+            env=env,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            train_steps=train_steps,
+            eval_at_steps=eval_at_steps,
+            evaluate=evaluate,
+            config=config,
+            save_at_steps=save_at_steps,
+            log_interval=log_interval,
+            eval_episodes=eval_episodes,
+            log_dir=log_dir,
+            seed=seed,
+        )
+        for config in configs
+    }
+    # index 0 corresponds to returned metrics and index [-1] is the last evaluation, so the final metrics dict
+    best_config = max(results, key=lambda config: results[config][0][-1]["success"])
+    return (
+        best_config,
+        results[best_config][1][save_at_steps.index(phase_steps)],
+    ), results
 
 
 def train(
@@ -51,7 +100,9 @@ def train(
     example_batch = train_dataset.sample(1)
     if config["discrete"]:
         # Fill with the maximum action to let the agent know the action space size.
-        example_batch["actions"] = np.full_like(example_batch["actions"], env.action_space.n - 1)  # type: ignore
+        example_batch["actions"] = np.full_like(
+            example_batch["actions"], env.action_space.n - 1
+        )  # type: ignore
 
     # [TODO: implement restoring trained agents when starting next phase]
     agent = agent_class.create(
@@ -93,9 +144,6 @@ def train(
         # Evaluate agent.
         if i in eval_at_steps:
             eval_agent = agent
-            overall_metrics = defaultdict(list)
-            task_infos = env.unwrapped.task_infos if hasattr(env.unwrapped, "task_infos") else env.task_infos  # type: ignore
-            num_tasks = len(task_infos)
             eval_info, eval_metrics, trajs, renders = evaluate(
                 eval_agent, env, eval_episodes, config, metrics=["success"]
             )
