@@ -58,6 +58,10 @@
           venvShellHook
           tkinter
         ]);
+        nativeBuildInputs = (with pkgs; [
+            ruff
+            pre-commit
+          ]);
       };
     });
 }
