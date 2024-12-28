@@ -23,7 +23,6 @@ def run_phase(
     env: gym.Env,
     train_dataset: GCDataset,
     val_dataset: GCDataset,
-    train_steps: int,
     eval_at_steps: list[int],
     evaluate: Callable[
         [Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]
@@ -34,6 +33,27 @@ def run_phase(
     log_dir: Path = Path("./logs"),
     seed: int = 0,
 ) -> tuple[tuple[ConfigDict, Path], dict[ConfigDict, tuple[list[dict], list[Path]]]]:
+    """Run a single phase of the training. Return best configuration from that phase
+
+    Args:
+        configs: Configurations to test
+        phase_steps: How many steps this phase has (for saving of model)
+        agent_class: Class to create agent with
+        agent_path: Checkpoint to load from (None if starting from scratch)
+        env: gymnasium environment
+        train_dataset: offline dataset to train on
+        val_dataset: offline dataset to validate on
+        eval_at_steps: list of at which steps to evaluate
+        evaluate: Function to evaluate agent. Although not in type hint, has to support optional parameter `metrics`
+        save_at_steps: list of steps at which to save agent
+        log_interval: how often to log training metrics
+        eval_episodes: how many episodes to evaluate
+        log_dir: where to save logs
+        seed: seed for training
+
+    Returns:
+        first entry is the best configuration with the path to its checkpoint at phase_steps, second entry is all results for all configurations
+    """
     if phase_steps not in eval_at_steps:
         eval_at_steps.append(phase_steps)
     if phase_steps not in save_at_steps:
@@ -46,7 +66,6 @@ def run_phase(
             env=env,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            train_steps=train_steps,
             eval_at_steps=eval_at_steps,
             evaluate=evaluate,
             config=config,
@@ -72,7 +91,6 @@ def train(
     env: gym.Env,
     train_dataset: GCDataset,
     val_dataset: GCDataset,
-    train_steps: int,
     eval_at_steps: list[int],
     evaluate: Callable[
         [Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]
@@ -84,14 +102,25 @@ def train(
     log_dir: Path = Path("./logs"),
     seed: int = 0,
 ) -> tuple[list[dict], list[Path]]:
-    """Train Loop for a single configuration for n train_steps
+    """Train Loop for a single configuration
     This code is adapted from [ogbench](https://github.com/seohongpark/ogbench)
 
     Args:
-        agent_class: ogbench agent class. Does not have a proper type hint but inherits from flax.struct.PyTreeNode
-        train_dataset: The dataset to train with (offline RL)
-        train_steps: for how many steps to train
-        config: The configuration to train with. Should match the agent
+        agent_class: Class to create agent with
+        agent_path: Checkpoint to load from (None if starting from scratch)
+        env: gymnasium environment
+        train_dataset: offline dataset to train on
+        val_dataset: offline dataset to validate on
+        eval_at_steps: list of at which steps to evaluate
+        evaluate: Function to evaluate agent. Although not in type hint, has to support optional parameter `metrics`
+        save_at_steps: list of steps at which to save agent
+        log_interval: how often to log training metrics
+        eval_episodes: how many episodes to evaluate
+        log_dir: where to save logs
+        seed: seed for training
+
+    Returns:
+        list of evaluation metrics and list of corresponding agent checkpoints, corresponding to eval_at_steps and save_at_steps
     """
     # Initialize agent.
     random.seed(seed)
@@ -122,7 +151,11 @@ def train(
     eval_logger = CsvLogger(save_dir / "eval_log.csv")
     first_time = time.time()
     last_time = time.time()
-    for i in tqdm.tqdm(range(1, train_steps + 1), smoothing=0.1, dynamic_ncols=True):
+    for i in tqdm.tqdm(
+        range(1, max(eval_at_steps + save_at_steps) + 1),
+        smoothing=0.1,
+        dynamic_ncols=True,
+    ):
         # Update agent.
         batch = train_dataset.sample(config["batch_size"])
         agent, update_info = agent.update(batch)
