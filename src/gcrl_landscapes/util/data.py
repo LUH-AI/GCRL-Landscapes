@@ -1,7 +1,7 @@
 import flax
 from pathlib import Path
 import pickle
-from ml_collections import ConfigDict
+from ml_collections import FrozenConfigDict
 from typing import Generic, TypeVar, Any
 
 type EvalTrajectory = tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path]]
@@ -18,8 +18,14 @@ class EvaluationResult:
     def __init__(self, success: float, metrics: dict[str, float], info: dict[str, Any]):
         self.success = success
 
+    def __repr__(self):
+        return self.__str__()
 
-type PhaseResult = dict[ConfigDict, EvalTrajectory]
+    def __str__(self):
+        return f"success: {self.success}"
+
+
+type PhaseResult = dict[FrozenConfigDict, EvalTrajectory]
 
 
 def restore_agent(agent, path: Path):
