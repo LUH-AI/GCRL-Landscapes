@@ -38,7 +38,7 @@ def full_phased_run(
     eval_episodes: int = 20,
     log_dir: Path = Path("./logs"),
     seed: int = 0,
-):
+) -> ResultsPerStep[PhaseResult]:
     # basically partial function application, but without the need of proper ordering
     def run_phase_configured(
         phase_step: int, already_trained_steps: int, agent_path: Optional[Path]
@@ -75,9 +75,8 @@ def full_phased_run(
         collector[phase_step] = results
         return (phase_step, best_config[1]), collector
 
-    results: ResultsPerStep[PhaseResult] = ResultsPerStep()
     # Pass 'None' to randomly initialize agent, Type hint does not work here properly as it expects the result of the function passed to result
-    _, results = reduce(run_phase_and_collect, phase_steps, [(0, None), results])
+    return reduce(run_phase_and_collect, phase_steps, [(0, None), ResultsPerStep()])[1]
 
 
 def run_phase(
