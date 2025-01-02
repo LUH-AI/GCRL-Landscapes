@@ -1,8 +1,9 @@
-from training import train
+from training import full_phased_run
 from evaluate import evaluate_wrapper
 import ogbench
 from ogbench.impls.utils.datasets import GCDataset, Dataset
 from ogbench.impls.agents.crl import CRLAgent, get_config
+from ml_collections import FrozenConfigDict
 
 if __name__ == "__main__":
     # [TODO: make this configurable by argument parser or loop over multiple setups]
@@ -16,16 +17,16 @@ if __name__ == "__main__":
     config = get_config()
     save_at_steps = [500]
 
-    evaluation_results, models = train(
-        agent_class=agent_class,
-        agent_path=None,
+    results_per_phase = full_phased_run(
+        phase_steps=[10, 20, 30, 40, 100],
+        configs=[FrozenConfigDict(config)],
+        agent_class=CRLAgent,  # type: ignore # types of ogbench are not properly defined
         env=env,
         train_dataset=GCDataset(Dataset.create(**train_dataset), config),
         val_dataset=GCDataset(Dataset.create(**val_dataset), config),
-        config=config,
-        train_steps=train_steps,
-        eval_at_steps=eval_at_steps,
+        eval_at_steps=[10, 20, 30, 40, 50, 100],
         evaluate=evaluate_wrapper,
-        save_at_steps=save_at_steps,
-        eval_episodes=1,
+        save_at_steps=[10, 20, 30, 40, 100],
+        eval_episodes=2,
     )
+    print(results_per_phase)
