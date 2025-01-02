@@ -18,6 +18,7 @@ import warnings
 def run_phase(
     configs: list[ConfigDict],
     phase_steps: int,
+    already_trained_steps: int,
     agent_class: Callable[[Any, gym.Env, int], EvaluationResult],
     agent_path: Optional[Path],
     env: gym.Env,
@@ -54,10 +55,8 @@ def run_phase(
     Returns:
         first entry is the best configuration with the path to its checkpoint at phase_steps, second entry is all results for all configurations
     """
-    if phase_steps not in eval_at_steps:
-        eval_at_steps.append(phase_steps)
-    if phase_steps not in save_at_steps:
-        save_at_steps.append(phase_steps)
+    assert phase_steps in eval_at_steps and phase_steps in save_at_steps
+    assert phase_steps > already_trained_steps
 
     results = {
         config: train(
@@ -66,10 +65,10 @@ def run_phase(
             env=env,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            eval_at_steps=eval_at_steps,
+            eval_at_steps=(np.array(eval_at_steps) - already_trained_steps).tolist(),
             evaluate=evaluate,
             config=config,
-            save_at_steps=save_at_steps,
+            save_at_steps=(np.array(save_at_steps) - already_trained_steps).tolist(),
             log_interval=log_interval,
             eval_episodes=eval_episodes,
             log_dir=log_dir,
