@@ -8,7 +8,9 @@ if __name__ == "__main__":
     # [TODO: make this configurable by argument parser or loop over multiple setups]
     # this is only an exemplary setup to test data collection
     agent_class = CRLAgent
-    env, train_dataset, val_dataset = ogbench.make_env_and_datasets("humanoidmaze-large-navigate-v0")  # type: ignore
+    env, train_dataset, val_dataset = ogbench.make_env_and_datasets(
+        "humanoidmaze-large-navigate-v0"
+    )  # type: ignore
     train_steps = 1000
     eval_at_steps = [500]
     config = get_config()
@@ -27,5 +29,3 @@ if __name__ == "__main__":
         save_at_steps=save_at_steps,
         eval_episodes=1,
     )
-    print(evaluation_results)
-    print(models)
