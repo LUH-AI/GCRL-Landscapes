@@ -122,8 +122,6 @@ def run_phase(
     """
     assert phase_steps in eval_at_steps and phase_steps in save_at_steps
     assert phase_steps > already_trained_steps
-    assert np.all(np.array(eval_at_steps) - already_trained_steps > 0)
-    assert np.all(np.array(save_at_steps) - already_trained_steps > 0)
 
     results = {
         config: train(
