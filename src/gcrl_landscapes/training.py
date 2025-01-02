@@ -10,9 +10,74 @@ from datetime import datetime
 from pathlib import Path
 from ml_collections import ConfigDict
 from typing import Callable, Any, Optional
-from util.data import EvaluationResult, EvalTrajectory, restore_agent, ResultsPerStep
+from util.data import (
+    EvaluationResult,
+    EvalTrajectory,
+    PhaseResult,
+    restore_agent,
+    ResultsPerStep,
+)
 import os
 import warnings
+from functools import reduce
+
+
+def full_phased_run(
+    phase_steps: list[int],
+    configs: list[ConfigDict],
+    agent_class: Callable[[Any, gym.Env, int], Any],
+    env: gym.Env,
+    train_dataset: GCDataset,
+    val_dataset: GCDataset,
+    eval_at_steps: list[int],
+    evaluate: Callable[
+        [Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]
+    ],
+    save_at_steps: list[int] = [],
+    log_interval: int = 5000,
+    eval_episodes: int = 20,
+    log_dir: Path = Path("./logs"),
+    seed: int = 0,
+):
+    # basically partial function application, but without the need of proper ordering
+    def run_phase_configured(
+        phase_step: int, already_trained_steps: int, agent_path: Optional[Path]
+    ) -> tuple[tuple[ConfigDict, Path], PhaseResult]:
+        return run_phase(
+            configs=configs,
+            phase_steps=phase_step,
+            already_trained_steps=already_trained_steps,
+            agent_class=agent_class,
+            agent_path=agent_path,
+            env=env,
+            train_dataset=train_dataset,
+            val_dataset=val_dataset,
+            eval_at_steps=eval_at_steps,
+            evaluate=evaluate,
+            save_at_steps=save_at_steps,
+            log_interval=log_interval,
+            eval_episodes=eval_episodes,
+            log_dir=log_dir,
+            seed=seed,
+        )
+
+    def run_phase_and_collect(
+        agentstate_and_collector: tuple[
+            tuple[int, Optional[Path]], ResultsPerStep[PhaseResult]
+        ],
+        phase_step: int,
+    ) -> tuple[tuple[int, Path], ResultsPerStep[PhaseResult]]:
+        (already_trained_steps, agent_path), collector = agentstate_and_collector
+        best_config, results = run_phase_configured(
+            phase_step, already_trained_steps, agent_path
+        )
+        # [TODO: confirm that we dont use the final reward here]
+        collector[phase_step] = results
+        return (phase_step, best_config[1]), collector
+
+    results: ResultsPerStep[PhaseResult] = ResultsPerStep()
+    # Pass 'None' to randomly initialize agent, Type hint does not work here properly as it expects the result of the function passed to result
+    _, results = reduce(run_phase_and_collect, phase_steps, [(0, None), results])
 
 
 def run_phase(
@@ -33,7 +98,7 @@ def run_phase(
     eval_episodes: int = 20,
     log_dir: Path = Path("./logs"),
     seed: int = 0,
-) -> tuple[tuple[ConfigDict, Path], dict[ConfigDict, tuple[list[dict], list[Path]]]]:
+) -> tuple[tuple[ConfigDict, Path], PhaseResult]:
     """Run a single phase of the training. Return best configuration from that phase
 
     Args:
