@@ -8,7 +8,7 @@ import random
 import time
 from datetime import datetime
 from pathlib import Path
-from ml_collections import ConfigDict
+from ml_collections import FrozenConfigDict
 from typing import Callable, Any, Optional
 from util.data import (
     EvaluationResult,
@@ -23,14 +23,15 @@ from functools import reduce
 
 def full_phased_run(
     phase_steps: list[int],
-    configs: list[ConfigDict],
+    configs: list[FrozenConfigDict],
     agent_class: Callable[[Any, gym.Env, int], Any],
     env: gym.Env,
     train_dataset: GCDataset,
     val_dataset: GCDataset,
     eval_at_steps: list[int],
     evaluate: Callable[
-        [Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]
+        [Any, gym.Env, int, FrozenConfigDict],
+        tuple[list, dict[str, np.floating], list, list],
     ],
     save_at_steps: list[int] = [],
     log_interval: int = 5000,
@@ -41,7 +42,7 @@ def full_phased_run(
     # basically partial function application, but without the need of proper ordering
     def run_phase_configured(
         phase_step: int, already_trained_steps: int, agent_path: Optional[Path]
-    ) -> tuple[tuple[ConfigDict, Path], PhaseResult]:
+    ) -> tuple[tuple[FrozenConfigDict, Path], PhaseResult]:
         return run_phase(
             configs=configs,
             phase_steps=phase_step,
@@ -79,7 +80,7 @@ def full_phased_run(
 
 
 def run_phase(
-    configs: list[ConfigDict],
+    configs: list[FrozenConfigDict],
     phase_steps: int,
     already_trained_steps: int,
     agent_class: Callable[[Any, gym.Env, int], Any],
@@ -89,14 +90,15 @@ def run_phase(
     val_dataset: GCDataset,
     eval_at_steps: list[int],
     evaluate: Callable[
-        [Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]
+        [Any, gym.Env, int, FrozenConfigDict],
+        tuple[list, dict[str, np.floating], list, list],
     ],
     save_at_steps: list[int] = [],
     log_interval: int = 5000,
     eval_episodes: int = 20,
     log_dir: Path = Path("./logs"),
     seed: int = 0,
-) -> tuple[tuple[ConfigDict, Path], PhaseResult]:
+) -> tuple[tuple[FrozenConfigDict, Path], PhaseResult]:
     """Run a single phase of the training. Return best configuration from that phase
 
     Args:
@@ -128,10 +130,11 @@ def run_phase(
             env=env,
             train_dataset=train_dataset,
             val_dataset=val_dataset,
-            eval_at_steps=(np.array(eval_at_steps) - already_trained_steps).tolist(),
+            already_trained_steps=already_trained_steps,
+            eval_at_steps=eval_at_steps,
             evaluate=evaluate,
             config=config,
-            save_at_steps=(np.array(save_at_steps) - already_trained_steps).tolist(),
+            save_at_steps=save_at_steps,
             log_interval=log_interval,
             eval_episodes=eval_episodes,
             log_dir=log_dir,
@@ -155,11 +158,13 @@ def train(
     env: gym.Env,
     train_dataset: GCDataset,
     val_dataset: GCDataset,
+    already_trained_steps: int,
     eval_at_steps: list[int],
     evaluate: Callable[
-        [Any, gym.Env, int, ConfigDict], tuple[list, dict[str, np.floating], list, list]
+        [Any, gym.Env, int, FrozenConfigDict],
+        tuple[list, dict[str, np.floating], list, list],
     ],
-    config: ConfigDict,
+    config: FrozenConfigDict,
     save_at_steps: list[int] = [],
     log_interval: int = 5000,
     eval_episodes: int = 20,
@@ -216,7 +221,7 @@ def train(
     first_time = time.time()
     last_time = time.time()
     for i in tqdm.tqdm(
-        range(1, max(eval_at_steps + save_at_steps) + 1),
+        range(already_trained_steps, max(eval_at_steps + save_at_steps) + 1),
         smoothing=0.1,
         dynamic_ncols=True,
     ):
@@ -256,7 +261,7 @@ def train(
 
         # Save agent.
         if i in save_at_steps:
-            agent_paths[i] = save_dir / f"agent_{i}.pkl"
+            agent_paths[i] = save_dir / f"params_{i}.pkl"
             save_agent(agent, save_dir, i)
 
     train_logger.close()
