@@ -33,6 +33,7 @@ dependencies = [
   "numpy",
   "jax[cuda12]",
   "wandb",
+  "scipy",
 ]
 
 [project.urls]
