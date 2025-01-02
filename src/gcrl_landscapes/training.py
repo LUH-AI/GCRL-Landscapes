@@ -35,7 +35,7 @@ def full_phased_run(
     ],
     save_at_steps: list[int] = [],
     log_interval: int = 5000,
-    eval_episodes: int = 20,
+    eval_episodes: int = 50,
     log_dir: Path = Path("./logs"),
     seed: int = 0,
 ) -> ResultsPerStep[PhaseResult]:
