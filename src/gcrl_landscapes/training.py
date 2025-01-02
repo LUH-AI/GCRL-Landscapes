@@ -26,8 +26,8 @@ def full_phased_run(
     configs: list[FrozenConfigDict],
     agent_class: Callable[[Any, gym.Env, int], Any],
     env: gym.Env,
-    train_dataset: GCDataset,
-    val_dataset: GCDataset,
+    train_datasets: list[GCDataset],
+    val_datasets: list[GCDataset],
     eval_at_steps: list[int],
     evaluate: Callable[
         [Any, gym.Env, int, FrozenConfigDict],
@@ -50,8 +50,8 @@ def full_phased_run(
             agent_class=agent_class,
             agent_path=agent_path,
             env=env,
-            train_dataset=train_dataset,
-            val_dataset=val_dataset,
+            train_datasets=train_datasets,
+            val_datasets=val_datasets,
             eval_at_steps=eval_at_steps,
             evaluate=evaluate,
             save_at_steps=save_at_steps,
@@ -86,8 +86,8 @@ def run_phase(
     agent_class: Callable[[Any, gym.Env, int], Any],
     agent_path: Optional[Path],
     env: gym.Env,
-    train_dataset: GCDataset,
-    val_dataset: GCDataset,
+    train_datasets: list[GCDataset],
+    val_datasets: list[GCDataset],
     eval_at_steps: list[int],
     evaluate: Callable[
         [Any, gym.Env, int, FrozenConfigDict],
@@ -140,7 +140,9 @@ def run_phase(
             log_dir=log_dir,
             seed=seed,
         )
-        for config in configs
+        for config, train_dataset, val_dataset in zip(
+            configs, train_datasets, val_datasets
+        )
     }
     # index 0 corresponds to returned metrics, then get final evaluation
     best_config = max(
