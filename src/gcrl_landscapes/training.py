@@ -18,7 +18,6 @@ from util.data import (
     ResultsPerStep,
 )
 import os
-import warnings
 from functools import reduce
 
 
@@ -263,7 +262,4 @@ def train(
     train_logger.close()
     eval_logger.close()
 
-    warnings.warn(
-        "The return values of the train function are not yet implemented and only return placeholders"
-    )
     return metrics, agent_paths
