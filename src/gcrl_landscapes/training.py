@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from ml_collections import ConfigDict
 from typing import Callable, Any, Optional
-from util.data import EvaluationResult, restore_agent
+from util.data import EvaluationResult, EvalTrajectory, restore_agent, ResultsPerStep
 import os
 import warnings
 
@@ -19,7 +19,7 @@ def run_phase(
     configs: list[ConfigDict],
     phase_steps: int,
     already_trained_steps: int,
-    agent_class: Callable[[Any, gym.Env, int], EvaluationResult],
+    agent_class: Callable[[Any, gym.Env, int], Any],
     agent_path: Optional[Path],
     env: gym.Env,
     train_dataset: GCDataset,
@@ -57,6 +57,8 @@ def run_phase(
     """
     assert phase_steps in eval_at_steps and phase_steps in save_at_steps
     assert phase_steps > already_trained_steps
+    assert np.all(np.array(eval_at_steps) - already_trained_steps > 0)
+    assert np.all(np.array(save_at_steps) - already_trained_steps > 0)
 
     results = {
         config: train(
@@ -76,16 +78,18 @@ def run_phase(
         )
         for config in configs
     }
-    # index 0 corresponds to returned metrics and index [-1] is the last evaluation, so the final metrics dict
-    best_config = max(results, key=lambda config: results[config][0][-1]["success"])
+    # index 0 corresponds to returned metrics, then get final evaluation
+    best_config = max(
+        results, key=lambda config: results[config][0].get_final_result().success
+    )
     return (
         best_config,
-        results[best_config][1][save_at_steps.index(phase_steps)],
+        results[best_config][1][phase_steps],
     ), results
 
 
 def train(
-    agent_class: Callable[[Any, gym.Env, int], EvaluationResult],
+    agent_class: Callable[[Any, gym.Env, int], Any],
     agent_path: Optional[Path],
     env: gym.Env,
     train_dataset: GCDataset,
@@ -100,7 +104,7 @@ def train(
     eval_episodes: int = 20,
     log_dir: Path = Path("./logs"),
     seed: int = 0,
-) -> tuple[list[dict], list[Path]]:
+) -> EvalTrajectory:
     """Train Loop for a single configuration
     This code is adapted from [ogbench](https://github.com/seohongpark/ogbench)
 
@@ -142,8 +146,8 @@ def train(
     if agent_path:
         agent = restore_agent(agent, agent_path)
 
-    metrics: list[dict[str, np.floating]] = []
-    agent_paths: list[Path] = []
+    metrics: ResultsPerStep[EvaluationResult] = ResultsPerStep()
+    agent_paths: ResultsPerStep[Path] = ResultsPerStep()
     save_dir = log_dir / datetime.now().strftime("%Y-%m-%dT%H:%M")
     os.makedirs(save_dir)
     train_logger = CsvLogger(save_dir / "train_log.csv")
@@ -184,12 +188,14 @@ def train(
                 pass
                 # [TODO: pass to wandb]
 
-            metrics.append(eval_metrics)
+            metrics[i] = EvaluationResult(
+                success=eval_metrics["success"], metrics=eval_metrics, info=eval_info
+            )
             eval_logger.log(eval_metrics, step=i)
 
         # Save agent.
         if i in save_at_steps:
-            agent_paths.append(save_dir / f"agent_{i}.pkl")
+            agent_paths[i] = save_dir / f"agent_{i}.pkl"
             save_agent(agent, save_dir, i)
 
     train_logger.close()
