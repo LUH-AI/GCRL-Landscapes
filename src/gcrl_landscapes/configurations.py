@@ -3,8 +3,9 @@ from scipy.stats.qmc import Sobol
 from math import log
 import ogbench.impls.agents.crl
 
-LEARNING_RATE_LOWER = 1e-4
-LEARNING_RATE_UPPER = 1e-1
+# [TODO: is it okay that this is different from the paper? With higher learning rates we get overflows]
+LEARNING_RATE_LOWER = 1e-6
+LEARNING_RATE_UPPER = 1e-3
 
 DISCOUNT_FACTOR_LOWER = 0.8
 DISCOUNT_FACTOR_UPPER = 0.99
