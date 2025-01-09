@@ -10,12 +10,12 @@ if __name__ == "__main__":
     # this is only an exemplary setup to test data collection
     agent_class = CRLAgent
     env, train_dataset, val_dataset = ogbench.make_env_and_datasets(
-        "humanoidmaze-large-navigate-v0"
+        "antmaze-medium-navigate-v0"
     )  # type: ignore
     configurations = generate_configurations_crl(128)
 
     results_per_phase = full_phased_run(
-        phase_steps=[10, 20],
+        phase_steps=[50000, 100000, 200000],
         configs=configurations,
         agent_class=CRLAgent,  # type: ignore # types of ogbench are not properly defined
         env=env,
@@ -27,9 +27,9 @@ if __name__ == "__main__":
             GCDataset(Dataset.create(**val_dataset), config)
             for config in configurations
         ],
-        eval_at_steps=[10, 20],
+        eval_at_steps=[10000, 50000, 100000, 200000, 500000],
         evaluate=evaluate_wrapper,
-        save_at_steps=[10, 20],
-        eval_episodes=2,
+        save_at_steps=[10000, 50000, 100000, 200000, 500000],
+        eval_episodes=10,
     )
     print(results_per_phase)
