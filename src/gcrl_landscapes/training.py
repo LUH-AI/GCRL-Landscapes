@@ -151,7 +151,7 @@ def run_phase(
     return (
         best_config,
         results[best_config][1][phase_steps],
-    ), results
+    ), PhaseResult(results)
 
 
 def train(
