@@ -11,6 +11,11 @@ DISCOUNT_FACTOR_LOWER = 0.8
 DISCOUNT_FACTOR_UPPER = 0.99
 
 
+def generate_configurations(n: int, agent: str) -> list[FrozenConfigDict]:
+    agent_config_generators = {"CRL": generate_configurations_crl}
+    return agent_config_generators[agent](n)
+
+
 def generate_configurations_crl(n: int) -> list[FrozenConfigDict]:
     ld_n = log(n, 2)
     if not ld_n.is_integer():
