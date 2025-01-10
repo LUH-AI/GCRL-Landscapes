@@ -7,6 +7,7 @@ from configurations import generate_configurations
 import argparse
 from datetime import datetime
 from pathlib import Path
+import json
 
 AGENT_CLASSES = {"CRL": CRLAgent}
 
@@ -53,4 +54,9 @@ if __name__ == "__main__":
         seed=args.seed,
         log_dir=log_dir,
     )
-    print(results_per_phase)
+
+    with open(log_dir / "results.json", "w") as f:
+        results_saveable = {
+            key: item.to_json() for key, item in results_per_phase.items()
+        }
+        json.dump(results_saveable, f)
