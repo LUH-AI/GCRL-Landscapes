@@ -32,20 +32,40 @@ class EvaluationResult:
 
 
 class PhaseResult(dict[FrozenConfigDict, EvalTrajectory]):
-    def to_json(self) -> str:
+    def to_dict(self) -> dict:
         def convert_evaluation_results(results: ResultsPerStep[EvaluationResult]):
             return {step: result.to_dict() for step, result in results.items()}
 
         def convert_paths(results: ResultsPerStep[Path]):
             return {step: str(path) for step, path in results.items()}
 
-        return json.dumps(
+        return {
+            config.to_json(): (
+                convert_evaluation_results(eval_trajectory[0]),
+                convert_paths(eval_trajectory[1]),
+            )
+            for config, eval_trajectory in self.items()
+        }
+
+    @classmethod
+    def from_dict(cls, raw_result: dict) -> "PhaseResult":
+        return PhaseResult(
             {
-                config.to_json(): (
-                    convert_evaluation_results(eval_trajectory[0]),
-                    convert_paths(eval_trajectory[1]),
+                FrozenConfigDict(json.loads(config)): (
+                    ResultsPerStep(
+                        {
+                            int(step): EvaluationResult(**result)
+                            for step, result in eval_trajectory[0].items()
+                        }
+                    ),
+                    ResultsPerStep(
+                        {
+                            int(step): Path(path)
+                            for step, path in eval_trajectory[1].items()
+                        }
+                    ),
                 )
-                for config, eval_trajectory in self.items()
+                for config, eval_trajectory in raw_result.items()
             }
         )
 
