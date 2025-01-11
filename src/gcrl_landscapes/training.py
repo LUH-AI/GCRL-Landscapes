@@ -223,7 +223,7 @@ def train(
     first_time = time.time()
     last_time = time.time()
     for i in tqdm.tqdm(
-        range(already_trained_steps, max(eval_at_steps + save_at_steps) + 1),
+        range(already_trained_steps + 1, max(eval_at_steps + save_at_steps) + 1),
         smoothing=0.1,
         dynamic_ncols=True,
     ):
