@@ -57,6 +57,6 @@ if __name__ == "__main__":
 
     with open(log_dir / "results.json", "w") as f:
         results_saveable = {
-            key: item.to_json() for key, item in results_per_phase.items()
+            key: item.to_dict() for key, item in results_per_phase.items()
         }
         json.dump(results_saveable, f)
