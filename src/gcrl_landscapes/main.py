@@ -2,14 +2,14 @@ from training import full_phased_run
 from evaluate import evaluate_wrapper
 import ogbench
 from ogbench.impls.utils.datasets import GCDataset, Dataset
-from ogbench.impls.agents.crl import CRLAgent
+from ogbench.impls.agents import CRLAgent, CMDAgent
 from configurations import generate_configurations
 import argparse
 from datetime import datetime
 from pathlib import Path
 import json
 
-AGENT_CLASSES = {"CRL": CRLAgent}
+AGENT_CLASSES = {"CRL": CRLAgent, "CMD": CMDAgent}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -37,7 +37,7 @@ if __name__ == "__main__":
     results_per_phase = full_phased_run(
         phase_steps=args.phase_steps,
         configs=configurations,
-        agent_class=CRLAgent,  # type: ignore # types of ogbench are not properly defined
+        agent_class=AGENT_CLASSES[args.agent],  # type: ignore # types of ogbench are not properly defined
         env=env,
         train_datasets=[
             GCDataset(Dataset.create(**train_dataset), config)
