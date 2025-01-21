@@ -2,14 +2,14 @@ from training import full_phased_run
 from evaluate import evaluate_wrapper
 import ogbench
 from ogbench.impls.utils.datasets import GCDataset, Dataset
-from ogbench.impls.agents import CRLAgent, CMDAgent
+from ogbench.impls.agents import CRLAgent, CMDAgent, SACAgent
 from configurations import generate_configurations
 import argparse
 from datetime import datetime
 from pathlib import Path
 import json
 
-AGENT_CLASSES = {"CRL": CRLAgent, "CMD": CMDAgent}
+AGENT_CLASSES = {"CRL": CRLAgent, "CMD": CMDAgent, "SAC": SACAgent}
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
