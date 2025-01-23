@@ -43,6 +43,7 @@ dependencies = [
   "gymnasium",
   "huggingface_hub",
   "seaborn",
+  "pandas",
 ]
 
 [project.urls]

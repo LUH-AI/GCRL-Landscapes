@@ -4,6 +4,7 @@ import pickle
 from ml_collections import FrozenConfigDict
 from typing import Generic, TypeVar, Any
 import json
+import pandas as pd
 
 type EvalTrajectory = tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path]]
 
@@ -75,3 +76,36 @@ def restore_agent(agent, path: Path):
         load_dict = pickle.load(f)
 
     return flax.serialization.from_state_dict(agent, load_dict["agent"])
+
+
+def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFrame:
+    df = pd.DataFrame()
+    # results are unpacked here until every step has a column, all hyperparameters have a column and the performance has a column
+    for phase_step, result in results.items():
+        for config, eval_trajectory in result.items():
+            for eval_step, (eval_result, path) in {
+                eval_step: (
+                    eval_trajectory[0][eval_step],
+                    eval_trajectory[1][eval_step],
+                )
+                for eval_step in eval_trajectory[0].keys()
+            }.items():  # In EvalTrajectory both ResultsPerStep have the same keys
+                new_df = pd.DataFrame.from_dict(
+                    {
+                        "phase": phase_step,
+                        "eval_step": eval_step,
+                        "success": eval_result.success,
+                        "path": str(path),
+                    }
+                    | {
+                        f"hp.{key}": [
+                            value,
+                        ]
+                        for key, value in config.to_dict().items()
+                    }
+                )
+                df = pd.concat(
+                    [df, new_df],
+                    ignore_index=True,
+                )
+    return df
