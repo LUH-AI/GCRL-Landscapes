@@ -1,9 +1,10 @@
-# +----------------------------------------------------------------------------------------------------------------------------------------------+
-# | The following code is taken from https://colab.research.google.com/drive/1VjWng8KeGiW1RnsU6FYriaxAOxkBooXc?usp=sharing#scrollTo=81Mam8kV7ksN |
-# | and was created by Aditya Mohan (https://amsks.github.io/)                                                                                   |
-# +----------------------------------------------------------------------------------------------------------------------------------------------+
+# +-----------------------------------------------------------------------------------------------------------------------------------------------------+
+# | The following code is mostly taken from https://colab.research.google.com/drive/1VjWng8KeGiW1RnsU6FYriaxAOxkBooXc?usp=sharing#scrollTo=81Mam8kV7ksN |
+# | and was created by Aditya Mohan (https://amsks.github.io/)                                                                                          |
+# +-----------------------------------------------------------------------------------------------------------------------------------------------------+
 
 import numpy as np
+from tqdm.notebook import tqdm
 import matplotlib.pyplot as plt
 from pathlib import Path
 import pandas as pd
@@ -13,7 +14,6 @@ from sklearn.model_selection import KFold
 from sklearn.metrics import mean_absolute_error, mean_squared_error
 from scipy.stats import trim_mean
 from ConfigSpace import ConfigurationSpace, Float, Categorical
-from arlbench.core.algorithms import DQN, PPO, SAC
 from autorl_landscape.visualize import (
     LEGEND_FSIZE,
     TITLE_FSIZE,
@@ -231,3 +231,34 @@ class TripleGPModel(BaseEstimator):
         plt.ylabel(self.y_col)
         plt.legend()
         plt.show()
+
+def create_contour_plot(model, x_dim, y_dim, z_dim, env, algo, filename, grid_length=51):
+    # Generate a finer grid for contour plot
+    x = np.linspace(model.x[:, x_dim].min(), model.x[:, x_dim].max(), grid_length)
+    y = np.linspace(model.x[:, y_dim].min(), model.x[:, y_dim].max(), grid_length)
+
+    X, Y = np.meshgrid(x, y)
+    Z = np.zeros_like(X)
+
+    for i in range(grid_length):
+        for j in range(grid_length):
+            point = np.zeros(model.x.shape[1])
+            point[x_dim] = X[i, j]
+            point[y_dim] = Y[i, j]
+            Z[i, j] = model.get_middle(point.reshape(1, -1))[0][0]
+
+    # Create contour plot
+    plt.figure(figsize=(8, 6))
+    contour = plt.contourf(X, Y, Z, levels=20, cmap="rocket")
+    plt.colorbar(contour)
+
+    # Mark the peaks and valleys
+    peaks = np.where(Z == Z.max())
+    valleys = np.where(Z == Z.min())
+    plt.scatter(X[peaks], Y[peaks], color='white', marker='^', s=100, edgecolor='black')  # Peaks
+    plt.scatter(X[valleys], Y[valleys], color='white', marker='v', s=100, edgecolor='black')  # Valleys
+
+    plt.xlabel(model.hp_names[x_dim].split('.')[-1], fontsize=18)
+    plt.ylabel(model.hp_names[y_dim].split('.')[-1], fontsize=18)
+    plt.title(f'{z_dim}', fontsize=18)
+    plt.savefig(filename)
