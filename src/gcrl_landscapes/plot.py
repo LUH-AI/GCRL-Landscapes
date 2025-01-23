@@ -2,6 +2,7 @@ import argparse
 from util.data import ResultsPerStep, PhaseResult
 import json
 from pathlib import Path
+from plots.triple_gp import TripleGPModel
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -17,3 +18,5 @@ if __name__ == "__main__":
             for step, result in results_raw.items()
         }
     )
+
+    model = TripleGPModel()
