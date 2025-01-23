@@ -240,12 +240,8 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, env, algo, filename, grid_le
     X, Y = np.meshgrid(x, y)
     Z = np.zeros_like(X)
 
-    for i in range(grid_length):
-        for j in range(grid_length):
-            point = np.zeros(model.x.shape[1])
-            point[x_dim] = X[i, j]
-            point[y_dim] = Y[i, j]
-            Z[i, j] = model.get_middle(point.reshape(1, -1))[0][0]
+    points = np.vstack([X.ravel(), Y.ravel()]).transpose()
+    Z = model.get_middle(points).reshape(X.shape)
 
     # Create contour plot
     plt.figure(figsize=(8, 6))
