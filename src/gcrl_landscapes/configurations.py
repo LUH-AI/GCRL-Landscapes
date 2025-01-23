@@ -1,4 +1,5 @@
 from ml_collections import FrozenConfigDict
+from ConfigSpace import ConfigurationSpace, Float
 from scipy.stats.qmc import Sobol
 from math import log
 import ogbench.impls.agents.crl
@@ -6,12 +7,25 @@ import ogbench.impls.agents.cmd
 import ogbench.impls.agents.gcbc
 import ogbench.impls.agents.qrl
 import ogbench.impls.agents.hiql
+import warnings
 
 LEARNING_RATE_LOWER = 1e-6
 LEARNING_RATE_UPPER = 1e-3
 
 DISCOUNT_FACTOR_LOWER = 0.8
 DISCOUNT_FACTOR_UPPER = 0.99
+
+
+def get_config_space(agent: str) -> ConfigurationSpace:
+    warnings.warn("not fully implemented, returns the same for every agent")
+    return ConfigurationSpace(
+        {
+            "lr": Float("lr", (LEARNING_RATE_LOWER, LEARNING_RATE_UPPER)),
+            "discount": Float(
+                "discount", (DISCOUNT_FACTOR_LOWER, DISCOUNT_FACTOR_UPPER)
+            ),
+        }
+    )
 
 
 def generate_configurations(n: int, agent: str) -> list[FrozenConfigDict]:

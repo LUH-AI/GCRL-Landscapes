@@ -2,7 +2,10 @@ import argparse
 from util.data import ResultsPerStep, PhaseResult, phase_results_to_pandas
 import json
 from pathlib import Path
-from plots.triple_gp import TripleGPModel
+from plots.triple_gp import TripleGPModel, create_contour_plot
+import numpy as np
+from configurations import get_config_space
+import pandas as pd
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -19,6 +22,33 @@ if __name__ == "__main__":
         }
     )
 
-    df = phase_results_to_pandas(results)
+    results_pandas = phase_results_to_pandas(results)
+    hp_full_list = results_pandas.columns[results_pandas.columns.str.startswith("hp.")]
+    # keep only hyperparameters that are actually changed/do not stay constant
+    hp_list = hp_full_list[results_pandas[hp_full_list].nunique() > 1].tolist()
 
-    model = TripleGPModel()
+    for phase in results_pandas["phase"].unique():
+        phase_results = results_pandas[
+            (results_pandas["eval_step"] == results_pandas["eval_step"].max())
+            & (results_pandas["phase"] == phase)
+        ]
+        phase_results.loc[:, "run_id"], _ = pd.factorize(
+            phase_results["run_id"]
+        )  # TripleGPModel needs continuous run-ids starting at 0
+        model = TripleGPModel(
+            phase_results,
+            np.float64,
+            y_col="success",
+            hp_names=hp_list,
+            configspace=get_config_space(""),
+        )
+        model.fit()
+        create_contour_plot(
+            model,
+            x_dim=0,
+            y_dim=1,
+            z_dim="Eval Returns",
+            filename=f"{phase}_igpr.png",
+            env=None,
+            algo=None,
+        )
