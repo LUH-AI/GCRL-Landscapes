@@ -1,5 +1,5 @@
 import argparse
-from util.data import ResultsPerStep, PhaseResult
+from util.data import ResultsPerStep, PhaseResult, phase_results_to_pandas
 import json
 from pathlib import Path
 from plots.triple_gp import TripleGPModel
@@ -18,5 +18,7 @@ if __name__ == "__main__":
             for step, result in results_raw.items()
         }
     )
+
+    df = phase_results_to_pandas(results)
 
     model = TripleGPModel()
