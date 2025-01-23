@@ -29,13 +29,20 @@ dependencies = [
   "gymnasium[mujoco]",
   "ogbench @ git+https://github.com/CrunchyFlakes/ogbench",
   "tqdm",
-  "flax>=0.8.4",
+  "flax",
   "numpy",
   "jax[cuda12]",
   "wandb",
   "scipy",
   "GitPython",
   "toml",
+  "gpflow",
+  "ConfigSpace",
+  "autorl_landscape @ git+https://github.com/automl/AutoRL-Landscape.git",
+  "arlbench",
+  "gymnasium",
+  "huggingface_hub",
+  "seaborn",
 ]
 
 [project.urls]
@@ -74,3 +81,6 @@ exclude_lines = [
   "if __name__ == .__main__.:",
   "if TYPE_CHECKING:",
 ]
+
+[tool.ruff]
+extend-exclude = [ "src/gcrl_landscapes/plots/triple_gp.py", ]
