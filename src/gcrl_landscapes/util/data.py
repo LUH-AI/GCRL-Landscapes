@@ -81,6 +81,7 @@ def restore_agent(agent, path: Path):
 def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFrame:
     df = pd.DataFrame()
     # results are unpacked here until every step has a column, all hyperparameters have a column and the performance has a column
+    run_id = 0
     for phase_step, result in results.items():
         for config, eval_trajectory in result.items():
             for eval_step, (eval_result, path) in {
@@ -92,6 +93,7 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
             }.items():  # In EvalTrajectory both ResultsPerStep have the same keys
                 new_df = pd.DataFrame.from_dict(
                     {
+                        "run_id": run_id,
                         "phase": phase_step,
                         "eval_step": eval_step,
                         "success": eval_result.success,
@@ -108,4 +110,5 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
                     [df, new_df],
                     ignore_index=True,
                 )
+            run_id += 1  # every configuration per phase has a distinct run_id
     return df
