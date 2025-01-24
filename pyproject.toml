@@ -34,6 +34,8 @@ dependencies = [
   "jax[cuda12]",
   "wandb",
   "scipy",
+  "GitPython",
+  "toml",
 ]
 
 [project.urls]

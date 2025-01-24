@@ -8,6 +8,8 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 import json
+import git
+import toml
 
 AGENT_CLASSES = {
     "CRL": CRLAgent,
@@ -36,6 +38,16 @@ if __name__ == "__main__":
         f"{datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}_{args.agent}_{args.dataset}"
     )
     log_dir.mkdir(parents=True, exist_ok=True)
+
+    metadata = {
+        "arguments": args.__dict__,
+        "git": {
+            "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
+            "branch": git.Repo(".", search_parent_directories=True).active_branch.name,
+        },
+    }
+    with open(log_dir / "info.toml", "w") as f:
+        f.write(toml.dumps(metadata))
 
     env, train_dataset, val_dataset = ogbench.make_env_and_datasets(args.dataset)  # type: ignore
     configurations = generate_configurations(args.n_configurations, args.agent)

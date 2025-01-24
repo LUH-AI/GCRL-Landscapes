@@ -7,7 +7,6 @@ import ogbench.impls.agents.gcbc
 import ogbench.impls.agents.qrl
 import ogbench.impls.agents.hiql
 
-# [TODO: is it okay that this is different from the paper? With higher learning rates we get overflows]
 LEARNING_RATE_LOWER = 1e-6
 LEARNING_RATE_UPPER = 1e-3
 
