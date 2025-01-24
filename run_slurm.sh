@@ -10,6 +10,18 @@
 
 #SBATCH --mail-user=m.toepperwien@stud.uni-hannover.de
 #SBATCH --mail-type=FAIL,END
+
+if [ -z "$1" ]
+  then
+    echo "Agent empty"
+    exit 1
+fi
+if [ -z "$2" ]
+  then
+    echo "Dataset empty"
+    exit 1
+fi
+
 cd $SLURM_SUBMIT_DIR
 
 module load Miniforge3
@@ -20,4 +32,4 @@ conda activate /bigwork/nhwptopm/.conda/envs/gcrl
 
 export WANDB_MODE=offline
 
-bash /bigwork/nhwptopm/GCRL-Landscapes/train.sh CRL antmaze-medium-navigate-v0
+bash /bigwork/nhwptopm/GCRL-Landscapes/train.sh "$1" "$2"
