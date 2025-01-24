@@ -20,4 +20,4 @@ conda activate /bigwork/nhwptopm/.conda/envs/gcrl
 
 export WANDB_MODE=offline
 
-bash /bigwork/nhwptopm/GCRL-Landscapes/train.sh > log.txt
+bash /bigwork/nhwptopm/GCRL-Landscapes/train.sh CRL antmaze-medium-navigate-v0
