@@ -40,7 +40,6 @@ dependencies = [
   "ConfigSpace >= 1.2.1",
   "autorl_landscape @ git+https://github.com/automl/AutoRL-Landscape.git",
   "gymnasium",
-  "huggingface_hub",
   "seaborn",
   "pandas",
 ]
