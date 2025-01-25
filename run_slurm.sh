@@ -32,4 +32,4 @@ conda activate /bigwork/nhwptopm/.conda/envs/gcrl
 
 export WANDB_MODE=offline
 
-bash /bigwork/nhwptopm/GCRL-Landscapes/train.sh "$1" "$2"
+./train.sh "$1" "$2"
