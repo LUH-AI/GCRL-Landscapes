@@ -85,9 +85,12 @@ class TripleGPModel(BaseEstimator):
         self.dim_info = hp_names
         conf_groups = data.groupby(["run_id"] + hp_names)
         # all groups (configurations):
-        self.x = np.array(list(conf_groups.groups.keys()))[:, 1:]
+        self.x_unscaled = np.array(list(conf_groups.groups.keys()))[:, 1:]
         """(num_confs, num_ls_dims). LS dimensions are sorted by name"""
         # all evaluations (y values) for a group (configuration):
+        self.x_normalizing_offset = self.x_unscaled.min(axis=0)
+        self.x_normalizing_factor = self.x_unscaled.max(axis=0) - self.x_unscaled.min(axis=0)
+        self.x = self._scale_x(self.x_unscaled)
 
         y = np.concatenate(conf_groups[y_col].apply(list))
         y = np.array([np.array(ys) for ys in y])
@@ -153,18 +156,24 @@ class TripleGPModel(BaseEstimator):
                 print(c, data[c].mean(), data[c].std())
         return data
 
-    def get_upper(self, x, assimilate_factor: float = 1.0):
+    def _scale_x(self, x):
+        return (x - self.x_normalizing_offset) / self.x_normalizing_factor
+
+    def get_upper(self, x_unscaled, assimilate_factor: float = 1.0):
         """Return the upper CI estimate of y at the position(s) x."""
+        x = self._scale_x(x_unscaled)
         f_mean, _ = self.upper_model.predict_f(x)
         return self._ci_scale(x, f_mean.numpy(), assimilate_factor)
 
-    def get_middle(self, x):
+    def get_middle(self, x_unscaled):
         """Return the IQM estimate of y at the position(s) x."""
+        x = self._scale_x(x_unscaled)
         f_mean, _ = self.iqm_model.predict_f(x)
         return f_mean.numpy()
 
-    def get_lower(self, x, assimilate_factor: float = 1.0):
+    def get_lower(self, x_unscaled, assimilate_factor: float = 1.0):
         """Return the lower CI estimate of y at the position(s) x."""
+        x = self._scale_x(x_unscaled)
         f_mean, _ = self.lower_model.predict_f(x)
         return self._ci_scale(x, f_mean.numpy(), assimilate_factor)
 
@@ -234,8 +243,8 @@ class TripleGPModel(BaseEstimator):
 
 def create_contour_plot(model, x_dim, y_dim, z_dim, env, algo, filename, grid_length=51):
     # Generate a finer grid for contour plot
-    x = np.linspace(model.x[:, x_dim].min(), model.x[:, x_dim].max(), grid_length)
-    y = np.linspace(model.x[:, y_dim].min(), model.x[:, y_dim].max(), grid_length)
+    x = np.linspace(model.x_unscaled[:, x_dim].min(), model.x_unscaled[:, x_dim].max(), grid_length)
+    y = np.linspace(model.x_unscaled[:, y_dim].min(), model.x_unscaled[:, y_dim].max(), grid_length)
 
     X, Y = np.meshgrid(x, y)
     Z = np.zeros_like(X)
