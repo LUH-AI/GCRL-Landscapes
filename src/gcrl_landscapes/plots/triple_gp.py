@@ -4,31 +4,18 @@
 # +-----------------------------------------------------------------------------------------------------------------------------------------------------+
 
 import numpy as np
-from tqdm.notebook import tqdm
 import matplotlib.pyplot as plt
-from pathlib import Path
-import pandas as pd
 import gpflow
 from sklearn.base import BaseEstimator
-from sklearn.model_selection import KFold
-from sklearn.metrics import mean_absolute_error, mean_squared_error
 from scipy.stats import trim_mean
-from ConfigSpace import ConfigurationSpace, Float, Categorical
-from autorl_landscape.visualize import (
-    LEGEND_FSIZE,
-    TITLE_FSIZE,
-)
+from ConfigSpace import ConfigurationSpace, Float
 
-from matplotlib.gridspec import GridSpecFromSubplotSpec
-from itertools import zip_longest
 from pandas import DataFrame
 from autorl_landscape.analyze.visualization import Visualization
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
-from matplotlib.colors import BoundaryNorm, LinearSegmentedColormap, TwoSlopeNorm
-from matplotlib.gridspec import GridSpecFromSubplotSpec
 from pandas import DataFrame
 from sklearn.base import BaseEstimator
 
