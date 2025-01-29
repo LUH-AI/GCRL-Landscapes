@@ -62,7 +62,7 @@ def _generate_configurations(base_config: dict, n: int):
 
 def _generate_learning_rates(n: int) -> list[float]:
     return list(
-        Sobol(1).random_base2(round(log(n, 2)))[0]
+        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
         * (LEARNING_RATE_UPPER - LEARNING_RATE_LOWER)
         + LEARNING_RATE_LOWER
     )
@@ -70,7 +70,7 @@ def _generate_learning_rates(n: int) -> list[float]:
 
 def _generate_discount_factors(n: int) -> list[float]:
     return list(
-        Sobol(1).random_base2(round(log(n, 2)))[0]
+        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
         * (DISCOUNT_FACTOR_UPPER - DISCOUNT_FACTOR_LOWER)
         + DISCOUNT_FACTOR_LOWER
     )
