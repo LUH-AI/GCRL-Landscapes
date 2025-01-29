@@ -9,10 +9,10 @@ import pandas as pd
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--logfolder", type=str, required=True)
+    parser.add_argument("--logfolder", type=Path, required=True)
     args = parser.parse_args()
 
-    with open(Path(args.logfolder) / "results.json", "r") as f:
+    with open(args.logfolder / "results.json", "r") as f:
         results_raw = json.load(f)
 
     results: ResultsPerStep[PhaseResult] = ResultsPerStep(
@@ -48,7 +48,6 @@ if __name__ == "__main__":
             x_dim=0,
             y_dim=1,
             z_dim="Eval Returns",
-            filename=f"{phase}_igpr.png",
-            env=None,
-            algo=None,
+            bounds=[0, 1],
+            filename=args.logfolder / f"igpr_{phase}.png",
         )

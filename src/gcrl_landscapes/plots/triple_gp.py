@@ -228,7 +228,7 @@ class TripleGPModel(BaseEstimator):
         plt.legend()
         plt.show()
 
-def create_contour_plot(model, x_dim, y_dim, z_dim, env, algo, filename, grid_length=51):
+def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, grid_length=51):
     # Generate a finer grid for contour plot
     x = np.linspace(model.x_unscaled[:, x_dim].min(), model.x_unscaled[:, x_dim].max(), grid_length)
     y = np.linspace(model.x_unscaled[:, y_dim].min(), model.x_unscaled[:, y_dim].max(), grid_length)
@@ -241,7 +241,7 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, env, algo, filename, grid_le
 
     # Create contour plot
     plt.figure(figsize=(8, 6))
-    contour = plt.contourf(X, Y, Z, levels=20, cmap="rocket")
+    contour = plt.contourf(X, Y, Z, levels=20, cmap="rocket", vmin=bounds[0], vmax=bounds[1])
     plt.colorbar(contour)
 
     # Mark the peaks and valleys
