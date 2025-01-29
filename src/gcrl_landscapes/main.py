@@ -1,7 +1,7 @@
 from training import full_phased_run
 from evaluate import evaluate_wrapper
 import ogbench
-from ogbench.impls.utils.datasets import GCDataset, Dataset
+from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
 from ogbench.impls.agents import CRLAgent, CMDAgent, GCBCAgent, QRLAgent, HIQLAgent
 from configurations import generate_configurations
 import argparse
@@ -17,6 +17,13 @@ AGENT_CLASSES = {
     "GCBC": GCBCAgent,
     "QRL": QRLAgent,
     "HIQL": HIQLAgent,
+}
+DATASET_CLASSES = {
+    "CRL": GCDataset,
+    "CMD": GCDataset,
+    "GCBC": GCDataset,
+    "QRL": GCDataset,
+    "HIQL": HGCDataset,
 }
 
 if __name__ == "__main__":
@@ -58,11 +65,11 @@ if __name__ == "__main__":
         agent_class=AGENT_CLASSES[args.agent],  # type: ignore # types of ogbench are not properly defined
         env=env,
         train_datasets=[
-            GCDataset(Dataset.create(**train_dataset), config)
+            DATASET_CLASSES[args.agent](Dataset.create(**train_dataset), config)
             for config in configurations
         ],
         val_datasets=[
-            GCDataset(Dataset.create(**val_dataset), config)
+            DATASET_CLASSES[args.agent](Dataset.create(**val_dataset), config)
             for config in configurations
         ],
         eval_at_steps=args.eval_steps,
