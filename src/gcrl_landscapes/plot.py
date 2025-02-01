@@ -27,16 +27,24 @@ if __name__ == "__main__":
     # keep only hyperparameters that are actually changed/do not stay constant
     hp_list = hp_full_list[results_pandas[hp_full_list].nunique() > 1].tolist()
 
-    for phase in results_pandas["phase"].unique():
-        phase_results = results_pandas[
-            (results_pandas["eval_step"] == results_pandas["eval_step"].max())
-            & (results_pandas["phase"] == phase)
-        ]
-        phase_results.loc[:, "run_id"], _ = pd.factorize(
-            phase_results["run_id"]
+    phase_results = [
+        (
+            phase,
+            results_pandas[
+                (results_pandas["eval_step"] == results_pandas["eval_step"].max())
+                & (results_pandas["phase"] == phase)
+            ],
+        )
+        for phase in results_pandas["phase"].unique()
+    ]
+
+    for phase, phase_result in phase_results:
+        phase_result_copy = phase_result.copy()
+        phase_result_copy.loc[:, "run_id"], _ = pd.factorize(
+            phase_result_copy["run_id"]
         )  # TripleGPModel needs continuous run-ids starting at 0
         model = TripleGPModel(
-            phase_results,
+            phase_result_copy,
             np.float64,
             y_col="success",
             hp_names=hp_list,
