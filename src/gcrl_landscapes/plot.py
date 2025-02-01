@@ -31,7 +31,7 @@ if __name__ == "__main__":
         (
             phase,
             results_pandas[
-                (results_pandas["eval_step"] == results_pandas["eval_step"].max())
+                (results_pandas["eval_step"] == phase)
                 & (results_pandas["phase"] == phase)
             ],
         )
