@@ -91,6 +91,9 @@ class TripleGPModel(BaseEstimator):
             if configspace[hp_names[i].split(".")[-1]].__class__ == Float:
                 self.x[:, i] = (self.x[:, i] - configspace[hp_names[i]].lower) / (configspace[hp_names[i]].upper - configspace[hp_names[i]].lower)
         # scale y into [0, 1] interval:
+        self.y_normalizing_offset = y.min()
+        self.y_normalizing_factor = y.max() - y.min()
+        self.y_unscaled = y
         self.y = (y - y.min()) / (y.max() - y.min())
         """(num_confs, samples_per_conf)"""
 
@@ -146,6 +149,9 @@ class TripleGPModel(BaseEstimator):
     def _scale_x(self, x):
         return (x - self.x_normalizing_offset) / self.x_normalizing_factor
 
+    def _unscale_y(self, y):
+        return (y * self.y_normalizing_factor) + self.y_normalizing_offset
+
     def get_upper(self, x_unscaled, assimilate_factor: float = 1.0):
         """Return the upper CI estimate of y at the position(s) x."""
         x = self._scale_x(x_unscaled)
@@ -156,7 +162,7 @@ class TripleGPModel(BaseEstimator):
         """Return the IQM estimate of y at the position(s) x."""
         x = self._scale_x(x_unscaled)
         f_mean, _ = self.iqm_model.predict_f(x)
-        return f_mean.numpy()
+        return self._unscale_y(f_mean.numpy())
 
     def get_lower(self, x_unscaled, assimilate_factor: float = 1.0):
         """Return the lower CI estimate of y at the position(s) x."""
