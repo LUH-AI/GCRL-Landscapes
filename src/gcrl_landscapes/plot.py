@@ -6,6 +6,8 @@ from plots.triple_gp import TripleGPModel, create_contour_plot
 import numpy as np
 from configurations import get_config_space
 import pandas as pd
+import matplotlib.pyplot as plt
+from scipy.interpolate import griddata
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -59,3 +61,26 @@ if __name__ == "__main__":
             bounds=[0, 1],
             filename=args.logfolder / f"igpr_{phase}.png",
         )
+
+        # Create plot without using gaussian processes
+        plt.figure()
+        x_scaled = model.x
+        y_scaled = model.y.reshape(-1)
+
+        x0i_scaled, x1i_scaled = np.meshgrid(
+            np.linspace(x_scaled[:, 0].min(), x_scaled[:, 0].max(), 1000),
+            np.linspace(x_scaled[:, 1].min(), x_scaled[:, 1].max(), 1000),
+        )
+        yi_scaled = griddata(
+            (x_scaled[:, 0], x_scaled[:, 1]),
+            y_scaled,
+            (x0i_scaled, x1i_scaled),
+            method="nearest",
+        )
+        x0i = x0i_scaled * model.x_normalizing_factor[0] + model.x_normalizing_offset[0]
+        x1i = x1i_scaled * model.x_normalizing_factor[1] + model.x_normalizing_offset[1]
+        yi = model._unscale_y(yi_scaled)
+
+        c = plt.pcolormesh(x0i, x1i, yi, cmap="rocket", vmin=yi.min(), vmax=yi.max())
+        plt.colorbar(c, label="Success")
+        plt.savefig(args.logfolder / f"nearest_{phase}.png")

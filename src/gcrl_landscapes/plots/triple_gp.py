@@ -149,6 +149,9 @@ class TripleGPModel(BaseEstimator):
     def _scale_x(self, x):
         return (x - self.x_normalizing_offset) / self.x_normalizing_factor
 
+    def _unscale_x(self, x):
+        return x * self.x_normalizing_factor + self.x_normalizing_offset
+
     def _unscale_y(self, y):
         return (y * self.y_normalizing_factor) + self.y_normalizing_offset
 
