@@ -46,7 +46,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     log_dir = Path("./logs") / Path(
-        f"{datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}_{args.agent}_{args.dataset}"
+        f"{datetime.now().strftime('%Y-%m-%dT%H:%M:%S')}_{args.agent}_{args.dataset}_{'-'.join(sorted(args.hyperparameters))}"
     )
     log_dir.mkdir(parents=True, exist_ok=True)
 
