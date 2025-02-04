@@ -10,6 +10,9 @@ from pathlib import Path
 import json
 import git
 import toml
+import logging
+
+logger = logging.getLogger(__name__)
 
 AGENT_CLASSES = {
     "CRL": CRLAgent,
@@ -34,6 +37,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--dataset", required=True, type=str)
     parser.add_argument("--n_configurations", required=True, type=int)
+    parser.add_argument("--hyperparameters", type=str, nargs="+")
     parser.add_argument("--phase_steps", required=True, type=int, nargs="+")
     parser.add_argument("--eval_steps", required=True, type=int, nargs="+")
     parser.add_argument("--save_steps", required=False, type=int, nargs="+")
@@ -46,6 +50,8 @@ if __name__ == "__main__":
     )
     log_dir.mkdir(parents=True, exist_ok=True)
 
+    logging.basicConfig(filename=log_dir / "log.txt", level=logging.INFO)
+
     metadata = {
         "arguments": args.__dict__,
         "git": {
@@ -57,7 +63,9 @@ if __name__ == "__main__":
         f.write(toml.dumps(metadata))
 
     env, train_dataset, val_dataset = ogbench.make_env_and_datasets(args.dataset)  # type: ignore
-    configurations = generate_configurations(args.n_configurations, args.agent)
+    configurations = generate_configurations(
+        args.n_configurations, args.agent, set(args.hyperparameters)
+    )
 
     results_per_phase = full_phased_run(
         phase_steps=args.phase_steps,

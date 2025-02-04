@@ -10,6 +10,12 @@ if [ -z "$2" ]
     echo "Dataset empty"
     exit 1
 fi
+if [ -z "$3" ]
+  then
+    echo "no hyperparameters given"
+    exit 1
+fi
+
 
 # for running on cluster with nvidia gpus, use egl backend
 export MUJOCO_GL=egl
@@ -17,4 +23,4 @@ export MUJOCO_GL=egl
 # cache autotuning results to not having to recompile them on every run
 export JAX_COMPILATION_CACHE_DIR="/tmp/jax_cache"
 
-python src/gcrl_landscapes/main.py --agent "$1" --dataset "$2" --n_configurations 32 --phase_steps 50000 100000 150000 --eval_steps 10000 50000 100000 150000 200000 --eval_episodes 10
+python src/gcrl_landscapes/main.py --agent "$1" --dataset "$2" --n_configurations 32 --phase_steps 50000 100000 150000 --eval_steps 10000 50000 100000 150000 200000 --eval_episodes 10 --hyperparameters $3
