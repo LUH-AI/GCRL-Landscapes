@@ -21,6 +21,11 @@ if [ -z "$2" ]
     echo "Dataset empty"
     exit 1
 fi
+if [ -z "$3" ]
+  then
+    echo "no hyperparameters given"
+    exit 1
+fi
 
 cd $SLURM_SUBMIT_DIR
 
@@ -32,4 +37,4 @@ conda activate /bigwork/nhwptopm/.conda/envs/gcrl
 
 export WANDB_MODE=offline
 
-./train.sh "$1" "$2"
+./train.sh "$1" "$2" "$3"
