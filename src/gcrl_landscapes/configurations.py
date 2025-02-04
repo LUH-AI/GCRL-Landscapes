@@ -30,6 +30,7 @@ def get_config_space(agent: str) -> ConfigurationSpace:
             "discount": Float(
                 "discount", (DISCOUNT_FACTOR_LOWER, DISCOUNT_FACTOR_UPPER)
             ),
+            "actor_p_trajgoal": Float("actor_p_trajgoal", (0, 1)),
         }
     )
 
