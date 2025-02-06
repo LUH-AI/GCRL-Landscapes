@@ -25,19 +25,19 @@
         pythonPackages = pkgs.python312Packages;
       in pkgs.mkShell rec {
         venvDir = "./.venv";
-        NIX_LD_LIBRARY_PATH = lib.makeLibraryPath (with pkgs; [
-          stdenv.cc.cc.lib
-          stdenv.cc.cc
-          stdenv.cc
-          qt6.qtbase
-          qt6.qtsvg
-          qt6.qtdeclarative
-          qt6.qtwayland
-          libcxx
-          openssl
-          zlib
+        NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
+          pkgs.stdenv.cc.cc.lib
+          pkgs.stdenv.cc.cc
+          pkgs.stdenv.cc
+          pkgs.qt6.qtbase
+          pkgs.qt6.qtsvg
+          pkgs.qt6.qtdeclarative
+          pkgs.qt6.qtwayland
+          pkgs.libcxx
+          pkgs.openssl
+          pkgs.zlib
           libfolding
-        ]);
+        ];
         NIX_LD = pkgs.runCommand "ld.so" {} ''
           ln -s "$(cat '${pkgs.stdenv.cc}/nix-support/dynamic-linker')" $out
         '';
