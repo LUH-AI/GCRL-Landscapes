@@ -16,7 +16,7 @@
         inherit system;
       };
       lib = pkgs.lib;
-      libfolding_pkg = (import libfolding).packages.${system}.libfolding;
+      libfolding_pkg = libfolding.packages.${system}.libfolding;
     in {
       packages = flake-utils.lib.flattenTree {
         inherit (pkgs) hello;
@@ -37,6 +37,7 @@
           pkgs.libcxx
           pkgs.openssl
           pkgs.zlib
+          libfolding_pkg
         ];
         NIX_LD = pkgs.runCommand "ld.so" {} ''
           ln -s "$(cat '${pkgs.stdenv.cc}/nix-support/dynamic-linker')" $out
