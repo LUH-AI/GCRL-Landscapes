@@ -12,6 +12,7 @@ from scipy.interpolate import griddata
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--logfolder", type=Path, required=True)
+    parser.add_argument("--hp_list", nargs="+", type=str)
     args = parser.parse_args()
 
     with open(args.logfolder / "results.json", "r") as f:
@@ -27,7 +28,7 @@ if __name__ == "__main__":
     results_pandas = phase_results_to_pandas(results)
     hp_full_list = results_pandas.columns[results_pandas.columns.str.startswith("hp.")]
     # keep only hyperparameters that are actually changed/do not stay constant
-    hp_list = hp_full_list[results_pandas[hp_full_list].nunique() > 1].tolist()
+    assert all(hp in hp_full_list for hp in args.hp_list)
 
     phase_results = [
         (
@@ -49,7 +50,7 @@ if __name__ == "__main__":
             phase_result_copy,
             np.float64,
             y_col="success",
-            hp_names=hp_list,
+            hp_names=args.hp_list,
             configspace=get_config_space(""),
         )
         model.fit()
