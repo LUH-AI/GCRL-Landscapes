@@ -1,12 +1,14 @@
 {
   description = "Virtual Environment for Python";
   inputs.systems.url = "github:nix-systems/default";
+  inputs.libfolding.url = "github:CrunchyFlakes/libfolding_flake_nix";
 
   outputs = {
     self,
     nixpkgs,
     flake-utils,
     systems,
+    libfolding,
   }:
     flake-utils.lib.eachSystem (import systems)
     (system: let
@@ -34,6 +36,7 @@
           libcxx
           openssl
           zlib
+          libfolding
         ]);
         NIX_LD = pkgs.runCommand "ld.so" {} ''
           ln -s "$(cat '${pkgs.stdenv.cc}/nix-support/dynamic-linker')" $out
@@ -57,7 +60,7 @@
           python
           venvShellHook
           tkinter
-        ]);
+        ]) ++ [ libfolding ];
         nativeBuildInputs = (with pkgs; [
             ruff
             pre-commit
