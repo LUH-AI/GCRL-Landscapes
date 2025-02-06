@@ -41,11 +41,11 @@
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1738858141,
-        "narHash": "sha256-6+bAcg2uI/0RdDstCpfVhpe033ka9nK0jXh2hGx/T04=",
+        "lastModified": 1738860367,
+        "narHash": "sha256-a/oszVa9S5JXNmmA9JF5U7PGh4Sqp2zNa/Ble9QgrQU=",
         "owner": "CrunchyFlakes",
         "repo": "libfolding_flake_nix",
-        "rev": "71732356be7f05e6122e2e10e59b6735a39795b5",
+        "rev": "64eb13a6ad0d6ee12dc036bcac90772b49c58dbc",
         "type": "github"
       },
       "original": {
@@ -85,8 +85,8 @@
     "nixpkgs_2": {
       "locked": {
         "lastModified": 0,
-        "narHash": "sha256-F7thesZPvAMSwjRu0K8uFshTk3ZZSNAsXTIFvXBT+34=",
-        "path": "/nix/store/ljk3wvwqqzbmz0pys49ii18qmsi5aibc-source",
+        "narHash": "sha256-DjkQPnkAfd7eB522PwnkGhOMuT9QVCZspDpJJYyOj60=",
+        "path": "/nix/store/g3jyakqb3ipnr6gz5rw10fb17ckr2z00-source",
         "type": "path"
       },
       "original": {
