@@ -193,6 +193,7 @@ def train(
     Returns:
         list of evaluation metrics and list of corresponding agent checkpoints, corresponding to eval_at_steps and save_at_steps
     """
+    assert already_trained_steps == 0 or agent_path
     # Initialize agent.
     random.seed(seed)
     np.random.seed(seed)
