@@ -1,3 +1,8 @@
+# [TODO: do backend setting more cleanly]
+import os
+
+os.environ["MUJOCO_GL"] = "egl"
+
 from .training import train
 from .evaluate import evaluate_wrapper
 from ogbench import make_env_and_datasets
