@@ -6,7 +6,6 @@ from typing import Generic, TypeVar, Any
 import json
 import pandas as pd
 
-type EvalTrajectory = tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path]]
 
 T = TypeVar("T")
 
@@ -32,19 +31,37 @@ class EvaluationResult:
         return {"success": self.success, "metrics": self.metrics, "info": self.info}
 
 
-class PhaseResult(dict[FrozenConfigDict, EvalTrajectory]):
-    def to_dict(self) -> dict:
+class EvalTrajectory(tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path]]):
+    def to_json(self) -> str:
         def convert_evaluation_results(results: ResultsPerStep[EvaluationResult]):
             return {step: result.to_dict() for step, result in results.items()}
 
         def convert_paths(results: ResultsPerStep[Path]):
             return {step: str(path) for step, path in results.items()}
 
-        return {
-            config.to_json(): (
-                convert_evaluation_results(eval_trajectory[0]),
-                convert_paths(eval_trajectory[1]),
+        return json.dumps((convert_evaluation_results(self[0]), convert_paths(self[1])))
+
+    @classmethod
+    def from_json(cls, eval_trajectory: tuple[dict, dict]) -> "EvalTrajectory":
+        return EvalTrajectory(
+            (
+                ResultsPerStep(
+                    {
+                        int(step): EvaluationResult(**result)
+                        for step, result in eval_trajectory[0].items()
+                    }
+                ),
+                ResultsPerStep(
+                    {int(step): Path(path) for step, path in eval_trajectory[1].items()}
+                ),
             )
+        )
+
+
+class PhaseResult(dict[FrozenConfigDict, EvalTrajectory]):
+    def to_dict(self) -> dict:
+        return {
+            config.to_json(): eval_trajectory.to_json()
             for config, eval_trajectory in self.items()
         }
 
@@ -52,19 +69,8 @@ class PhaseResult(dict[FrozenConfigDict, EvalTrajectory]):
     def from_dict(cls, raw_result: dict) -> "PhaseResult":
         return PhaseResult(
             {
-                FrozenConfigDict(json.loads(config)): (
-                    ResultsPerStep(
-                        {
-                            int(step): EvaluationResult(**result)
-                            for step, result in eval_trajectory[0].items()
-                        }
-                    ),
-                    ResultsPerStep(
-                        {
-                            int(step): Path(path)
-                            for step, path in eval_trajectory[1].items()
-                        }
-                    ),
+                FrozenConfigDict(json.loads(config)): EvalTrajectory.from_json(
+                    eval_trajectory
                 )
                 for config, eval_trajectory in raw_result.items()
             }
