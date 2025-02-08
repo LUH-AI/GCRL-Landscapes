@@ -43,6 +43,7 @@ dependencies = [
   "seaborn",
   "pandas",
   "scikit-learn",
+  "submitit",
 ]
 
 [project.urls]

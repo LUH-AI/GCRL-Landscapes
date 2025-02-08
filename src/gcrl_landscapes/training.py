@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from ml_collections import FrozenConfigDict
 from typing import Callable, Any, Optional
-from util.data import (
+from .util.data import (
     EvaluationResult,
     EvalTrajectory,
     PhaseResult,

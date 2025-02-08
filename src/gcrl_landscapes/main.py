@@ -1,9 +1,9 @@
-from training import train
-from evaluate import evaluate_wrapper
-import ogbench
+from .training import train
+from .evaluate import evaluate_wrapper
+from ogbench import make_env_and_datasets
 from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
 from ogbench.impls.agents import CRLAgent, CMDAgent, GCBCAgent, QRLAgent, HIQLAgent
-from configurations import generate_configurations, get_config_space
+from .configurations import generate_configurations, get_config_space
 import argparse
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +12,8 @@ import git
 import toml
 import logging
 from ml_collections import FrozenConfigDict
+import submitit
+from itertools import product
 
 logger = logging.getLogger(__name__)
 
@@ -65,23 +67,35 @@ def run_setup(args: argparse.Namespace) -> None:
     return
 
 
-def run_config(args: argparse.Namespace) -> None:
-    assert args.phase == 0 or args.agent_path
+def run_config(
+    logdir: Path,
+    phase: int,
+    agent_path: Path | None,
+    configuration_index: int,
+    seed: int,
+) -> None:
+    assert phase == 0 or agent_path
 
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
     run_log_dir = (
-        args.logdir
+        logdir
         / "run_logs"
-        / f"configuration_{args.configuration}"
-        / f"phase_{args.phase}"
-        / f"seed_{args.seed}"
+        / f"configuration_{configuration_index}"
+        / f"phase_{phase}"
+        / f"seed_{seed}"
     )
     run_log_dir.mkdir(parents=True, exist_ok=False)
 
     # Log metadata to file
     metadata = {
-        "arguments": args.__dict__,
+        "arguments": {
+            "logdir": logdir,
+            "phase": phase,
+            "agent_path": agent_path,
+            "configuration_index": configuration_index,
+            "seed": seed,
+        },
         "git": {
             "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
             "branch": git.Repo(".", search_parent_directories=True).active_branch.name,
@@ -91,16 +105,16 @@ def run_config(args: argparse.Namespace) -> None:
     with open(run_log_dir / "info.toml", "w") as f:
         f.write(toml.dumps(metadata))
 
-    env, train_dataset, val_dataset = ogbench.make_env_and_datasets(setup["dataset"])  # type: ignore
+    env, train_dataset, val_dataset = make_env_and_datasets(setup["dataset"])  # type: ignore
 
     with open(
-        args.logdir / "configurations" / f"configuration_{args.configuration}.json", "r"
+        logdir / "configurations" / f"configuration_{configuration_index}.json", "r"
     ) as f:
         configuration = FrozenConfigDict(json.loads(f.read()))
 
     eval_trajectory = train(
         agent_class=AGENT_CLASSES[setup["agent"]],
-        agent_path=args.agent_path,
+        agent_path=agent_path,
         env=env,
         train_dataset=DATASET_CLASSES[setup["agent"]](
             Dataset.create(**train_dataset), configuration
@@ -108,7 +122,7 @@ def run_config(args: argparse.Namespace) -> None:
         val_dataset=DATASET_CLASSES[setup["agent"]](
             Dataset.create(**val_dataset), configuration
         ),
-        already_trained_steps=args.phase,
+        already_trained_steps=phase,
         eval_at_steps=setup["eval_steps"],
         evaluate=evaluate_wrapper,
         config=configuration,
@@ -117,11 +131,42 @@ def run_config(args: argparse.Namespace) -> None:
         else setup["eval_steps"],
         eval_episodes=setup["eval_episodes"],
         log_dir=run_log_dir,
-        seed=args.seed,
+        seed=seed,
     )
 
     with open(run_log_dir / "eval_trajectory.json", "w") as f:
         f.write(eval_trajectory.to_json())
+
+
+def submit(args: argparse.Namespace) -> None:
+    setup = toml.load(args.logdir / "info.toml")["arguments"]
+
+    configuration_indices = list(range(setup["n_configurations"]))
+    seeds = list(range(args.n_seeds))
+    arguments = product(
+        [args.logdir], [args.phase], [args.agent_path], configuration_indices, seeds
+    )
+
+    executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
+    executor.update_parameters(
+        cpus_per_task=10,
+        slurm_time=60,
+        slurm_num_gpus=1,
+        slurm_partition=args.partition,
+        slurm_mem="16G",
+        slurm_job_name="gcrl_submitit",
+        slurm_mail_user="m.toepperwien@stud.uni-hannover.de",
+        slurm_mail_type="BEGIN,FAIL,END",
+    )
+    executor.map_array(run_config, *zip(*arguments))
+
+    return
+
+
+def run_config_wrapper(args: argparse.Namespace) -> None:
+    return run_config(
+        args.logdir, args.phase, args.agent_path, args.configuration, args.seed
+    )
 
 
 if __name__ == "__main__":
@@ -147,6 +192,16 @@ if __name__ == "__main__":
     setup_subparser.add_argument("--logdir", type=Path, required=True)
     setup_subparser.set_defaults(func=run_setup)
 
+    # Setup slurm parsing
+    # Submits all jobs to slurm
+    slurm_subparser = subparsers.add_parser("submit")
+    slurm_subparser.add_argument("--logdir", type=Path, required=True)
+    slurm_subparser.add_argument("--phase", required=True, type=int)
+    slurm_subparser.add_argument("--agent_path", required=False, type=Path)
+    slurm_subparser.add_argument("--n_seeds", type=int, required=True)
+    slurm_subparser.add_argument("--partition", type=str, default="ai")
+    slurm_subparser.set_defaults(func=submit)
+
     # Run subcommand parsing
     # Runs a configuration and a seed
     run_subparser = subparsers.add_parser("run")
@@ -155,7 +210,7 @@ if __name__ == "__main__":
     run_subparser.add_argument("--agent_path", required=False, type=Path)
     run_subparser.add_argument("--configuration", required=True, type=int)
     run_subparser.add_argument("--seed", type=int, required=True)
-    run_subparser.set_defaults(func=run_config)
+    run_subparser.set_defaults(func=run_config_wrapper)
 
     args = parser.parse_args()
     args.func(args)
