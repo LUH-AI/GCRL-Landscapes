@@ -1,9 +1,9 @@
-from training import full_phased_run
+from training import train
 from evaluate import evaluate_wrapper
 import ogbench
 from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
 from ogbench.impls.agents import CRLAgent, CMDAgent, GCBCAgent, QRLAgent, HIQLAgent
-from configurations import generate_configurations
+from configurations import generate_configurations, get_config_space
 import argparse
 from datetime import datetime
 from pathlib import Path
@@ -11,6 +11,7 @@ import json
 import git
 import toml
 import logging
+from ml_collections import FrozenConfigDict
 
 logger = logging.getLogger(__name__)
 
@@ -29,67 +30,132 @@ DATASET_CLASSES = {
     "HIQL": HGCDataset,
 }
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    # [TODO: add all agents]
-    parser.add_argument(
-        "--agent", required=True, type=str, choices=list(AGENT_CLASSES.keys())
-    )
-    parser.add_argument("--dataset", required=True, type=str)
-    parser.add_argument("--n_configurations", required=True, type=int)
-    parser.add_argument("--hyperparameters", type=str, nargs="+")
-    parser.add_argument("--phase_steps", required=True, type=int, nargs="+")
-    parser.add_argument("--eval_steps", required=True, type=int, nargs="+")
-    parser.add_argument("--save_steps", required=False, type=int, nargs="+")
-    parser.add_argument("--eval_episodes", required=True, type=int)
-    parser.add_argument("--seed", type=int, default=0)
-    args = parser.parse_args()
 
-    log_dir = Path("./logs") / Path(
-        f"{datetime.now().strftime('%Y-%m-%dT%H-%M-%S')}_{args.agent}_{args.dataset}_{'-'.join(sorted(args.hyperparameters))}"
-    )
-    log_dir.mkdir(parents=True, exist_ok=True)
+def run_setup(args: argparse.Namespace) -> None:
+    args.logdir.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(filename=args.logdir / "log.txt", level=logging.INFO)
+    logging.info("Set up for later running")
 
-    logging.basicConfig(filename=log_dir / "log.txt", level=logging.INFO)
-
+    # Log metadata to file
     metadata = {
         "arguments": args.__dict__,
         "git": {
             "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
             "branch": git.Repo(".", search_parent_directories=True).active_branch.name,
         },
+        "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
     }
-    with open(log_dir / "info.toml", "w") as f:
+    with open(args.logdir / "info.toml", "w") as f:
         f.write(toml.dumps(metadata))
 
-    env, train_dataset, val_dataset = ogbench.make_env_and_datasets(args.dataset)  # type: ignore
+    # Save configurations
+    config_dir = args.logdir / "configurations"
+    config_dir.mkdir()
+
+    config_space = get_config_space(args.agent)
+    config_space.to_json(config_dir / "configspace.json")
+
     configurations = generate_configurations(
         args.n_configurations, args.agent, set(args.hyperparameters)
     )
+    for i, config in enumerate(configurations):
+        with open(config_dir / f"configuration_{i}.json", "w") as f:
+            f.write(config.to_json())
 
-    results_per_phase = full_phased_run(
-        phase_steps=args.phase_steps,
-        configs=configurations,
-        agent_class=AGENT_CLASSES[args.agent],  # type: ignore # types of ogbench are not properly defined
+    return
+
+
+def run_config(args: argparse.Namespace) -> None:
+    assert args.already_trained_steps == 0 or args.agent_path
+
+    run_log_dir = (
+        args.logdir
+        / "run_logs"
+        / f"configuration_{args.configuration}"
+        / f"phase_{args.already_trained_steps}"
+        / f"seed_{args.seed}"
+    )
+    run_log_dir.mkdir(parents=True, exist_ok=False)
+
+    # Log metadata to file
+    metadata = {
+        "arguments": args.__dict__,
+        "git": {
+            "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
+            "branch": git.Repo(".", search_parent_directories=True).active_branch.name,
+        },
+        "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+    }
+    with open(run_log_dir / "info.toml", "w") as f:
+        f.write(toml.dumps(metadata))
+
+    env, train_dataset, val_dataset = ogbench.make_env_and_datasets(args.dataset)  # type: ignore
+
+    with open(
+        args.logdir / "configurations" / f"configuration_{args.configuration}.json", "r"
+    ) as f:
+        configuration = FrozenConfigDict(json.loads(f.read()))
+
+    eval_trajectory = train(
+        agent_class=AGENT_CLASSES[args.agent],
+        agent_path=args.agent_path,
         env=env,
-        train_datasets=[
-            DATASET_CLASSES[args.agent](Dataset.create(**train_dataset), config)
-            for config in configurations
-        ],
-        val_datasets=[
-            DATASET_CLASSES[args.agent](Dataset.create(**val_dataset), config)
-            for config in configurations
-        ],
+        train_dataset=DATASET_CLASSES[args.agent](
+            Dataset.create(**train_dataset), configuration
+        ),
+        val_dataset=DATASET_CLASSES[args.agent](
+            Dataset.create(**val_dataset), configuration
+        ),
+        already_trained_steps=args.already_trained_steps,
         eval_at_steps=args.eval_steps,
         evaluate=evaluate_wrapper,
+        config=configuration,
         save_at_steps=args.save_steps if args.save_steps else args.eval_steps,
         eval_episodes=args.eval_episodes,
+        log_dir=run_log_dir,
         seed=args.seed,
-        log_dir=log_dir,
     )
 
-    with open(log_dir / "results.json", "w") as f:
-        results_saveable = {
-            key: item.to_dict() for key, item in results_per_phase.items()
-        }
-        json.dump(results_saveable, f)
+    with open(run_log_dir / "eval_trajectory.json", "w") as f:
+        f.write(eval_trajectory.to_json())
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    subparsers = parser.add_subparsers(required=True)
+
+    # Setup subcommand parsing
+    # Creates configurations and folder to log into
+    setup_subparser = subparsers.add_parser("setup")
+    setup_subparser.add_argument(
+        "--agent", required=True, type=str, choices=list(AGENT_CLASSES.keys())
+    )
+    setup_subparser.add_argument("--dataset", required=True, type=str)
+    setup_subparser.add_argument("--n_configurations", required=True, type=int)
+    setup_subparser.add_argument(
+        "--hyperparameters", required=True, type=str, nargs="+"
+    )
+    setup_subparser.add_argument("--seed", type=int, default=0)
+    setup_subparser.add_argument("--logdir", type=Path, required=True)
+    setup_subparser.set_defaults(func=run_setup)
+
+    # Run subcommand parsing
+    # Runs a configuration and a seed
+    run_subparser = subparsers.add_parser("run")
+    run_subparser.add_argument("--logdir", type=Path, required=True)
+    run_subparser.add_argument(
+        "--agent", required=True, type=str, choices=list(AGENT_CLASSES.keys())
+    )
+    run_subparser.add_argument("--already_trained_steps", required=True, type=int)
+    run_subparser.add_argument("--agent_path", required=False, type=Path)
+    run_subparser.add_argument("--dataset", required=True, type=str)
+    run_subparser.add_argument("--configuration", required=True, type=int)
+    run_subparser.add_argument("--hyperparameters", type=str, nargs="+")
+    run_subparser.add_argument("--eval_steps", required=True, type=int, nargs="+")
+    run_subparser.add_argument("--save_steps", required=False, type=int, nargs="+")
+    run_subparser.add_argument("--eval_episodes", required=True, type=int)
+    run_subparser.add_argument("--seed", type=int, required=True)
+    run_subparser.set_defaults(func=run_config)
+
+    args = parser.parse_args()
+    args.func(args)

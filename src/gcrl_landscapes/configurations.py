@@ -21,6 +21,8 @@ DISCOUNT_FACTOR_UPPER = 0.99
 
 SUPPORTED_HPS = set(["lr", "discount", "actor_p_trajgoal"])
 
+# [TODO: add seeding to configuration generation]
+
 
 def get_config_space(agent: str) -> ConfigurationSpace:
     warnings.warn("not fully implemented, returns the same for every agent")

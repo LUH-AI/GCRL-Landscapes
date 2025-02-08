@@ -269,4 +269,4 @@ def train(
     train_logger.close()
     eval_logger.close()
 
-    return metrics, agent_paths
+    return EvalTrajectory((metrics, agent_paths))
