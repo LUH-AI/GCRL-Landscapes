@@ -66,13 +66,15 @@ def run_setup(args: argparse.Namespace) -> None:
 
 
 def run_config(args: argparse.Namespace) -> None:
-    assert args.already_trained_steps == 0 or args.agent_path
+    assert args.phase == 0 or args.agent_path
+
+    setup = toml.load(args.logdir / "info.toml")["arguments"]
 
     run_log_dir = (
         args.logdir
         / "run_logs"
         / f"configuration_{args.configuration}"
-        / f"phase_{args.already_trained_steps}"
+        / f"phase_{args.phase}"
         / f"seed_{args.seed}"
     )
     run_log_dir.mkdir(parents=True, exist_ok=False)
@@ -89,7 +91,7 @@ def run_config(args: argparse.Namespace) -> None:
     with open(run_log_dir / "info.toml", "w") as f:
         f.write(toml.dumps(metadata))
 
-    env, train_dataset, val_dataset = ogbench.make_env_and_datasets(args.dataset)  # type: ignore
+    env, train_dataset, val_dataset = ogbench.make_env_and_datasets(setup["dataset"])  # type: ignore
 
     with open(
         args.logdir / "configurations" / f"configuration_{args.configuration}.json", "r"
@@ -97,21 +99,23 @@ def run_config(args: argparse.Namespace) -> None:
         configuration = FrozenConfigDict(json.loads(f.read()))
 
     eval_trajectory = train(
-        agent_class=AGENT_CLASSES[args.agent],
+        agent_class=AGENT_CLASSES[setup["agent"]],
         agent_path=args.agent_path,
         env=env,
-        train_dataset=DATASET_CLASSES[args.agent](
+        train_dataset=DATASET_CLASSES[setup["agent"]](
             Dataset.create(**train_dataset), configuration
         ),
-        val_dataset=DATASET_CLASSES[args.agent](
+        val_dataset=DATASET_CLASSES[setup["agent"]](
             Dataset.create(**val_dataset), configuration
         ),
-        already_trained_steps=args.already_trained_steps,
-        eval_at_steps=args.eval_steps,
+        already_trained_steps=args.phase,
+        eval_at_steps=setup["eval_steps"],
         evaluate=evaluate_wrapper,
         config=configuration,
-        save_at_steps=args.save_steps if args.save_steps else args.eval_steps,
-        eval_episodes=args.eval_episodes,
+        save_at_steps=setup["save_steps"]
+        if "save_steps" in setup
+        else setup["eval_steps"],
+        eval_episodes=setup["eval_episodes"],
         log_dir=run_log_dir,
         seed=args.seed,
     )
@@ -130,11 +134,15 @@ if __name__ == "__main__":
     setup_subparser.add_argument(
         "--agent", required=True, type=str, choices=list(AGENT_CLASSES.keys())
     )
+    setup_subparser.add_argument("--phases", required=True, type=int, nargs="+")
     setup_subparser.add_argument("--dataset", required=True, type=str)
     setup_subparser.add_argument("--n_configurations", required=True, type=int)
     setup_subparser.add_argument(
         "--hyperparameters", required=True, type=str, nargs="+"
     )
+    setup_subparser.add_argument("--eval_steps", required=True, type=int, nargs="+")
+    setup_subparser.add_argument("--save_steps", required=False, type=int, nargs="+")
+    setup_subparser.add_argument("--eval_episodes", required=True, type=int)
     setup_subparser.add_argument("--seed", type=int, default=0)
     setup_subparser.add_argument("--logdir", type=Path, required=True)
     setup_subparser.set_defaults(func=run_setup)
@@ -143,17 +151,9 @@ if __name__ == "__main__":
     # Runs a configuration and a seed
     run_subparser = subparsers.add_parser("run")
     run_subparser.add_argument("--logdir", type=Path, required=True)
-    run_subparser.add_argument(
-        "--agent", required=True, type=str, choices=list(AGENT_CLASSES.keys())
-    )
-    run_subparser.add_argument("--already_trained_steps", required=True, type=int)
+    run_subparser.add_argument("--phase", required=True, type=int)
     run_subparser.add_argument("--agent_path", required=False, type=Path)
-    run_subparser.add_argument("--dataset", required=True, type=str)
     run_subparser.add_argument("--configuration", required=True, type=int)
-    run_subparser.add_argument("--hyperparameters", type=str, nargs="+")
-    run_subparser.add_argument("--eval_steps", required=True, type=int, nargs="+")
-    run_subparser.add_argument("--save_steps", required=False, type=int, nargs="+")
-    run_subparser.add_argument("--eval_episodes", required=True, type=int)
     run_subparser.add_argument("--seed", type=int, required=True)
     run_subparser.set_defaults(func=run_config)
 
