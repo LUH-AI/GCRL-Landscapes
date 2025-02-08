@@ -204,7 +204,6 @@ def train(
             example_batch["actions"], env.action_space.n - 1
         )  # type: ignore
 
-    # [TODO: implement restoring trained agents when starting next phase]
     agent = agent_class.create(
         seed,
         example_batch["observations"],
