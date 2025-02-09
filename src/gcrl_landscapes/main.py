@@ -18,6 +18,8 @@ import toml
 import logging
 from ml_collections import FrozenConfigDict
 import submitit
+import signal
+import sys
 from itertools import product
 
 logger = logging.getLogger(__name__)
@@ -80,6 +82,13 @@ def run_config(
     seed: int,
 ) -> None:
     assert phase == 0 or agent_path
+
+    # submitit just bypasses SIGTERM although it should end the job, overwrite that behaviour here
+    def handler(signum, frame):
+        print(f"Received {signal.Signals(signum).name} ({signum}), stopping!")
+        sys.exit(1)
+
+    signal.signal(signal.SIGTERM, handler)
 
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
