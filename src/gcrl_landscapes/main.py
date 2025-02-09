@@ -176,7 +176,7 @@ def submit(args: argparse.Namespace) -> None:
         slurm_gpus_per_node=1,
         tasks_per_node=args.tasks_per_node,
         slurm_mem_per_cpu="1G",
-        slurm_array_parallelism=1,
+        slurm_array_parallelism=50,
         slurm_partition=args.partition,
         slurm_job_name="gcrl_submitit",
         slurm_mail_user="m.toepperwien@stud.uni-hannover.de",
