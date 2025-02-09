@@ -157,25 +157,51 @@ def submit(args: argparse.Namespace) -> None:
 
     configuration_indices = list(range(setup["n_configurations"]))
     seeds = list(range(args.n_seeds))
-    arguments = product(
+    argument_lines = product(
         [args.logdir], [args.phase], [args.agent_path], configuration_indices, seeds
     )
+    argument_columns = list(zip(*argument_lines))
+    chunked_arguments = [
+        [
+            argument_columns[column_idx][i : i + args.tasks_per_node]
+            for i in range(0, len(argument_columns[column_idx]), args.tasks_per_node)
+        ]
+        for column_idx in range(len(argument_columns))
+    ]
 
     executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
     executor.update_parameters(
         cpus_per_task=10,
-        slurm_time=120,
+        slurm_time=60,
         slurm_gpus_per_node=1,
-        slurm_ntasks_per_gpu=5,
+        tasks_per_node=args.tasks_per_node,
+        slurm_mem_per_cpu="1G",
+        slurm_array_parallelism=1,
         slurm_partition=args.partition,
-        slurm_mem="16G",
         slurm_job_name="gcrl_submitit",
         slurm_mail_user="m.toepperwien@stud.uni-hannover.de",
         slurm_mail_type="BEGIN,FAIL,END",
     )
-    executor.map_array(run_config, *zip(*arguments))
+    executor.map_array(run_config_slurm_tasks_wrapper, *chunked_arguments)
 
     return
+
+
+def run_config_slurm_tasks_wrapper(
+    logdirs: list[Path],
+    phases: list[int],
+    agent_paths: list[Path | None],
+    configuration_indices: list[int],
+    seeds: list[int],
+):
+    job_env = submitit.JobEnvironment()
+    print(f"There are {job_env.num_tasks} in this job")
+    print(f"I'm the task #{job_env.local_rank} on the node {job_env.node}")
+    print(f"I'm the task #{job_env.global_rank} in the job")
+    r = job_env.local_rank
+    return run_config(
+        logdirs[r], phases[r], agent_paths[r], configuration_indices[r], seeds[r]
+    )
 
 
 def run_config_wrapper(args: argparse.Namespace) -> None:
@@ -215,6 +241,7 @@ if __name__ == "__main__":
     slurm_subparser.add_argument("--agent_path", required=False, type=Path)
     slurm_subparser.add_argument("--n_seeds", type=int, required=True)
     slurm_subparser.add_argument("--partition", type=str, default="ai")
+    slurm_subparser.add_argument("--tasks_per_node", type=int, required=True)
     slurm_subparser.set_defaults(func=submit)
 
     # Run subcommand parsing
