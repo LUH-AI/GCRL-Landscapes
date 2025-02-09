@@ -21,7 +21,7 @@ fi
 export MUJOCO_GL=egl
 
 # cache autotuning results to not having to recompile them on every run
-export JAX_COMPILATION_CACHE_DIR="/tmp/jax_cache"
+export JAX_COMPILATION_CACHE_DIR="${BIGWORK}/jax_cache"
 
-python -m gcrl_landscapes.main setup --agent "$1" --dataset "$2" --n_configurations 32 --phases 50000 100000 150000 --eval_steps 10000 50000 100000 150000 200000 --eval_episodes 10 --hyperparameters "$3" --logdir "logs/2025-02-08-${1}-${2}-seeds_5-${3}-firsttry"
+python -m gcrl_landscapes.main setup --agent "$1" --dataset "$2" --n_configurations 32 --phases 50000 100000 150000 --eval_steps 10000 50000 100000 150000 200000 --eval_episodes 10 --hyperparameters $3 --logdir "logs/2025-02-08-${1}-${2}-seeds_5-${3}-firsttry"
 python -m gcrl_landscapes.main submit --logdir --logdir "logs/2025-02-08-${1}-${2}-seeds_5-${3}-firsttry" --phase 0 --n_seeds 5
