@@ -24,4 +24,4 @@ export MUJOCO_GL=egl
 export JAX_COMPILATION_CACHE_DIR="${BIGWORK}/jax_cache"
 
 python -m gcrl_landscapes.main setup --agent "$1" --dataset "$2" --n_configurations 32 --phases 50000 100000 150000 --eval_steps 10000 50000 100000 150000 200000 --eval_episodes 10 --hyperparameters $3 --logdir "logs/2025-02-08-${1}-${2}-seeds_5-${3}-firsttry"
-python -m gcrl_landscapes.main submit --logdir "logs/2025-02-08-${1}-${2}-seeds_5-${3}-firsttry" --phase 0 --n_seeds 5
+python -m gcrl_landscapes.main submit --logdir "logs/2025-02-08-${1}-${2}-seeds_5-${3}-firsttry" --phase 0 --n_seeds 5 --tasks_per_node 5
