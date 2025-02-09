@@ -171,11 +171,11 @@ def submit(args: argparse.Namespace) -> None:
 
     executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
     executor.update_parameters(
-        cpus_per_task=4,
+        cpus_per_task=8,
         slurm_time=60,
         slurm_gpus_per_node=1,
         tasks_per_node=args.tasks_per_node,
-        slurm_mem_per_cpu="4G",
+        slurm_mem_per_cpu="1G",
         slurm_array_parallelism=50,
         slurm_partition=args.partition,
         slurm_job_name="gcrl_submitit",
