@@ -217,13 +217,13 @@ def submit(args: argparse.Namespace) -> None:
     executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
     executor.update_parameters(
         cpus_per_task=8,
-        slurm_time=60,
+        slurm_time=60 * args.tasks_per_node,  # this overestimates, keep safety margin
         slurm_gpus_per_node=1,
         tasks_per_node=args.tasks_per_node,
         slurm_mem_per_cpu="1G",
         slurm_array_parallelism=50,
         slurm_partition=args.partition,
-        slurm_job_name="gcrl_submitit",
+        slurm_job_name=args.jobname,
         slurm_mail_user="m.toepperwien@stud.uni-hannover.de",
         slurm_mail_type="BEGIN,FAIL,END",
     )
@@ -309,6 +309,7 @@ if __name__ == "__main__":
     slurm_subparser.add_argument("--n_seeds", type=int, required=True)
     slurm_subparser.add_argument("--partition", type=str, default="ai")
     slurm_subparser.add_argument("--tasks_per_node", type=int, required=True)
+    slurm_subparser.add_argument("--jobname", required=True, type=str)
     slurm_subparser.set_defaults(func=submit)
 
     # Run subcommand parsing
