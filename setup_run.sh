@@ -26,4 +26,4 @@ fi
 # cache autotuning results to not having to recompile them on every run
 export JAX_COMPILATION_CACHE_DIR="${BIGWORK}/jax_cache"
 
-python -m gcrl_landscapes.main setup --agent "$1" --dataset "$2" --n_configurations  --phases 50000 100000 150000 --eval_steps 0 10000 50000 100000 150000 200000 --eval_episodes 20 --hyperparameters $3 --logdir "$4"
+python -m gcrl_landscapes.main setup --agent "$1" --dataset "$2" --n_configurations 32 --phases 50000 100000 150000 --eval_steps 0 10000 50000 100000 150000 200000 --eval_episodes 20 --hyperparameters $3 --logdir "$4"
