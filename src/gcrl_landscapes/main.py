@@ -82,9 +82,11 @@ def run_config(
 
     os.environ["MUJOCO_GL"] = "egl"
     # let jax only pre-allocate a fraction of gpus memory, so that all tasks on node can run
-    fraction_gpu_allocation = np.round(1/(tasks_per_node+1), 2)
+    fraction_gpu_allocation = np.round(1 / (tasks_per_node + 1), 2)
     fraction_only_decimal = f"{fraction_gpu_allocation}".split(".")[1]
-    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = f".{fraction_only_decimal}"  # one more task to leave some space in gpu ram
+    os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = (
+        f".{fraction_only_decimal}"  # one more task to leave some space in gpu ram
+    )
 
     from .training import train
     from .evaluate import evaluate_wrapper
@@ -196,7 +198,12 @@ def submit(args: argparse.Namespace) -> None:
     configuration_indices = list(range(setup["n_configurations"]))
     seeds = list(range(args.n_seeds))
     argument_lines = product(
-        [args.logdir], [args.phase], [args.agent_path], configuration_indices, seeds, [args.tasks_per_node]
+        [args.logdir],
+        [args.phase],
+        [args.agent_path],
+        configuration_indices,
+        seeds,
+        [args.tasks_per_node],
     )
     argument_columns = list(zip(*argument_lines))
     chunked_arguments = [
@@ -233,19 +240,40 @@ def run_config_slurm_tasks_wrapper(
     seeds: list[int],
     tasks_per_node: list[int],
 ):
+    assert (
+        len(logdirs)
+        == len(phases)
+        == len(agent_paths)
+        == len(configuration_indices)
+        == len(seeds)
+        == len(tasks_per_node)
+    )
     job_env = submitit.JobEnvironment()
     print(f"There are {job_env.num_tasks} in this job")
     print(f"I'm the task #{job_env.local_rank} on the node {job_env.node}")
     print(f"I'm the task #{job_env.global_rank} in the job")
     r = job_env.local_rank
+    if r >= len(logdirs):
+        print(f"Not enough jobs ({len(logdirs)}) for this node. Exiting ...")
+        sys.exit(0)
     return run_config(
-        logdirs[r], phases[r], agent_paths[r], configuration_indices[r], seeds[r], tasks_per_node[r]
+        logdirs[r],
+        phases[r],
+        agent_paths[r],
+        configuration_indices[r],
+        seeds[r],
+        tasks_per_node[r],
     )
 
 
 def run_config_wrapper(args: argparse.Namespace) -> None:
     return run_config(
-        args.logdir, args.phase, args.agent_path, args.configuration, args.seed, args.tasks_per_node
+        args.logdir,
+        args.phase,
+        args.agent_path,
+        args.configuration,
+        args.seed,
+        args.tasks_per_node,
     )
 
 
@@ -291,7 +319,12 @@ if __name__ == "__main__":
     run_subparser.add_argument("--agent_path", required=False, type=Path)
     run_subparser.add_argument("--configuration", required=True, type=int)
     run_subparser.add_argument("--seed", type=int, required=True)
-    run_subparser.add_argument("--tasks_per_node", type=int, default=1, help="Limits jax gpu pre-allocation in case of multiple jobs running")
+    run_subparser.add_argument(
+        "--tasks_per_node",
+        type=int,
+        default=1,
+        help="Limits jax gpu pre-allocation in case of multiple jobs running",
+    )
     run_subparser.set_defaults(func=run_config_wrapper)
 
     args = parser.parse_args()
