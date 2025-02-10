@@ -85,6 +85,18 @@ def run_config(
     from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
     from ogbench.impls.agents import CRLAgent, CMDAgent, GCBCAgent, QRLAgent, HIQLAgent
 
+    # check if running on gpu
+    import jax
+
+    def jax_has_gpu():
+        try:
+            _ = jax.device_put(jax.numpy.ones(1), device=jax.devices("gpu")[0])
+            return True
+        except:  # noqa: E722  # usually one should specify the error, here a catch all is enough
+            return False
+
+    print(f"Default backend: {jax.default_backend()}, running on gpu?: {jax_has_gpu()}")
+
     AGENT_CLASSES = {
         "CRL": CRLAgent,
         "CMD": CMDAgent,
