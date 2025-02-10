@@ -1,14 +1,5 @@
-# [TODO: do backend setting more cleanly]
-import os
+# A lot of the imports are lazy loaded. This is needed to prevent issues from coming up during submitit, as it will run on different hardware configurations
 
-os.environ["MUJOCO_GL"] = "egl"
-
-from .training import train
-from .evaluate import evaluate_wrapper
-from ogbench import make_env_and_datasets
-from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
-from ogbench.impls.agents import CRLAgent, CMDAgent, GCBCAgent, QRLAgent, HIQLAgent
-from .configurations import generate_configurations, get_config_space
 import argparse
 from datetime import datetime
 from pathlib import Path
@@ -24,23 +15,26 @@ from itertools import product
 
 logger = logging.getLogger(__name__)
 
+# None to allow for lazy loading of ogbench
 AGENT_CLASSES = {
-    "CRL": CRLAgent,
-    "CMD": CMDAgent,
-    "GCBC": GCBCAgent,
-    "QRL": QRLAgent,
-    "HIQL": HIQLAgent,
+    "CRL": None,
+    "CMD": None,
+    "GCBC": None,
+    "QRL": None,
+    "HIQL": None,
 }
 DATASET_CLASSES = {
-    "CRL": GCDataset,
-    "CMD": GCDataset,
-    "GCBC": GCDataset,
-    "QRL": GCDataset,
-    "HIQL": HGCDataset,
+    "CRL": None,
+    "CMD": None,
+    "GCBC": None,
+    "QRL": None,
+    "HIQL": None,
 }
 
 
 def run_setup(args: argparse.Namespace) -> None:
+    from .configurations import generate_configurations, get_config_space
+
     args.logdir.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=args.logdir / "log.txt", level=logging.INFO)
     logging.info("Set up for later running")
@@ -81,6 +75,31 @@ def run_config(
     configuration_index: int,
     seed: int,
 ) -> None:
+    # [TODO: do backend setting more cleanly]
+    import os
+
+    os.environ["MUJOCO_GL"] = "egl"
+    from .training import train
+    from .evaluate import evaluate_wrapper
+    from ogbench import make_env_and_datasets
+    from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
+    from ogbench.impls.agents import CRLAgent, CMDAgent, GCBCAgent, QRLAgent, HIQLAgent
+
+    AGENT_CLASSES = {
+        "CRL": CRLAgent,
+        "CMD": CMDAgent,
+        "GCBC": GCBCAgent,
+        "QRL": QRLAgent,
+        "HIQL": HIQLAgent,
+    }
+    DATASET_CLASSES = {
+        "CRL": GCDataset,
+        "CMD": GCDataset,
+        "GCBC": GCDataset,
+        "QRL": GCDataset,
+        "HIQL": HGCDataset,
+    }
+
     assert phase == 0 or agent_path
 
     # submitit just bypasses SIGTERM although it should end the job, overwrite that behaviour here
