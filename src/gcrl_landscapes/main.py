@@ -218,7 +218,7 @@ def submit(args: argparse.Namespace) -> None:
     executor.update_parameters(
         cpus_per_task=4,
         slurm_time=int(60 * args.tasks_per_node * ((200000 - args.phase) / 200000)),  # this overestimates, keep safety margin
-        slurm_gpus_per_node=8,
+        slurm_gpus_per_node=1,
         tasks_per_node=args.tasks_per_node,
         slurm_mem_per_cpu="1G",
         slurm_array_parallelism=50,
