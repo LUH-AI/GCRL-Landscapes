@@ -217,7 +217,7 @@ def train(
     metrics: ResultsPerStep[EvaluationResult] = ResultsPerStep()
     agent_paths: ResultsPerStep[Path] = ResultsPerStep()
     save_dir = log_dir
-    os.makedirs(save_dir)
+    os.makedirs(save_dir, exist_ok=True)
     train_logger = CsvLogger(save_dir / "train_log.csv")
     eval_logger = CsvLogger(save_dir / "eval_log.csv")
     first_time = time.time()
