@@ -130,7 +130,7 @@ def data_saving_wait(save_call: Callable):
     while save_tries < MAX_SAVE_TRIES:
         try:
             save_call()
-            break
+            return
         except Exception as e:
             error = e
             save_tries += 1
