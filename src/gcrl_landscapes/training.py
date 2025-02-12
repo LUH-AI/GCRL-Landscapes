@@ -6,7 +6,6 @@ from ogbench.impls.utils.flax_utils import save_agent
 import gymnasium as gym
 import random
 import time
-from datetime import datetime
 from pathlib import Path
 from ml_collections import FrozenConfigDict
 from typing import Callable, Any, Optional
@@ -20,7 +19,6 @@ from .util.data import (
 )
 import os
 from functools import reduce
-from time import sleep
 
 
 def full_phased_run(
@@ -214,7 +212,7 @@ def train(
         config,
     )
     if agent_path:
-        agent = restore_agent(agent, agent_path)
+        data_saving_wait(lambda: restore_agent(agent, agent_path))
 
     metrics: ResultsPerStep[EvaluationResult] = ResultsPerStep()
     agent_paths: ResultsPerStep[Path] = ResultsPerStep()
@@ -266,6 +264,7 @@ def train(
         # Save agent.
         if i in save_at_steps:
             agent_paths[i] = save_dir / f"params_{i}.pkl"
+            print(f"Trying to save agent to {save_dir}")
             data_saving_wait(lambda: save_agent(agent, save_dir, i))
 
     train_logger.close()
