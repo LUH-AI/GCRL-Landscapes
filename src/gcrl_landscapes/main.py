@@ -4,6 +4,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 import json
+import git
 import toml
 import logging
 from ml_collections import FrozenConfigDict
@@ -41,6 +42,10 @@ def run_setup(args: argparse.Namespace) -> None:
     # Log metadata to file
     metadata = {
         "arguments": args.__dict__,
+        "git": {
+            "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
+            "branch": git.Repo(".", search_parent_directories=True).active_branch.name,
+        },
         "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
     }
     with open(args.logdir / "info.toml", "w") as f:
@@ -144,6 +149,10 @@ def run_config(
             "agent_path": agent_path,
             "configuration_index": configuration_index,
             "seed": seed,
+        },
+        "git": {
+            "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
+            "branch": git.Repo(".", search_parent_directories=True).active_branch.name,
         },
         "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
     }
