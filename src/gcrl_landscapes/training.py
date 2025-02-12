@@ -264,7 +264,10 @@ def train(
         # Save agent.
         if i in save_at_steps:
             agent_paths[i] = save_dir / f"params_{i}.pkl"
-            save_agent(agent, save_dir, i)
+            print(f"save_dir: {str(save_dir)}")
+            print(f"os.environ.keys(): {os.environ.keys()}")
+            print(f"os.environ: {os.environ}")
+            save_agent(agent, str(save_dir), i)
 
     train_logger.close()
     eval_logger.close()
