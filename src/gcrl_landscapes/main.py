@@ -12,6 +12,7 @@ import submitit
 import signal
 import sys
 from itertools import product
+from .util.data import data_saving_wait
 
 logger = logging.getLogger(__name__)
 
@@ -48,8 +49,12 @@ def run_setup(args: argparse.Namespace) -> None:
         },
         "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
     }
-    with open(args.logdir / "info.toml", "w") as f:
-        f.write(toml.dumps(metadata))
+
+    def save_call():
+        with open(args.logdir / "info.toml", "w") as f:
+            f.write(toml.dumps(metadata))
+
+    data_saving_wait(save_call)
 
     # Save configurations
     config_dir = args.logdir / "configurations"
@@ -61,9 +66,13 @@ def run_setup(args: argparse.Namespace) -> None:
     configurations = generate_configurations(
         args.n_configurations, args.agent, set(args.hyperparameters)
     )
-    for i, config in enumerate(configurations):
-        with open(config_dir / f"configuration_{i}.json", "w") as f:
-            f.write(config.to_json())
+
+    def save_call_1():
+        for i, config in enumerate(configurations):
+            with open(config_dir / f"configuration_{i}.json", "w") as f:
+                f.write(config.to_json())
+
+    data_saving_wait(save_call_1)
 
     return
 
@@ -156,8 +165,12 @@ def run_config(
         },
         "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
     }
-    with open(run_log_dir / "info.toml", "w") as f:
-        f.write(toml.dumps(metadata))
+
+    def save_call_0():
+        with open(run_log_dir / "info.toml", "w") as f:
+            f.write(toml.dumps(metadata))
+
+    data_saving_wait(save_call_0)
 
     env, train_dataset, val_dataset = make_env_and_datasets(setup["dataset"])  # type: ignore
 
@@ -188,8 +201,11 @@ def run_config(
         seed=seed,
     )
 
-    with open(run_log_dir / "eval_trajectory.json", "w") as f:
-        f.write(eval_trajectory.to_json())
+    def save_results():
+        with open(run_log_dir / "eval_trajectory.json", "w") as f:
+            f.write(eval_trajectory.to_json())
+
+    data_saving_wait(save_results)
 
 
 def submit(args: argparse.Namespace) -> None:
@@ -217,7 +233,9 @@ def submit(args: argparse.Namespace) -> None:
     executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
     executor.update_parameters(
         cpus_per_task=4,
-        slurm_time=int(60 * args.tasks_per_node * ((200000 - args.phase) / 200000)),  # this overestimates, keep safety margin
+        slurm_time=int(
+            60 * args.tasks_per_node * ((200000 - args.phase) / 200000)
+        ),  # this overestimates, keep safety margin
         slurm_gpus_per_node=1,
         tasks_per_node=args.tasks_per_node,
         slurm_mem_per_cpu="1G",

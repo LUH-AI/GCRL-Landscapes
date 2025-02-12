@@ -6,6 +6,7 @@ from typing import Generic, TypeVar, Any, Callable
 import json
 import pandas as pd
 from time import sleep
+import numpy as np
 
 
 T = TypeVar("T")
@@ -120,18 +121,19 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
             run_id += 1  # every configuration per phase has a distinct run_id
     return df
 
+
 def data_saving_wait(save_call: Callable):
     sleep_interval = [1, 60]
     MAX_SAVE_TRIES = 10
     save_tries = 0
     while save_tries < MAX_SAVE_TRIES:
         try:
-            print(f"Trying to save agent to {save_dir}")
-            save_agent(agent, save_dir, i)
+            save_call()
             break
-        except:
+        except:  # noqa: E722  # [TODO: do this properly]
             save_tries += 1
-            wait_time = int(np.random.randint(low=sleep_interval[0], high=sleep_interval[1]))
-            print(f"Failed to save agent, sleeping {wait_time}s")
+            wait_time = int(
+                np.random.randint(low=sleep_interval[0], high=sleep_interval[1])
+            )
+            print(f"Failed to save, sleeping {wait_time}s")
             sleep(wait_time)
-
