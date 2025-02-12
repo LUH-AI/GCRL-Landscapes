@@ -16,9 +16,11 @@ from .util.data import (
     PhaseResult,
     restore_agent,
     ResultsPerStep,
+    data_saving_wait,
 )
 import os
 from functools import reduce
+from time import sleep
 
 
 def full_phased_run(
@@ -264,7 +266,7 @@ def train(
         # Save agent.
         if i in save_at_steps:
             agent_paths[i] = save_dir / f"params_{i}.pkl"
-            save_agent(agent, save_dir, i)
+            data_saving_wait(lambda: save_agent(agent, save_dir, i))
 
     train_logger.close()
     eval_logger.close()
