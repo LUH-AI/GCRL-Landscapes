@@ -124,7 +124,7 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
 
 def data_saving_wait(save_call: Callable):
     sleep_interval = [1, 60]
-    MAX_SAVE_TRIES = 10
+    MAX_SAVE_TRIES = 20
     save_tries = 0
     error = None
     while save_tries < MAX_SAVE_TRIES:
