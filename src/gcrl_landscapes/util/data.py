@@ -126,14 +126,18 @@ def data_saving_wait(save_call: Callable):
     sleep_interval = [1, 60]
     MAX_SAVE_TRIES = 10
     save_tries = 0
+    error = None
     while save_tries < MAX_SAVE_TRIES:
         try:
             save_call()
             break
-        except:  # noqa: E722  # [TODO: do this properly]
+        except Exception as e:
+            error = e
             save_tries += 1
             wait_time = int(
                 np.random.randint(low=sleep_interval[0], high=sleep_interval[1])
             )
             print(f"Failed to save, sleeping {wait_time}s")
             sleep(wait_time)
+    print("Error saving")
+    print(error)
