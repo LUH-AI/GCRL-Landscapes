@@ -7,6 +7,9 @@ import json
 import pandas as pd
 from time import sleep
 import numpy as np
+import zipfile
+import re
+import toml
 
 
 T = TypeVar("T")
@@ -141,3 +144,29 @@ def data_saving_wait(save_call: Callable):
             sleep(wait_time)
     print("Error saving")
     print(error)
+
+
+def read_results_from_zip(zippath: Path) -> dict[str, ResultsPerStep[PhaseResult]]:
+    def get_prefix_run_mappings(
+        filenames: list[str], zip_file: zipfile.ZipFile
+    ) -> dict[str, dict[str, Any]]:
+        top_level_info_pattern = re.compile(r"^(logs/[^/]*/)info.toml")
+        top_level_info_names = [
+            filename for filename in filenames if top_level_info_pattern.match(filename)
+        ]
+        info_contents: dict[str, str] = {}
+        for info_name in top_level_info_names:
+            with zip_file.open(info_name) as f:
+                info_contents[info_name] = f.read().decode(encoding="utf-8")
+        return {
+            top_level_info_pattern.match(info_name).group(1): toml.loads(
+                info_contents[info_name]
+            )
+            for info_name in top_level_info_names
+        }
+
+    with zipfile.ZipFile(zippath, "r") as zip_file:
+        filenames: list[str] = zip_file.namelist()
+        prefix_run_mappings = get_prefix_run_mappings(filenames, zip_file)  # noqa: F841
+
+    return {}
