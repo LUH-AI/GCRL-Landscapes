@@ -149,7 +149,9 @@ def data_saving_wait(save_call: Callable):
     print(error)
 
 
-def read_results_from_zip(zippath: Path) -> dict[str, ResultsPerStep[PhaseResult]]:
+def read_results_from_zip(
+    zippath: Path,
+) -> dict[str, tuple[dict, ResultsPerStep[PhaseResult]]]:
     def get_prefix_run_mappings(
         filenames: list[str], zip_file: zipfile.ZipFile
     ) -> dict[str, dict[str, Any]]:
@@ -236,4 +238,7 @@ def read_results_from_zip(zippath: Path) -> dict[str, ResultsPerStep[PhaseResult
             for prefix in prefix_run_mapping.keys()
         }
 
-    return prefix_phase_results_mapping
+    return {
+        prefix: (prefix_run_mapping[prefix], prefix_phase_results_mapping[prefix])
+        for prefix in prefix_run_mapping.keys()
+    }
