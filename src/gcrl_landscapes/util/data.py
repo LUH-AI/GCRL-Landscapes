@@ -93,37 +93,40 @@ def restore_agent(agent, path: Path):
 
 
 def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFrame:
+    # [TODO: this code is a mess, rewrite it]
     df = pd.DataFrame()
     # results are unpacked here until every step has a column, all hyperparameters have a column and the performance has a column
     run_id = 0
     for phase_step, result in results.items():
-        for config, eval_trajectory in result.items():
-            for eval_step, (eval_result, path) in {
-                eval_step: (
-                    eval_trajectory[0][eval_step],
-                    eval_trajectory[1][eval_step],
-                )
-                for eval_step in eval_trajectory[0].keys()
-            }.items():  # In EvalTrajectory both ResultsPerStep have the same keys
-                new_df = pd.DataFrame.from_dict(
-                    {
-                        "run_id": run_id,
-                        "phase": phase_step,
-                        "eval_step": eval_step,
-                        "success": eval_result.success,
-                        "path": str(path),
-                    }
-                    | {
-                        f"hp.{key}": [
-                            value,
-                        ]
-                        for key, value in config.to_dict().items()
-                    }
-                )
-                df = pd.concat(
-                    [df, new_df],
-                    ignore_index=True,
-                )
+        for config, eval_trajectories in result.items():
+            for eval_trajectory_seed, eval_trajectory in enumerate(eval_trajectories):
+                for eval_step, (eval_result, path) in {
+                    eval_step: (
+                        eval_trajectory[0][eval_step],
+                        eval_trajectory[1][eval_step],
+                    )
+                    for eval_step in eval_trajectory[0].keys()
+                }.items():  # In EvalTrajectory both ResultsPerStep have the same keys
+                    new_df = pd.DataFrame.from_dict(
+                        {
+                            "run_id": run_id,
+                            "eval_seed": eval_trajectory_seed,
+                            "phase_start": phase_step,
+                            "eval_step": eval_step,
+                            "success": eval_result.success,
+                            "path": str(path),
+                        }
+                        | {
+                            f"hp.{key}": [
+                                value,
+                            ]
+                            for key, value in config.to_dict().items()
+                        }
+                    )
+                    df = pd.concat(
+                        [df, new_df],
+                        ignore_index=True,
+                    )
             run_id += 1  # every configuration per phase has a distinct run_id
     return df
 
