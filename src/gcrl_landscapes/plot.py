@@ -13,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
 from typing import Any
+import re
 
 
 def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
@@ -53,11 +54,19 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
             bounds=[0, 1],
             filename=folder / f"igpr_{phase}.png",
         )
+        create_contour_plot(
+            model,
+            x_dim=0,
+            y_dim=1,
+            z_dim="Eval Returns",
+            bounds=[None, None],
+            filename=folder / f"igpr_{phase}_scaled.png",
+        )
 
         # Create plot without using gaussian processes
         plt.figure()
         x_scaled = model.x
-        y_scaled = model.y.reshape(-1)
+        y_scaled = model.y_iqm
 
         x0i_scaled, x1i_scaled = np.meshgrid(
             np.linspace(x_scaled[:, 0].min(), x_scaled[:, 0].max(), 1000),
@@ -71,9 +80,9 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
         )
         x0i = x0i_scaled * model.x_normalizing_factor[0] + model.x_normalizing_offset[0]
         x1i = x1i_scaled * model.x_normalizing_factor[1] + model.x_normalizing_offset[1]
-        yi = model._unscale_y(yi_scaled)
+        yi = model._unscale_y(yi_scaled).squeeze()
 
-        c = plt.pcolormesh(x0i, x1i, yi, cmap="rocket", vmin=yi.min(), vmax=yi.max())
+        c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
         plt.colorbar(c, label="Success")
         plt.savefig(folder / f"nearest_{phase}.png")
 
@@ -93,9 +102,6 @@ if __name__ == "__main__":
     }
 
     for prefix, (run_info, results_df) in results_pandas.items():
-        folder = (
-            Path("plots")
-            / f"{run_info['arguments']['agent']}_{'-'.join(run_info['arguments']['hyperparameters'])}"
-        )
+        folder = Path("plots") / re.match(r"^logs/([^/]*)/?", prefix).group(1)
         folder.mkdir(exist_ok=True, parents=True)
         plot(results_df, folder, run_info)
