@@ -114,6 +114,7 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
                             "phase_start": phase_step,
                             "eval_step": eval_step,
                             "success": eval_result.success,
+                            "eval_result": eval_result,
                             "path": str(path),
                         }
                         | {
