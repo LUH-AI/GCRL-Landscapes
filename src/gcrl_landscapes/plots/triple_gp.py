@@ -26,6 +26,7 @@ from sklearn.base import BaseEstimator
 
 from autorl_landscape.analyze.visualization import Visualization
 from autorl_landscape.run.compare import iqm
+from typing import Callable
 
 def iqm(x, axis=None):
     """
@@ -237,7 +238,7 @@ class TripleGPModel(BaseEstimator):
         plt.legend()
         plt.show()
 
-def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, grid_length=51):
+def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str], grid_length=51):
     # Generate a finer grid for contour plot
     x = np.linspace(model.x_unscaled[:, x_dim].min(), model.x_unscaled[:, x_dim].max(), grid_length)
     y = np.linspace(model.x_unscaled[:, y_dim].min(), model.x_unscaled[:, y_dim].max(), grid_length)
@@ -259,7 +260,7 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, grid_lengt
     plt.scatter(X[peaks], Y[peaks], color='white', marker='^', s=100, edgecolor='black')  # Peaks
     plt.scatter(X[valleys], Y[valleys], color='white', marker='v', s=100, edgecolor='black')  # Valleys
 
-    plt.xlabel(model.hp_names[x_dim].split('.')[-1], fontsize=18)
-    plt.ylabel(model.hp_names[y_dim].split('.')[-1], fontsize=18)
+    plt.xlabel(dim_label_mapping(model.hp_names[x_dim].split('.')[-1]), fontsize=18)
+    plt.ylabel(dim_label_mapping(model.hp_names[y_dim].split('.')[-1]), fontsize=18)
     plt.title(f'{z_dim}', fontsize=18)
     plt.savefig(filename)

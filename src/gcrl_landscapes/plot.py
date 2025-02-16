@@ -15,6 +15,15 @@ from scipy.interpolate import griddata
 from typing import Any
 import re
 
+DIM_LABEL_MAPPING = {
+    "actor_p_trajgoal": "$p_{trajgoal}$",
+    "discount": "Discount Factor",
+}
+
+
+def map_labels(label: str) -> str:
+    return DIM_LABEL_MAPPING[label] if label in DIM_LABEL_MAPPING else label
+
 
 def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
     hp_full_list = results_pandas.columns[results_pandas.columns.str.startswith("hp.")]
@@ -53,6 +62,7 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
             z_dim="Eval Returns",
             bounds=[0, 1],
             filename=folder / f"igpr_{phase}.png",
+            dim_label_mapping=map_labels,
         )
         create_contour_plot(
             model,
@@ -61,6 +71,7 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
             z_dim="Eval Returns",
             bounds=[None, None],
             filename=folder / f"igpr_{phase}_scaled.png",
+            dim_label_mapping=map_labels,
         )
 
         # Create plot without using gaussian processes
