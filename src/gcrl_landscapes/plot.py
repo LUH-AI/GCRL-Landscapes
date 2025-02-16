@@ -4,6 +4,7 @@ from .util.data import (
     PhaseResult,
     phase_results_to_pandas,
     read_results_from_zip,
+    EvaluationResult,
 )
 from pathlib import Path
 from .plots.triple_gp import TripleGPModel, create_contour_plot
@@ -14,11 +15,16 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
 from typing import Any
 import re
+from pyfolding import FTU
+import seaborn as sns
+import matplotlib.ticker as ticker
 
 DIM_LABEL_MAPPING = {
     "actor_p_trajgoal": "$p_{trajgoal}$",
     "discount": "Discount Factor",
 }
+
+FTU_SIGNIFICANCE_THRESHOLD = 0.05
 
 
 def map_labels(label: str) -> str:
@@ -96,6 +102,80 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
         c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
         plt.colorbar(c, label="Success")
         plt.savefig(folder / f"nearest_{phase}.png")
+
+        # Create plot based on folding test of unimodality
+        def eval_result_to_mean_over_tasks(
+            eval_result: EvaluationResult,
+        ) -> list[float]:
+            all_success_trajectories = np.array(
+                [task["success_all"] for task in eval_result.info]
+            )  # type: ignore
+            return np.mean(all_success_trajectories, axis=0)
+
+        phase_result_copy["success_all_mean_over_tasks"] = phase_result_copy[
+            "eval_result"
+        ].apply(eval_result_to_mean_over_tasks)
+
+        def aggregate_mean_task_results(series: pd.Series) -> FTU:
+            # at this point, we have a series containing n seeds (rows) with the average result over tasks as the "columns" (we have a list as item)
+            y = np.array(series.tolist())
+            # rows should be observations
+            y_transposed = np.transpose(y)
+            # for now, just concatenate into one long list, so treat all seeds equally.
+            # 50 observations are not enough for a small p-value.
+            # This may bias the result into being more multimodal,
+            # so worst-case is that we underestimate the positive impact of the approach
+            # [TODO: this may have to change]
+            return FTU(y_transposed.reshape(-1), routine="c++")  # type: ignore  # the type is correct, there seems to be an import problem
+
+        # group by configuration to apply statistic over seeds
+        ftu_object_per_configuration = phase_result_copy.groupby(["run_id"] + hp_list)[
+            "success_all_mean_over_tasks"
+        ].aggregate(aggregate_mean_task_results)
+        ftu_result_per_configuration = ftu_object_per_configuration.apply(
+            lambda ftu: ftu.folding_statistics
+            if ftu.p_value <= FTU_SIGNIFICANCE_THRESHOLD
+            else 1.0
+        )
+
+        # get configurations as x
+        x_unscaled = np.array(ftu_result_per_configuration.index.tolist())[:, 1:]
+        x_scaled = (x_unscaled - x_unscaled.min(axis=0)) / (
+            x_unscaled.max(axis=0) - x_unscaled.min(axis=0)
+        )
+        # Replace nan values with 1.0, which means undecided
+        y = np.nan_to_num(np.array(ftu_result_per_configuration.tolist()), nan=1.0)
+        y_discrete = np.copy(y)
+        y_discrete[y_discrete > 1.0] = 2.0
+        y_discrete[y_discrete < 1.0] = 0.0
+        x0_grid, x1_grid = np.meshgrid(
+            np.linspace(x_scaled[:, 0].min(), x_scaled[:, 0].max(), 1000),
+            np.linspace(x_scaled[:, 1].min(), x_scaled[:, 1].max(), 1000),
+        )
+        y_grid = griddata(
+            (x_scaled[:, 0], x_scaled[:, 1]),
+            y_discrete,
+            (x0_grid, x1_grid),
+            method="nearest",
+        )
+        assert y_grid.min() >= 0.0 and y_grid.max() <= 2.0
+
+        fig = plt.figure()
+        c = plt.contourf(
+            x0_grid,
+            x1_grid,
+            y_grid,
+            cmap=sns.color_palette("vlag", as_cmap=True),
+            vmin=0.0,
+            vmax=2.0,
+        )
+        cbar = fig.colorbar(c, label="Modality")
+
+        cbar.ax.yaxis.set_minor_locator(ticker.FixedLocator([0.0, 1.0, 2.0]))
+        cbar.ax.yaxis.set_minor_formatter(ticker.FixedFormatter(["MM", "N/A", "UM"]))
+        cbar.ax.set_yticks([])
+
+        plt.savefig(folder / f"modality_{phase}.png")
 
 
 if __name__ == "__main__":
