@@ -117,20 +117,18 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
         ].apply(eval_result_to_mean_over_tasks)
 
         def aggregate_mean_task_results(series: pd.Series) -> FTU:
-            # at this point, we have a series containing n seeds (rows) with the average result over tasks as the "columns" (we have a list as item)
-            y = np.array(series.tolist())
-            # rows should be observations
-            y_transposed = np.transpose(y)
-            # for now, just concatenate into one long list, so treat all seeds equally.
-            # 50 observations are not enough for a small p-value.
-            # This may bias the result into being more multimodal,
-            # so worst-case is that we underestimate the positive impact of the approach
-            # [TODO: this may have to change]
-            return FTU(y_transposed.reshape(-1), routine="c++")  # type: ignore  # the type is correct, there seems to be an import problem
+            eval_results = series.tolist()
+            success_per_seed_task = np.array(
+                [
+                    [np.mean(task["success_all"]) for task in result.info]
+                    for result in eval_results
+                ]
+            )
+            return FTU(success_per_seed_task.reshape(-1), routine="c++")  # type: ignore  # the type is correct, there seems to be an import problem
 
         # group by configuration to apply statistic over seeds
         ftu_object_per_configuration = phase_result_copy.groupby(["run_id"] + hp_list)[
-            "success_all_mean_over_tasks"
+            "eval_result"
         ].aggregate(aggregate_mean_task_results)
         ftu_result_per_configuration = ftu_object_per_configuration.apply(
             lambda ftu: ftu.folding_statistics
