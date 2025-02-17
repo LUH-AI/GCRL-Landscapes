@@ -212,7 +212,7 @@ def train(
         config,
     )
     if agent_path:
-        data_saving_wait(lambda: restore_agent(agent, agent_path))
+        agent = restore_agent(agent, agent_path)
 
     metrics: ResultsPerStep[EvaluationResult] = ResultsPerStep()
     agent_paths: ResultsPerStep[Path] = ResultsPerStep()
