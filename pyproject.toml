@@ -45,6 +45,7 @@ dependencies = [
   "scikit-learn",
   "submitit",
   "pyfolding",
+  "pyDeprecate",
 ]
 
 [project.urls]
