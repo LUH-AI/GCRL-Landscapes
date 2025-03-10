@@ -15,12 +15,17 @@ from .util.data import (
     PhaseResult,
     restore_agent,
     ResultsPerStep,
-    data_saving_wait,
 )
+from .util.misc import retry_call
 import os
 from functools import reduce
+from deprecate import deprecated
 
 
+@deprecated(
+    target=None,
+    template_mgs="Deprecated in favor of manual running in parallel and collecting afterwards.",
+)
 def full_phased_run(
     phase_steps: list[int],
     configs: list[FrozenConfigDict],
@@ -79,6 +84,10 @@ def full_phased_run(
     return reduce(run_phase_and_collect, phase_steps, [(0, None), ResultsPerStep()])[1]
 
 
+@deprecated(
+    target=None,
+    template_mgs="Deprecated in favor of manual running in parallel and collecting afterwards.",
+)
 def run_phase(
     configs: list[FrozenConfigDict],
     phase_steps: int,
@@ -265,7 +274,7 @@ def train(
         if i in save_at_steps:
             agent_paths[i] = save_dir / f"params_{i}.pkl"
             print(f"Trying to save agent to {save_dir}")
-            data_saving_wait(lambda: save_agent(agent, save_dir, i))
+            retry_call(lambda: save_agent(agent, save_dir, i))
 
     train_logger.close()
     eval_logger.close()
