@@ -85,6 +85,13 @@ def run_config(
     seed: int,
     tasks_per_node: int,
 ) -> None:
+    # submitit just bypasses SIGTERM although it should end the job, overwrite that behaviour here
+    def handler(signum, frame):
+        print(f"Received {signal.Signals(signum).name} ({signum}), stopping!")
+        sys.exit(1)
+
+    signal.signal(signal.SIGTERM, handler)
+
     # [TODO: do backend setting more cleanly]
     import os
     import numpy as np
@@ -131,13 +138,6 @@ def run_config(
     }
 
     assert phase == 0 or agent_path
-
-    # submitit just bypasses SIGTERM although it should end the job, overwrite that behaviour here
-    def handler(signum, frame):
-        print(f"Received {signal.Signals(signum).name} ({signum}), stopping!")
-        sys.exit(1)
-
-    signal.signal(signal.SIGTERM, handler)
 
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
