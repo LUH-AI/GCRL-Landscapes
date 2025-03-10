@@ -96,6 +96,7 @@ def run_config(
     import os
     import numpy as np
 
+    # This will set egl (nvidia) as the backend for mujoco and may lead to failure on other systems
     os.environ["MUJOCO_GL"] = "egl"
     # let jax only pre-allocate a fraction of gpus memory, so that all tasks on node can run
     fraction_gpu_allocation = np.round(1 / (tasks_per_node + 1), 2)
