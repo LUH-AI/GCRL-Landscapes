@@ -21,8 +21,6 @@ DISCOUNT_FACTOR_UPPER = 0.99
 
 SUPPORTED_HPS = set(["lr", "discount", "actor_p_trajgoal"])
 
-# [TODO: add seeding to configuration generation]
-
 
 def get_config_space(agent: str) -> ConfigurationSpace:
     warnings.warn("not fully implemented, returns the same for every agent")
@@ -40,9 +38,10 @@ def get_config_space(agent: str) -> ConfigurationSpace:
 
 
 def generate_configurations(
-    n: int, agent: str, hyperparameters: set[str]
+    n: int, agent: str, hyperparameters: set[str], seed: int = 0
 ) -> list[FrozenConfigDict]:
     logger.info(f"Generating {n} configurations for {agent} using {hyperparameters}")
+    np.random.seed(seed)
     ld_n = log(n, 2)
     if not ld_n.is_integer():
         raise ValueError("Only supports powers of 2")
