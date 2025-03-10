@@ -76,7 +76,6 @@ def full_phased_run(
         best_config, results = run_phase_configured(
             phase_step, already_trained_steps, agent_path
         )
-        # [TODO: confirm that we dont use the final reward here]
         collector[phase_step] = results
         return (phase_step, best_config[1]), collector
 

@@ -64,7 +64,7 @@ def run_setup(args: argparse.Namespace) -> None:
     config_space.to_json(config_dir / "configspace.json")
 
     configurations = generate_configurations(
-        args.n_configurations, args.agent, set(args.hyperparameters)
+        args.n_configurations, args.agent, set(args.hyperparameters), seed=args.seed
     )
 
     def save_configurations():
