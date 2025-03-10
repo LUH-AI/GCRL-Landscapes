@@ -12,7 +12,7 @@ import submitit
 import signal
 import sys
 from itertools import product
-from .util.data import data_saving_wait
+from .util.misc import retry_call
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +50,11 @@ def run_setup(args: argparse.Namespace) -> None:
         "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
     }
 
-    def save_call():
+    def save_info():
         with open(args.logdir / "info.toml", "w") as f:
             f.write(toml.dumps(metadata))
 
-    data_saving_wait(save_call)
+    retry_call(save_info)
 
     # Save configurations
     config_dir = args.logdir / "configurations"
@@ -67,12 +67,12 @@ def run_setup(args: argparse.Namespace) -> None:
         args.n_configurations, args.agent, set(args.hyperparameters)
     )
 
-    def save_call_1():
+    def save_configurations():
         for i, config in enumerate(configurations):
             with open(config_dir / f"configuration_{i}.json", "w") as f:
                 f.write(config.to_json())
 
-    data_saving_wait(save_call_1)
+    retry_call(save_configurations)
 
     return
 
@@ -110,19 +110,12 @@ def run_config(
     from ogbench import make_env_and_datasets
     from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
     from ogbench.impls.agents import CRLAgent, CMDAgent, GCBCAgent, QRLAgent, HIQLAgent
-
-    # check if running on gpu
     import jax
-
-    def jax_has_gpu():
-        try:
-            _ = jax.device_put(jax.numpy.ones(1), device=jax.devices("gpu")[0])
-            return True
-        except:  # noqa: E722  # usually one should specify the error, here a catch all is enough
-            return False
+    from .util.misc import jax_has_gpu
 
     print(f"Default backend: {jax.default_backend()}, running on gpu?: {jax_has_gpu()}")
 
+    # populate agent classes and dataset classes after loading ogbench
     AGENT_CLASSES = {
         "CRL": CRLAgent,
         "CMD": CMDAgent,
@@ -167,11 +160,11 @@ def run_config(
         "time": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
     }
 
-    def save_call_0():
+    def save_metadata():
         with open(run_log_dir / "info.toml", "w") as f:
             f.write(toml.dumps(metadata))
 
-    data_saving_wait(save_call_0)
+    retry_call(save_metadata)
 
     env, train_dataset, val_dataset = make_env_and_datasets(setup["dataset"])  # type: ignore
 
@@ -206,7 +199,7 @@ def run_config(
         with open(run_log_dir / "eval_trajectory.json", "w") as f:
             f.write(eval_trajectory.to_json())
 
-    data_saving_wait(save_results)
+    retry_call(save_results)
 
 
 def submit(args: argparse.Namespace) -> None:
