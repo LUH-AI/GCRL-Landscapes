@@ -13,6 +13,7 @@ import signal
 import sys
 from itertools import product
 from .util.misc import retry_call
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -207,39 +208,56 @@ def submit(args: argparse.Namespace) -> None:
 
     configuration_indices = list(range(setup["n_configurations"]))
     seeds = list(range(args.n_seeds))
-    argument_lines = product(
-        [args.logdir],
-        [args.phase],
-        [args.agent_path],
-        configuration_indices,
-        seeds,
-        [args.tasks_per_node],
-    )
-    argument_columns = list(zip(*argument_lines))
-    chunked_arguments = [
-        [
-            argument_columns[column_idx][i : i + args.tasks_per_node]
-            for i in range(0, len(argument_columns[column_idx]), args.tasks_per_node)
+    array_id: int | None = None
+    for phase in setup["phases"]:
+        argument_lines = product(
+            [args.logdir],
+            [phase],
+            [args.agent_path],
+            configuration_indices,
+            seeds,
+            [args.tasks_per_node],
+        )
+        argument_columns = list(zip(*argument_lines))
+        chunked_arguments = [
+            [
+                argument_columns[column_idx][i : i + args.tasks_per_node]
+                for i in range(
+                    0, len(argument_columns[column_idx]), args.tasks_per_node
+                )
+            ]
+            for column_idx in range(len(argument_columns))
         ]
-        for column_idx in range(len(argument_columns))
-    ]
 
-    executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
-    executor.update_parameters(
-        cpus_per_task=4,
-        slurm_time=int(
-            45 * args.tasks_per_node * ((150000 - args.phase) / 150000)
-        ),  # this overestimates, keep safety margin
-        slurm_gpus_per_node=1,
-        tasks_per_node=args.tasks_per_node,
-        slurm_mem_per_cpu="1G",
-        slurm_array_parallelism=50,
-        slurm_partition=args.partition,
-        slurm_job_name=args.jobname,
-        slurm_mail_user="m.toepperwien@stud.uni-hannover.de",
-        slurm_mail_type="BEGIN,FAIL,END",
-    )
-    executor.map_array(run_config_slurm_tasks_wrapper, *chunked_arguments)
+        executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
+        executor.update_parameters(
+            cpus_per_task=4,
+            slurm_time=int(
+                args.min_per_task
+                * args.tasks_per_node
+                * ((max(setup["eval_steps"]) - phase) / max(setup["eval_steps"]))
+            ),  # this overestimates, keep safety margin
+            slurm_gpus_per_node=1,
+            tasks_per_node=args.tasks_per_node,
+            slurm_mem_per_cpu="1G",
+            slurm_array_parallelism=50,
+            slurm_partition=args.partition,
+            slurm_job_name=args.jobname,
+            slurm_mail_user="m.toepperwien@stud.uni-hannover.de",
+            slurm_mail_type="BEGIN,FAIL,END",
+            additional_parameters={"dependency": f"afterok:{array_id}"}
+            if array_id
+            else {},
+        )
+        jobs = executor.map_array(run_config_slurm_tasks_wrapper, *chunked_arguments)
+        # parse job array number/array id without subtaskid
+        array_id_match = re.fullmatch(r"^(?P<array_id>\d+)_\d+$", jobs[0].job_id)
+        if not array_id_match:
+            raise Exception(
+                f'Slurm job id does not match expected format "\\d+_\\d+": {jobs[0].job_id}'
+            )
+        array_id = int(array_id_match.groupdict()["array_id"])
+        # [TODO: get job number and add dependency to additional_parameters in next phase]
 
     return
 
@@ -316,12 +334,12 @@ if __name__ == "__main__":
     # Submits all jobs to slurm
     slurm_subparser = subparsers.add_parser("submit")
     slurm_subparser.add_argument("--logdir", type=Path, required=True)
-    slurm_subparser.add_argument("--phase", required=True, type=int)
     slurm_subparser.add_argument("--agent_path", required=False, type=Path)
     slurm_subparser.add_argument("--n_seeds", type=int, required=True)
     slurm_subparser.add_argument("--partition", type=str, default="ai")
     slurm_subparser.add_argument("--tasks_per_node", type=int, required=True)
     slurm_subparser.add_argument("--jobname", required=True, type=str)
+    slurm_subparser.add_argument("--min_per_task", type=int, default=45, required=False)
     slurm_subparser.set_defaults(func=submit)
 
     # Run subcommand parsing
