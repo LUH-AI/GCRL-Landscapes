@@ -8,6 +8,8 @@ import pandas as pd
 import zipfile
 import re
 import toml
+from tempfile import NamedTemporaryFile
+from glob import glob
 
 
 T = TypeVar("T")
@@ -81,6 +83,43 @@ class PhaseResult(dict[FrozenConfigDict, list[EvalTrajectory]]):
                 for config, eval_trajectories in raw_result.items()
             }
         )
+
+
+def get_best_agent_path(phase: int, logdir: Path) -> Path:
+    logfiles = glob(str(logdir / "**"), recursive=True)
+    nonbinary_logfiles = [
+        file for file in logfiles if not re.fullmatch(r"^.*\.pkl$", file)
+    ]
+    phase_nonbinary_logfiles = [
+        file
+        for file in nonbinary_logfiles
+        if re.fullmatch(f"^.*/phase_{phase}/.*$", file)
+        or not re.fullmatch(r"^.*/phase_.*$", file)
+    ]
+    assert not [
+        file
+        for file in phase_nonbinary_logfiles
+        if phase_nonbinary_logfiles.count(file) > 1
+    ]
+
+    with NamedTemporaryFile(mode="w+b") as temp_f:
+        with zipfile.ZipFile(temp_f, mode="w") as zip_f:
+            for file in phase_nonbinary_logfiles:
+                zip_f.write(file, arcname=re.sub(r"^.*/logs/", "logs/", file))
+        temp_f.flush()
+        results_from_zip = read_results_from_zip(Path(temp_f.name))
+
+    assert len(results_from_zip.values()) == 1
+    result: ResultsPerStep[PhaseResult] = list(results_from_zip.values())[0][1]
+    result_pandas = phase_results_to_pandas(result)
+    final_eval_result = result_pandas[
+        result_pandas["eval_step"] == result_pandas["eval_step"].max()
+    ]
+    return Path(
+        final_eval_result[
+            final_eval_result["success"] == final_eval_result["success"].max()
+        ].iloc[0]["path"]
+    )
 
 
 def restore_agent(agent, path: Path):
