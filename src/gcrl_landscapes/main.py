@@ -274,7 +274,6 @@ def submit(args: argparse.Namespace) -> None:
 def run_config_slurm_tasks_wrapper(
     logdirs: list[Path],
     phases: list[int],
-    agent_paths: list[Path | None],
     configuration_indices: list[int],
     seeds: list[int],
     tasks_per_node: list[int],
@@ -282,7 +281,6 @@ def run_config_slurm_tasks_wrapper(
     assert (
         len(logdirs)
         == len(phases)
-        == len(agent_paths)
         == len(configuration_indices)
         == len(seeds)
         == len(tasks_per_node)
@@ -298,7 +296,6 @@ def run_config_slurm_tasks_wrapper(
     return run_config(
         logdirs[r],
         phases[r],
-        agent_paths[r],
         configuration_indices[r],
         seeds[r],
         tasks_per_node[r],
@@ -343,7 +340,6 @@ if __name__ == "__main__":
     # Submits all jobs to slurm
     slurm_subparser = subparsers.add_parser("submit")
     slurm_subparser.add_argument("--logdir", type=Path, required=True)
-    slurm_subparser.add_argument("--agent_path", required=False, type=Path)
     slurm_subparser.add_argument("--n_seeds", type=int, required=True)
     slurm_subparser.add_argument("--partition", type=str, default="ai")
     slurm_subparser.add_argument("--tasks_per_node", type=int, required=True)
