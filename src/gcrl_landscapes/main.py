@@ -14,6 +14,7 @@ import sys
 from itertools import product
 from .util.misc import retry_call
 import re
+from .util.data import get_best_agent_path
 
 logger = logging.getLogger(__name__)
 
@@ -81,11 +82,12 @@ def run_setup(args: argparse.Namespace) -> None:
 def run_config(
     logdir: Path,
     phase: int,
-    agent_path: Path | None,
     configuration_index: int,
     seed: int,
     tasks_per_node: int,
 ) -> None:
+    setup = toml.load(args.logdir / "info.toml")["arguments"]
+
     # submitit just bypasses SIGTERM although it should end the job, overwrite that behaviour here
     def handler(signum, frame):
         print(f"Received {signal.Signals(signum).name} ({signum}), stopping!")
@@ -131,6 +133,14 @@ def run_config(
         "QRL": GCDataset,
         "HIQL": HGCDataset,
     }
+
+    # Find best agent for last phase
+    last_phase_index = setup["phases"].index(phase) - 1
+    agent_path = (
+        get_best_agent_path(setup["phases"][last_phase_index], logdir)
+        if not last_phase_index < 0
+        else None
+    )
 
     assert phase == 0 or agent_path
 
@@ -213,7 +223,6 @@ def submit(args: argparse.Namespace) -> None:
         argument_lines = product(
             [args.logdir],
             [phase],
-            [args.agent_path],
             configuration_indices,
             seeds,
             [args.tasks_per_node],
