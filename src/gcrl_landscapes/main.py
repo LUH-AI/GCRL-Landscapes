@@ -136,9 +136,12 @@ def run_config(
 
     # Find best agent for last phase
     last_phase_index = setup["phases"].index(phase) - 1
+    already_trained_steps = (
+        setup["phases"][last_phase_index] if last_phase_index >= 0 else 0
+    )
     agent_path = (
-        get_best_agent_path(setup["phases"][last_phase_index], logdir)
-        if not last_phase_index < 0
+        get_best_agent_path(already_trained_steps, logdir)
+        if already_trained_steps > 0
         else None
     )
 
@@ -184,6 +187,18 @@ def run_config(
     ) as f:
         configuration = FrozenConfigDict(json.loads(f.read()))
 
+    # don't train until end if we don't use final timestep as fitness evaluation
+    setup_eval_steps = setup["eval_steps"]
+    setup_save_steps = (
+        setup["save_steps"] if "save_steps" in setup else setup_eval_steps
+    )
+    if setup.final_step_is_phase:
+        eval_steps = [step for step in setup_eval_steps if step <= phase]
+        save_steps = [step for step in setup_save_steps if step <= phase]
+    else:
+        eval_steps = setup["eval_steps"]
+        save_steps = setup["save_steps"]
+
     eval_trajectory = train(
         agent_class=AGENT_CLASSES[setup["agent"]],
         agent_path=agent_path,
@@ -194,13 +209,11 @@ def run_config(
         val_dataset=DATASET_CLASSES[setup["agent"]](
             Dataset.create(**val_dataset), configuration
         ),
-        already_trained_steps=phase,
-        eval_at_steps=setup["eval_steps"],
+        already_trained_steps=already_trained_steps,
+        eval_at_steps=eval_steps,
         evaluate=evaluate_wrapper,
         config=configuration,
-        save_at_steps=setup["save_steps"]
-        if "save_steps" in setup
-        else setup["eval_steps"],
+        save_at_steps=save_steps,
         eval_episodes=setup["eval_episodes"],
         log_dir=run_log_dir,
         seed=seed,
@@ -334,6 +347,11 @@ if __name__ == "__main__":
     setup_subparser.add_argument("--eval_episodes", required=True, type=int)
     setup_subparser.add_argument("--seed", type=int, default=0)
     setup_subparser.add_argument("--logdir", type=Path, required=True)
+    setup_subparser.add_argument(
+        "--final_step_is_phase",
+        action="store_true",
+        help="Train configs in phase only till end of phase.",
+    )
     setup_subparser.set_defaults(func=run_setup)
 
     # Setup slurm parsing

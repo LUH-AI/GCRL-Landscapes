@@ -85,7 +85,7 @@ class PhaseResult(dict[FrozenConfigDict, list[EvalTrajectory]]):
         )
 
 
-def get_best_agent_path(phase: int, logdir: Path) -> Path:
+def get_best_agent_path(phase: int, logdir: Path, eval_step: int | None = None) -> Path:
     logfiles = glob(str(logdir / "**"), recursive=True)
     nonbinary_logfiles = [
         file for file in logfiles if not re.fullmatch(r"^.*\.pkl$", file)
@@ -113,7 +113,8 @@ def get_best_agent_path(phase: int, logdir: Path) -> Path:
     result: ResultsPerStep[PhaseResult] = list(results_from_zip.values())[0][1]
     result_pandas = phase_results_to_pandas(result)
     final_eval_result = result_pandas[
-        result_pandas["eval_step"] == result_pandas["eval_step"].max()
+        result_pandas["eval_step"]
+        == (eval_step if eval_step else result_pandas["eval_step"].max())
     ]
     return Path(
         final_eval_result[
