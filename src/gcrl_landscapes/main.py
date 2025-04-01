@@ -145,8 +145,6 @@ def run_config(
         else None
     )
 
-    assert phase == 0 or agent_path
-
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
     run_log_dir = (
