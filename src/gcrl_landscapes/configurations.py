@@ -67,7 +67,10 @@ def generate_configurations(
 
 
 def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str]):
-    assert len(hyperparameters & SUPPORTED_HPS) == len(hyperparameters)
+    if not len(hyperparameters & SUPPORTED_HPS) == len(hyperparameters):
+        raise NotImplementedError(
+            f"hyperparameters {hyperparameters - SUPPORTED_HPS} not supported"
+        )
     learning_rates = (
         _generate_learning_rates(n)
         if "lr" in hyperparameters
