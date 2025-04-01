@@ -194,8 +194,8 @@ def run_config(
         eval_steps = [step for step in setup_eval_steps if step <= phase]
         save_steps = [step for step in setup_save_steps if step <= phase]
     else:
-        eval_steps = setup["eval_steps"]
-        save_steps = setup["save_steps"]
+        eval_steps = setup_eval_steps
+        save_steps = setup_save_steps
 
     eval_trajectory = train(
         agent_class=AGENT_CLASSES[setup["agent"]],
@@ -317,7 +317,6 @@ def run_config_wrapper(args: argparse.Namespace) -> None:
     return run_config(
         args.logdir,
         args.phase,
-        args.agent_path,
         args.configuration,
         args.seed,
         args.tasks_per_node,
