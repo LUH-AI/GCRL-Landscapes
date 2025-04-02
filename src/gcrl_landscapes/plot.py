@@ -18,6 +18,9 @@ import re
 from pyfolding import FTU
 import seaborn as sns
 import matplotlib.ticker as ticker
+from mpl_toolkits.axes_grid1 import ImageGrid
+from PIL import Image
+import os
 
 DIM_LABEL_MAPPING = {
     "actor_p_trajgoal": "$p_{trajgoal}$",
@@ -183,10 +186,44 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         plt.savefig(output_folder / f"modality_{phase}.png")
 
 
+def grid_plot(
+    imgpath_dataframe: pd.DataFrame,
+    output_folder: Path,
+    title: str,
+    grid_columns: tuple[str, str],
+) -> None:
+    indexed_imgpath_series = imgpath_dataframe.set_index(
+        list(grid_columns)
+    ).sort_index()
+
+    fig = plt.figure(figsize=(16, 16))
+    grid = ImageGrid(
+        fig,
+        111,
+        nrows_ncols=(
+            len(indexed_imgpath_series.index.get_level_values(0).unique()),
+            len(indexed_imgpath_series.index.get_level_values(1).unique()),
+        ),
+        axes_pad=0.1,
+    )
+    plt.axis("off")
+
+    for ax, ((dataset, phase), imgpath) in zip(
+        grid, indexed_imgpath_series["path"].items()
+    ):
+        ax.imshow(Image.open(imgpath))
+        ax.axis("off")
+        ax.set_title(f"{dataset}-{phase}")
+    fig.savefig(output_folder / f"{title}.png")
+    return
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--zipfile", type=Path, required=True)
     args = parser.parse_args()
+
+    plots_folder = Path("plots") / os.path.basename(args.zipfile)
 
     results: dict[str, tuple[dict, ResultsPerStep[PhaseResult]]] = (
         read_results_from_zip(args.zipfile)
@@ -198,6 +235,47 @@ if __name__ == "__main__":
     }
 
     for prefix, (run_info, results_df) in results_pandas.items():
-        folder = Path("plots") / re.match(r"^logs/([^/]*)/?", prefix).group(1)
+        run_match = re.match(r"^logs/([^/]*)/?", prefix)
+        if not run_match:
+            raise ValueError("Naming inside of zipfile not as expected.")
+        run_name = run_match.group(1)
+
+        folder = plots_folder / run_name
         folder.mkdir(exist_ok=True, parents=True)
         plot(results_df, folder, run_info)
+
+    # Build igpr grid of plots (across datasets)
+    imgpath_dataframe = pd.DataFrame(columns=["phase", "agent", "path", "dataset"])  # type: ignore
+    for experiment_name in os.listdir(plots_folder):
+        if not Path(plots_folder / experiment_name).is_dir():
+            continue
+        experiment_name_matches = re.match(
+            r"^(?P<agent>[^_]*)_(?P<dataset>[^_]*)_", experiment_name
+        )
+        if not experiment_name_matches:
+            raise ValueError("Naming inside of plots folder not as expected.")
+        agent = experiment_name_matches["agent"]
+        dataset = experiment_name_matches["dataset"]
+
+        for unscaled_igpr_plotpath in [
+            plots_folder / experiment_name / filename
+            for filename in os.listdir(plots_folder / experiment_name)
+            if re.match(r"^igpr_\d+.png$", filename)
+        ]:
+            phase = re.match(r".*/igpr_(\d+).png$", str(unscaled_igpr_plotpath)).group(
+                1
+            )  # type: ignore
+            imgpath_dataframe.loc[len(imgpath_dataframe)] = [
+                int(phase),
+                agent,
+                str(unscaled_igpr_plotpath),
+                dataset,
+            ]
+
+    for agent in imgpath_dataframe["agent"].unique():
+        grid_plot(
+            imgpath_dataframe[imgpath_dataframe["agent"] == agent],  # type: ignore
+            plots_folder,
+            f"{agent}",
+            grid_columns=("dataset", "phase"),
+        )  # type: ignore
