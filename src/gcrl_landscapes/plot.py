@@ -31,9 +31,16 @@ def map_labels(label: str) -> str:
     return DIM_LABEL_MAPPING[label] if label in DIM_LABEL_MAPPING else label
 
 
-def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
+def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, Any]):
+    """Main plotting Code to generate the landscapes
+
+    Args:
+        results_pandas: pandas dataframe containing all results (all phases) for one experiment
+        output_folder: folder to save plots in
+        run_info: info about the run/setup
+    """
     hp_full_list = results_pandas.columns[results_pandas.columns.str.startswith("hp.")]
-    hp_list = [f"hp.{hp_name}" for hp_name in info["arguments"]["hyperparameters"]]
+    hp_list = [f"hp.{hp_name}" for hp_name in run_info["arguments"]["hyperparameters"]]
     assert all(hp in hp_full_list for hp in hp_list)
 
     phase_starts = sorted(results_pandas["phase_start"].unique().tolist())
@@ -45,7 +52,7 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
                 & (results_pandas["phase_start"] == phase_start)
             ],
         )
-        for phase_start, phase in zip(phase_starts, info["arguments"]["phases"])
+        for phase_start, phase in zip(phase_starts, run_info["arguments"]["phases"])
     ]
 
     for phase, phase_result in phase_results:
@@ -67,7 +74,7 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
             y_dim=1,
             z_dim="Eval Returns",
             bounds=[0, 1],
-            filename=folder / f"igpr_{phase}.png",
+            filename=output_folder / f"igpr_{phase}.png",
             dim_label_mapping=map_labels,
         )
         create_contour_plot(
@@ -76,7 +83,7 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
             y_dim=1,
             z_dim="Eval Returns",
             bounds=[None, None],
-            filename=folder / f"igpr_{phase}_scaled.png",
+            filename=output_folder / f"igpr_{phase}_scaled.png",
             dim_label_mapping=map_labels,
         )
 
@@ -101,7 +108,7 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
 
         c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
         plt.colorbar(c, label="Success")
-        plt.savefig(folder / f"nearest_{phase}.png")
+        plt.savefig(output_folder / f"nearest_{phase}.png")
 
         # Create plot based on folding test of unimodality
         def eval_result_to_mean_over_tasks(
@@ -173,7 +180,7 @@ def plot(results_pandas: pd.DataFrame, folder: Path, info: dict[str, Any]):
         cbar.ax.yaxis.set_minor_formatter(ticker.FixedFormatter(["MM", "N/A", "UM"]))
         cbar.ax.set_yticks([])
 
-        plt.savefig(folder / f"modality_{phase}.png")
+        plt.savefig(output_folder / f"modality_{phase}.png")
 
 
 if __name__ == "__main__":
