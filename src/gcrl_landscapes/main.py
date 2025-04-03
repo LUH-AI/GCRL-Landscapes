@@ -277,7 +277,6 @@ def submit(args: argparse.Namespace) -> None:
                 f'Slurm job id does not match expected format "\\d+_\\d+": {jobs[0].job_id}'
             )
         array_id = int(array_id_match.groupdict()["array_id"])
-        # [TODO: get job number and add dependency to additional_parameters in next phase]
 
     return
 
