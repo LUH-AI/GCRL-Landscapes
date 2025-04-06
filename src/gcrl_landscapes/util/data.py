@@ -88,7 +88,10 @@ class PhaseResult(dict[FrozenConfigDict, list[EvalTrajectory]]):
 def get_best_agent_path(phase: int, logdir: Path, eval_step: int | None = None) -> Path:
     logfiles = glob(str(logdir / "**"), recursive=True)
     nonbinary_logfiles = [
-        file for file in logfiles if not re.fullmatch(r"^.*\.pkl$", file)
+        file
+        for file in logfiles
+        if not re.fullmatch(r"^.*/submitit/.*$", file)
+        and not re.fullmatch(r"^.*\.pkl$", file)
     ]
     phase_nonbinary_logfiles = [
         file
