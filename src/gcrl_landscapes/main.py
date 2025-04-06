@@ -249,13 +249,23 @@ def submit(args: argparse.Namespace) -> None:
             for column_idx in range(len(argument_columns))
         ]
 
+        last_phase_index = setup["phases"].index(phase) - 1
+        already_trained_steps = (
+            setup["phases"][last_phase_index] if last_phase_index >= 0 else 0
+        )
+
+        steps_to_train = (
+            max(setup["eval_steps"]) - already_trained_steps
+            if not setup["final_step_is_phase"]
+            else phase - already_trained_steps
+        )
         executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
         executor.update_parameters(
             cpus_per_task=4,
             slurm_time=int(
-                args.min_per_task
+                args.min_per_mill_steps
+                * (steps_to_train / 1_000_000)
                 * args.tasks_per_node
-                * ((max(setup["eval_steps"]) - phase) / max(setup["eval_steps"]))
             ),  # this overestimates, keep safety margin
             slurm_gpus_per_node=1,
             tasks_per_node=args.tasks_per_node,
@@ -358,7 +368,9 @@ if __name__ == "__main__":
     slurm_subparser.add_argument("--partition", type=str, default="ai")
     slurm_subparser.add_argument("--tasks_per_node", type=int, required=True)
     slurm_subparser.add_argument("--jobname", required=True, type=str)
-    slurm_subparser.add_argument("--min_per_task", type=int, default=45, required=False)
+    slurm_subparser.add_argument(
+        "--min_per_mill_steps", type=int, default=300, required=False
+    )
     slurm_subparser.set_defaults(func=submit)
 
     # Run subcommand parsing
