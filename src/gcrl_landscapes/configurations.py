@@ -1,5 +1,5 @@
 from ml_collections import FrozenConfigDict
-from ConfigSpace import ConfigurationSpace, Float
+from ConfigSpace import ConfigurationSpace, Float, Categorical
 from scipy.stats.qmc import Sobol
 from math import log
 import ogbench.impls.agents.crl
@@ -33,6 +33,7 @@ def get_config_space(agent: str) -> ConfigurationSpace:
             "actor_p_trajgoal": Float("actor_p_trajgoal", (0, 1)),
             "actor_p_randomgoal": Float("actor_p_randomgoal", (0, 1)),
             "actor_p_curgoal": Float("actor_p_curgoal", (0, 1)),
+            "actor_geom_sample": Categorical("actor_geom_sample", (True, False)),
         }
     )
 
@@ -54,7 +55,12 @@ def generate_configurations(
             ogbench.impls.agents.cmd.get_config().to_dict(), n, hyperparameters
         ),
         "GCBC": lambda n: _generate_configurations(
-            ogbench.impls.agents.gcbc.get_config().to_dict(), n, hyperparameters
+            ogbench.impls.agents.gcbc.get_config().to_dict()
+            if "discount" not in hyperparameters
+            else ogbench.impls.agents.gcbc.get_config().to_dict()
+            | {"actor_geom_sample": True},
+            n,
+            hyperparameters,
         ),
         "QRL": lambda n: _generate_configurations(
             ogbench.impls.agents.qrl.get_config().to_dict(), n, hyperparameters
