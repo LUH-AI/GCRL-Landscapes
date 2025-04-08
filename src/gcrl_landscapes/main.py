@@ -230,7 +230,8 @@ def submit(args: argparse.Namespace) -> None:
     configuration_indices = list(range(setup["n_configurations"]))
     seeds = list(range(args.n_seeds))
     array_id: int | None = None
-    for phase in setup["phases"]:
+    phases = setup["phases"] if not args.phases else args.phases
+    for phase in phases:
         argument_lines = product(
             [args.logdir],
             [phase],
@@ -275,7 +276,7 @@ def submit(args: argparse.Namespace) -> None:
             slurm_job_name=args.jobname,
             slurm_mail_user="m.toepperwien@stud.uni-hannover.de",
             slurm_mail_type="FAIL,END",
-            additional_parameters={"dependency": f"afterok:{array_id}"}
+            slurm_additional_parameters={"dependency": f"afterok:{array_id}"}
             if array_id
             else {},
         )
@@ -371,6 +372,7 @@ if __name__ == "__main__":
     slurm_subparser.add_argument(
         "--min_per_mill_steps", type=int, default=300, required=False
     )
+    slurm_subparser.add_argument("--phases", required=False, nargs="+", type=int)
     slurm_subparser.set_defaults(func=submit)
 
     # Run subcommand parsing
