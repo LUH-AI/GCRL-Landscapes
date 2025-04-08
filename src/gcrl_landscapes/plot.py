@@ -113,6 +113,19 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         plt.colorbar(c, label="Success")
         plt.savefig(output_folder / f"nearest_{phase}.png")
 
+        # Modality plots
+        phase_result_copy["normalized_goal_distances"] = phase_result_copy[
+            "eval_result"
+        ].apply(
+            lambda results_per_seed: np.array(
+                [
+                    np.array(result["goal_end_distances"])
+                    / np.array(result["goal_start_distances"])
+                    for result in results_per_seed.info
+                ]
+            ).reshape(-1)
+        )
+
         # Create plot based on folding test of unimodality
         def eval_result_to_mean_over_tasks(
             eval_result: EvaluationResult,
@@ -128,17 +141,12 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
 
         def aggregate_mean_task_results(series: pd.Series) -> FTU:
             eval_results = series.tolist()
-            success_per_seed_task = np.array(
-                [
-                    [np.mean(task["success_all"]) for task in result.info]
-                    for result in eval_results
-                ]
-            )
+            success_per_seed_task = np.array(eval_results)
             return FTU(success_per_seed_task.reshape(-1), routine="c++")  # type: ignore  # the type is correct, there seems to be an import problem
 
         # group by configuration to apply statistic over seeds
         ftu_object_per_configuration = phase_result_copy.groupby(["run_id"] + hp_list)[
-            "eval_result"
+            "normalized_goal_distances"
         ].aggregate(aggregate_mean_task_results)
         ftu_result_per_configuration = ftu_object_per_configuration.apply(
             lambda ftu: ftu.folding_statistics
