@@ -264,7 +264,8 @@ def submit(args: argparse.Namespace) -> None:
         executor.update_parameters(
             cpus_per_task=4,
             slurm_time=int(
-                args.min_per_mill_steps
+                args.basetime
+                + args.min_per_mill_steps
                 * (steps_to_train / 1_000_000)
                 * args.tasks_per_node
             ),  # this overestimates, keep safety margin
@@ -371,6 +372,13 @@ if __name__ == "__main__":
     slurm_subparser.add_argument("--jobname", required=True, type=str)
     slurm_subparser.add_argument(
         "--min_per_mill_steps", type=int, default=300, required=False
+    )
+    slurm_subparser.add_argument(
+        "--basetime",
+        type=int,
+        required=False,
+        default=30,
+        help="Time allocation per Job independent from training steps",
     )
     slurm_subparser.add_argument("--phases", required=False, nargs="+", type=int)
     slurm_subparser.set_defaults(func=submit)
