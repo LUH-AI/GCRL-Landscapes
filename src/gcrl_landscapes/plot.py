@@ -21,6 +21,7 @@ import matplotlib.ticker as ticker
 from mpl_toolkits.axes_grid1 import ImageGrid
 from PIL import Image
 import os
+from copy import deepcopy
 
 DIM_LABEL_MAPPING = {
     "actor_p_trajgoal": "$p_{trajgoal}$",
@@ -32,6 +33,24 @@ FTU_SIGNIFICANCE_THRESHOLD = 0.05
 
 def map_labels(label: str) -> str:
     return DIM_LABEL_MAPPING[label] if label in DIM_LABEL_MAPPING else label
+
+
+def compute_additional_information(
+    phase_results: list[tuple[int, pd.DataFrame]],
+) -> list[tuple[int, pd.DataFrame]]:
+    phase_results_copy = deepcopy(phase_results)
+    for _, phase_result in phase_results_copy:
+        phase_result["normalized_goal_distances"] = phase_result["eval_result"].apply(
+            lambda results_per_seed: np.array(
+                [
+                    np.array(result["goal_end_distances"])
+                    / np.array(result["goal_start_distances"])
+                    for result in results_per_seed.info
+                ]
+            ).reshape(-1)
+        )
+
+    return phase_results_copy
 
 
 def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, Any]):
@@ -57,6 +76,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         )
         for phase_start, phase in zip(phase_starts, run_info["arguments"]["phases"])
     ]
+    phase_results = compute_additional_information(phase_results)  # type: ignore
 
     for phase, phase_result in phase_results:
         phase_result_copy = phase_result.copy()
@@ -114,18 +134,6 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         plt.savefig(output_folder / f"nearest_{phase}.png")
 
         # Modality plots
-        phase_result_copy["normalized_goal_distances"] = phase_result_copy[
-            "eval_result"
-        ].apply(
-            lambda results_per_seed: np.array(
-                [
-                    np.array(result["goal_end_distances"])
-                    / np.array(result["goal_start_distances"])
-                    for result in results_per_seed.info
-                ]
-            ).reshape(-1)
-        )
-
         # Create plot based on folding test of unimodality
         def eval_result_to_mean_over_tasks(
             eval_result: EvaluationResult,
