@@ -22,6 +22,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from PIL import Image
 import os
 from copy import deepcopy
+from itertools import product
 
 DIM_LABEL_MAPPING = {
     "actor_p_trajgoal": "$p_{trajgoal}$",
@@ -52,6 +53,9 @@ def compute_additional_information(
         phase_result["mean_normalized_goal_distance"] = phase_result[
             "normalized_goal_distances"
         ].apply(np.mean)
+        phase_result["mean_normalized_goal_distance_return"] = (
+            1 - phase_result["mean_normalized_goal_distance"]
+        )
 
     return phase_results_copy
 
@@ -148,6 +152,14 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
 
         plot_igpr(
             phase, phase_result_copy, "success", hp_list, output_folder, "Success Rate"
+        )
+        plot_igpr(
+            phase,
+            phase_result_copy,
+            "mean_normalized_goal_distance_return",
+            hp_list,
+            output_folder,
+            "Normalized Goal Distance Return",
         )
 
         # Modality plots
@@ -278,7 +290,9 @@ if __name__ == "__main__":
         plot(results_df, folder, run_info)
 
     # Build igpr grid of plots (across datasets)
-    imgpath_dataframe = pd.DataFrame(columns=["phase", "agent", "path", "dataset"])  # type: ignore
+    imgpath_dataframe = pd.DataFrame(
+        columns=["phase", "agent", "path", "dataset", "y_col"]
+    )  # type: ignore
     for experiment_name in os.listdir(plots_folder):
         if not Path(plots_folder / experiment_name).is_dir():
             continue
@@ -293,22 +307,32 @@ if __name__ == "__main__":
         for unscaled_igpr_plotpath in [
             plots_folder / experiment_name / filename
             for filename in os.listdir(plots_folder / experiment_name)
-            if re.match(r"^igpr_\d+.png$", filename)
+            if re.match(r"^igpr_.*_\d+.png$", filename)
         ]:
-            phase = re.match(r".*/igpr_(\d+).png$", str(unscaled_igpr_plotpath)).group(
-                1
-            )  # type: ignore
+            plot_name_matches = re.match(
+                r".*/igpr_(?P<y_col>.*)_(?P<phase>\d+).png$",
+                str(unscaled_igpr_plotpath),
+            )
+            if not plot_name_matches:
+                raise ValueError("Naming inside of plots folder not as expected.")
+
             imgpath_dataframe.loc[len(imgpath_dataframe)] = [
-                int(phase),
+                int(plot_name_matches["phase"]),
                 agent,
                 str(unscaled_igpr_plotpath),
                 dataset,
+                plot_name_matches["y_col"],
             ]
 
-    for agent in imgpath_dataframe["agent"].unique():
+    for agent, y_col in product(
+        imgpath_dataframe["agent"].unique(), imgpath_dataframe["y_col"].unique()
+    ):
         grid_plot(
-            imgpath_dataframe[imgpath_dataframe["agent"] == agent],  # type: ignore
+            imgpath_dataframe[
+                (imgpath_dataframe["agent"] == agent)
+                & (imgpath_dataframe["y_col"] == y_col)
+            ],  # type: ignore
             plots_folder,
-            f"{agent}",
+            f"{agent}_{y_col}",
             grid_columns=("dataset", "phase"),
         )  # type: ignore
