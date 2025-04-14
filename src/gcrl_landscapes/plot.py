@@ -49,8 +49,70 @@ def compute_additional_information(
                 ]
             ).reshape(-1)
         )
+        phase_result["mean_normalized_goal_distance"] = phase_result[
+            "normalized_goal_distances"
+        ].apply(np.mean)
 
     return phase_results_copy
+
+
+def plot_igpr(
+    phase: int,
+    phase_result: pd.DataFrame,
+    y_col: str,
+    hp_names: list[str],
+    output_folder: Path,
+    y_label: str | None,
+):
+    model = TripleGPModel(
+        phase_result,
+        np.float64,
+        y_col=y_col,
+        hp_names=hp_names,
+        configspace=get_config_space(""),
+    )
+    model.fit()
+    create_contour_plot(
+        model,
+        x_dim=0,
+        y_dim=1,
+        z_dim=y_label if y_label else y_col,
+        bounds=[0, 1],
+        filename=output_folder / f"igpr_{y_col}_{phase}.png",
+        dim_label_mapping=map_labels,
+    )
+    create_contour_plot(
+        model,
+        x_dim=0,
+        y_dim=1,
+        z_dim=y_label if y_label else y_col,
+        bounds=[None, None],
+        filename=output_folder / f"igpr_{y_col}_{phase}_scaled.png",
+        dim_label_mapping=map_labels,
+    )
+
+    # Create plot without using gaussian processes
+    plt.figure()
+    x_scaled = model.x
+    y_scaled = model.y_iqm
+
+    x0i_scaled, x1i_scaled = np.meshgrid(
+        np.linspace(x_scaled[:, 0].min(), x_scaled[:, 0].max(), 1000),
+        np.linspace(x_scaled[:, 1].min(), x_scaled[:, 1].max(), 1000),
+    )
+    yi_scaled = griddata(
+        (x_scaled[:, 0], x_scaled[:, 1]),
+        y_scaled,
+        (x0i_scaled, x1i_scaled),
+        method="nearest",
+    )
+    x0i = x0i_scaled * model.x_normalizing_factor[0] + model.x_normalizing_offset[0]
+    x1i = x1i_scaled * model.x_normalizing_factor[1] + model.x_normalizing_offset[1]
+    yi = model._unscale_y(yi_scaled).squeeze()
+
+    c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
+    plt.colorbar(c, label=y_label if y_label else y_col)
+    plt.savefig(output_folder / f"nearest_{y_label}_{phase}.png")
 
 
 def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, Any]):
@@ -83,55 +145,10 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         phase_result_copy.loc[:, "run_id"], _ = pd.factorize(
             phase_result_copy["run_id"]
         )  # TripleGPModel needs continuous run-ids starting at 0
-        model = TripleGPModel(
-            phase_result_copy,
-            np.float64,
-            y_col="success",
-            hp_names=hp_list,
-            configspace=get_config_space(""),
-        )
-        model.fit()
-        create_contour_plot(
-            model,
-            x_dim=0,
-            y_dim=1,
-            z_dim="Eval Returns",
-            bounds=[0, 1],
-            filename=output_folder / f"igpr_{phase}.png",
-            dim_label_mapping=map_labels,
-        )
-        create_contour_plot(
-            model,
-            x_dim=0,
-            y_dim=1,
-            z_dim="Eval Returns",
-            bounds=[None, None],
-            filename=output_folder / f"igpr_{phase}_scaled.png",
-            dim_label_mapping=map_labels,
-        )
 
-        # Create plot without using gaussian processes
-        plt.figure()
-        x_scaled = model.x
-        y_scaled = model.y_iqm
-
-        x0i_scaled, x1i_scaled = np.meshgrid(
-            np.linspace(x_scaled[:, 0].min(), x_scaled[:, 0].max(), 1000),
-            np.linspace(x_scaled[:, 1].min(), x_scaled[:, 1].max(), 1000),
+        plot_igpr(
+            phase, phase_result_copy, "success", hp_list, output_folder, "Success Rate"
         )
-        yi_scaled = griddata(
-            (x_scaled[:, 0], x_scaled[:, 1]),
-            y_scaled,
-            (x0i_scaled, x1i_scaled),
-            method="nearest",
-        )
-        x0i = x0i_scaled * model.x_normalizing_factor[0] + model.x_normalizing_offset[0]
-        x1i = x1i_scaled * model.x_normalizing_factor[1] + model.x_normalizing_offset[1]
-        yi = model._unscale_y(yi_scaled).squeeze()
-
-        c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
-        plt.colorbar(c, label="Success")
-        plt.savefig(output_folder / f"nearest_{phase}.png")
 
         # Modality plots
         # Create plot based on folding test of unimodality
