@@ -23,7 +23,7 @@ from PIL import Image
 import os
 from copy import deepcopy
 from itertools import product
-from gcrl_landscapes.util.eval import cvar
+from gcrl_landscapes.util.eval import cvar, iqr
 
 DIM_LABEL_MAPPING = {
     "actor_p_trajgoal": "$p_{trajgoal}$",
@@ -33,6 +33,7 @@ DIM_LABEL_MAPPING = {
 FTU_SIGNIFICANCE_THRESHOLD = 0.05
 
 CVAR_CONFIDENCE_LEVEL = 10
+DISP_CONFIDENCE_LEVELS = (10, 90)
 
 
 def map_labels(label: str) -> str:
@@ -53,20 +54,28 @@ def compute_additional_information(
                 ]
             ).reshape(-1)
         )
+        phase_result["normalized_goal_distance_returns"] = phase_result[
+            "normalized_goal_distances"
+        ].apply(lambda distances: 1 - distances)
         phase_result["mean_normalized_goal_distance"] = phase_result[
             "normalized_goal_distances"
         ].apply(np.mean)
-        phase_result["mean_normalized_goal_distance_return"] = (
-            1 - phase_result["mean_normalized_goal_distance"]
-        )
+        phase_result["mean_normalized_goal_distance_return"] = phase_result[
+            "normalized_goal_distance_returns"
+        ].apply(np.mean)
 
         phase_result["cvar_normalized_goal_distance_return"] = phase_result[
-            "normalized_goal_distances"
+            "normalized_goal_distance_returns"
         ].apply(
-            lambda distances: cvar(
-                1 - distances, confidence_level=CVAR_CONFIDENCE_LEVEL
-            )
+            lambda distances: cvar(distances, confidence_level=CVAR_CONFIDENCE_LEVEL)
         )
+        phase_result["disp_normalized_goal_distance"] = phase_result[
+            "normalized_goal_distance_returns"
+        ].apply(lambda returns: iqr(returns, DISP_CONFIDENCE_LEVELS))
+        phase_result["disp_normalized_goal_distance_score"] = (
+            1 - phase_result["disp_normalized_goal_distance"]
+        )
+        assert phase_result["disp_normalized_goal_distance_score"].max() <= 1
 
     return phase_results_copy
 
@@ -180,6 +189,14 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             hp_list,
             output_folder,
             "CVaR of normalized goal distance return",
+        )
+        plot_igpr(
+            phase,
+            phase_result_copy,
+            "disp_normalized_goal_distance_score",
+            hp_list,
+            output_folder,
+            "Dispersion score of normalized goal distance return",
         )
 
         # Modality plots
