@@ -128,6 +128,7 @@ def plot_igpr(
     c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
     plt.colorbar(c, label=y_label if y_label else y_col)
     plt.savefig(output_folder / f"nearest_{y_label}_{phase}.png")
+    plt.close()
 
 
 def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, Any]):
@@ -248,6 +249,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         cbar.ax.set_yticks([])
 
         plt.savefig(output_folder / f"modality_{phase}.png")
+        plt.close()
 
 
 def grid_plot(
@@ -279,6 +281,7 @@ def grid_plot(
         ax.axis("off")
         ax.set_title(f"{dataset}-{phase}")
     fig.savefig(output_folder / f"{title}.png")
+    plt.close()
     return
 
 
