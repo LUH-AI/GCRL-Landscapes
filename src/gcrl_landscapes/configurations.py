@@ -94,7 +94,7 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
     actor_p_trajgoals = (
         _generate_actor_p_trajgoals(n)
         if "actor_p_trajgoal" in hyperparameters
-        else _generate_dummy_list(n, base_config["discount"])
+        else _generate_dummy_list(n, base_config["actor_p_trajgoal"])
     )
     actor_p_randomgoals = list(
         np.ones(len(actor_p_trajgoals)) - np.array(actor_p_trajgoals)
