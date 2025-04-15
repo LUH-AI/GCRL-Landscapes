@@ -271,7 +271,7 @@ def submit(args: argparse.Namespace) -> None:
             ),  # this overestimates, keep safety margin
             slurm_gpus_per_node=1,
             tasks_per_node=args.tasks_per_node,
-            slurm_mem_per_cpu="2G",
+            slurm_mem_per_cpu="3G",
             slurm_array_parallelism=50,
             slurm_partition=args.partition,
             slurm_job_name=args.jobname,
