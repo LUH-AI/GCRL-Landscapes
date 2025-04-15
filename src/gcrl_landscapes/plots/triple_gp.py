@@ -264,3 +264,4 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
     plt.ylabel(dim_label_mapping(model.hp_names[y_dim].split('.')[-1]), fontsize=18)
     plt.title(f'{z_dim}', fontsize=18)
     plt.savefig(filename)
+    plt.close()
