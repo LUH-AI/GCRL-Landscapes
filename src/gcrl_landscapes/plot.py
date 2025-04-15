@@ -23,7 +23,7 @@ from PIL import Image
 import os
 from copy import deepcopy
 from itertools import product
-from gcrl_landscapes.util.eval import cvar, iqr
+from gcrl_landscapes.util.eval import cvar, iqr, cvar_inv
 
 DIM_LABEL_MAPPING = {
     "actor_p_trajgoal": "$p_{trajgoal}$",
@@ -76,6 +76,14 @@ def compute_additional_information(
             1 - phase_result["disp_normalized_goal_distance"]
         )
         assert phase_result["disp_normalized_goal_distance_score"].max() <= 1
+        phase_result["cvar_normalized_goal_distance_return_half_percentile"] = (
+            phase_result[
+                "normalized_goal_distance_returns"
+            ].apply(lambda returns: cvar_inv(returns, 0.5))
+        )
+        phase_result["cvar_normalized_goal_distance_return_half_percentile_score"] = (
+            1 - phase_result["cvar_normalized_goal_distance_return_half_percentile"]
+        )
 
     return phase_results_copy
 
@@ -197,6 +205,14 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             hp_list,
             output_folder,
             "Dispersion score of normalized goal distance return",
+        )
+        plot_igpr(
+            phase,
+            phase_result_copy,
+            "cvar_normalized_goal_distance_return_half_percentile_score",
+            hp_list,
+            output_folder,
+            "1 - Percentile needed to reach CVaR of 0.5",
         )
 
         # Modality plots
