@@ -23,6 +23,7 @@ from PIL import Image
 import os
 from copy import deepcopy
 from itertools import product
+from gcrl_landscapes.util.eval import cvar
 
 DIM_LABEL_MAPPING = {
     "actor_p_trajgoal": "$p_{trajgoal}$",
@@ -30,6 +31,8 @@ DIM_LABEL_MAPPING = {
 }
 
 FTU_SIGNIFICANCE_THRESHOLD = 0.05
+
+CVAR_CONFIDENCE_LEVEL = 10
 
 
 def map_labels(label: str) -> str:
@@ -55,6 +58,14 @@ def compute_additional_information(
         ].apply(np.mean)
         phase_result["mean_normalized_goal_distance_return"] = (
             1 - phase_result["mean_normalized_goal_distance"]
+        )
+
+        phase_result["cvar_normalized_goal_distance_return"] = phase_result[
+            "normalized_goal_distances"
+        ].apply(
+            lambda distances: cvar(
+                1 - distances, confidence_level=CVAR_CONFIDENCE_LEVEL
+            )
         )
 
     return phase_results_copy
@@ -160,6 +171,14 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             hp_list,
             output_folder,
             "Normalized Goal Distance Return",
+        )
+        plot_igpr(
+            phase,
+            phase_result_copy,
+            "cvar_normalized_goal_distance_return",
+            hp_list,
+            output_folder,
+            "CVaR of normalized goal distance return",
         )
 
         # Modality plots
