@@ -144,7 +144,7 @@ def plot_igpr(
 
     c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
     plt.colorbar(c, label=y_label if y_label else y_col)
-    plt.savefig(output_folder / f"nearest_{y_label}_{phase}.png")
+    plt.savefig(output_folder / f"nearest_{y_label}_{phase}.png", bbox_inches="tight")
     plt.close()
 
 
@@ -281,7 +281,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         cbar.ax.yaxis.set_minor_formatter(ticker.FixedFormatter(["MM", "N/A", "UM"]))
         cbar.ax.set_yticks([])
 
-        plt.savefig(output_folder / f"modality_{phase}.png")
+        plt.savefig(output_folder / f"modality_{phase}.png", bbox_inches="tight")
         plt.close()
 
 
@@ -313,7 +313,7 @@ def grid_plot(
         ax.imshow(Image.open(imgpath))
         ax.axis("off")
         ax.set_title(f"{dataset}-{phase}")
-    fig.savefig(output_folder / f"{title}.png")
+    fig.savefig(output_folder / f"{title}.png", bbox_inches="tight")
     plt.close()
     return
 
