@@ -23,6 +23,8 @@ AGENT_CLASSES = {
     "CRL": None,
     "CMD": None,
     "GCBC": None,
+    "GCIQL": None,
+    "GCIVL": None,
     "QRL": None,
     "HIQL": None,
 }
@@ -30,6 +32,8 @@ DATASET_CLASSES = {
     "CRL": None,
     "CMD": None,
     "GCBC": None,
+    "GCIQL": None,
+    "GCIVL": None,
     "QRL": None,
     "HIQL": None,
 }
@@ -112,7 +116,15 @@ def run_config(
     from .evaluate import evaluate_wrapper
     from ogbench import make_env_and_datasets
     from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
-    from ogbench.impls.agents import CRLAgent, CMDAgent, GCBCAgent, QRLAgent, HIQLAgent
+    from ogbench.impls.agents import (
+        CRLAgent,
+        CMDAgent,
+        GCBCAgent,
+        QRLAgent,
+        HIQLAgent,
+        GCIQLAgent,
+        GCIVLAgent,
+    )
     import jax
     from .util.misc import jax_has_gpu
 
@@ -123,6 +135,8 @@ def run_config(
         "CRL": CRLAgent,
         "CMD": CMDAgent,
         "GCBC": GCBCAgent,
+        "GCIQL": GCIQLAgent,
+        "GCIVL": GCIVLAgent,
         "QRL": QRLAgent,
         "HIQL": HIQLAgent,
     }
@@ -130,6 +144,8 @@ def run_config(
         "CRL": GCDataset,
         "CMD": GCDataset,
         "GCBC": GCDataset,
+        "GCIQL": GCDataset,
+        "GCIVL": GCDataset,
         "QRL": GCDataset,
         "HIQL": HGCDataset,
     }
