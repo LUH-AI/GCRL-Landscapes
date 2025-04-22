@@ -262,7 +262,7 @@ def submit(args: argparse.Namespace) -> None:
         )
         executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
         executor.update_parameters(
-            cpus_per_task=4,
+            cpus_per_task=3,
             slurm_time=int(
                 args.basetime
                 + args.min_per_mill_steps
