@@ -3,6 +3,8 @@ from ConfigSpace import ConfigurationSpace, Float, Categorical
 from scipy.stats.qmc import Sobol
 from math import log
 import ogbench.impls.agents.crl
+import ogbench.impls.agents.gciql
+import ogbench.impls.agents.gcivl
 import ogbench.impls.agents.cmd
 import ogbench.impls.agents.gcbc
 import ogbench.impls.agents.qrl
@@ -62,11 +64,17 @@ def generate_configurations(
             n,
             hyperparameters,
         ),
-        "QRL": lambda n: _generate_configurations(
-            ogbench.impls.agents.qrl.get_config().to_dict(), n, hyperparameters
+        "GCIQL": lambda n: _generate_configurations(
+            ogbench.impls.agents.gciql.get_config().to_dict(), n, hyperparameters
+        ),
+        "GCIVL": lambda n: _generate_configurations(
+            ogbench.impls.agents.gcivl.get_config().to_dict(), n, hyperparameters
         ),
         "HIQL": lambda n: _generate_configurations(
             ogbench.impls.agents.hiql.get_config().to_dict(), n, hyperparameters
+        ),
+        "QRL": lambda n: _generate_configurations(
+            ogbench.impls.agents.qrl.get_config().to_dict(), n, hyperparameters
         ),
     }
     return agent_config_generators[agent](n)
