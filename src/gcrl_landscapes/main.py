@@ -14,7 +14,7 @@ import sys
 from itertools import product
 from .util.misc import retry_call
 import re
-from .util.data import get_best_agent_path
+from .util.data import get_best_agent_path, get_phase_results
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +89,7 @@ def run_config(
     configuration_index: int,
     seed: int,
     tasks_per_node: int,
+    clean_checkpoints: bool = False,
 ) -> None:
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
@@ -155,11 +156,16 @@ def run_config(
     already_trained_steps = (
         setup["phases"][last_phase_index] if last_phase_index >= 0 else 0
     )
+    phase_results = get_phase_results(already_trained_steps, logdir)
     agent_path = (
-        get_best_agent_path(already_trained_steps, logdir)
-        if already_trained_steps > 0
-        else None
+        get_best_agent_path(phase_results) if already_trained_steps > 0 else None
     )
+    # delete unneeded checkpoints
+    if clean_checkpoints:
+        print("Cleaning checkpoints")
+        for path in phase_results["path"]:
+            if path != agent_path:
+                path.unlink(missing_ok=True)
 
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
@@ -337,6 +343,8 @@ def run_config_slurm_tasks_wrapper(
         configuration_indices[r],
         seeds[r],
         tasks_per_node[r],
+        # clean up unneeded checkpoints from last phase if we are job zero and task zero in array
+        clean_checkpoints=job_env.array_task_id == 0 and r == 0,
     )
 
 

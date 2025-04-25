@@ -85,7 +85,23 @@ class PhaseResult(dict[FrozenConfigDict, list[EvalTrajectory]]):
         )
 
 
-def get_best_agent_path(phase: int, logdir: Path, eval_step: int | None = None) -> Path:
+def get_best_agent_path(
+    result_pandas: pd.DataFrame, eval_step: int | None = None
+) -> Path:
+    final_eval_result = result_pandas[
+        result_pandas["eval_step"]
+        == (eval_step if eval_step else result_pandas["eval_step"].max())
+    ]
+    return Path(
+        final_eval_result[
+            final_eval_result["success"] == final_eval_result["success"].max()
+        ].iloc[0]["path"]
+    )
+
+
+def get_phase_results(
+    phase: int, logdir: Path, eval_step: int | None = None
+) -> pd.DataFrame:
     logfiles = glob(str(logdir / "**"), recursive=True)
     nonbinary_logfiles = [
         file
@@ -115,15 +131,8 @@ def get_best_agent_path(phase: int, logdir: Path, eval_step: int | None = None) 
     assert len(results_from_zip.values()) == 1
     result: ResultsPerStep[PhaseResult] = list(results_from_zip.values())[0][1]
     result_pandas = phase_results_to_pandas(result)
-    final_eval_result = result_pandas[
-        result_pandas["eval_step"]
-        == (eval_step if eval_step else result_pandas["eval_step"].max())
-    ]
-    return Path(
-        final_eval_result[
-            final_eval_result["success"] == final_eval_result["success"].max()
-        ].iloc[0]["path"]
-    )
+
+    return result_pandas
 
 
 def restore_agent(agent, path: Path):
