@@ -49,7 +49,9 @@ else
 fi
 
 for environment in "${environments[@]}"; do
+  echo "Starting jobs for ${environment}"
   for agent in "${agents[@]}"; do
+    echo "Starting job for ${agent}"
     full_log_dir="${logdir}/${agent}_${environment}_${numconfigurations}c_${hyperparameters// /-}"
 
     python -m gcrl_landscapes.main setup --agent "$agent" --dataset "$environment" --n_configurations "$numconfigurations" --phases $phases --eval_steps $evalsteps --eval_episodes "$numevalepisodes" --hyperparameters $hyperparameters --logdir "$full_log_dir"
