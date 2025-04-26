@@ -1,8 +1,10 @@
 import gymnasium as gym
 from ogbench.impls.utils.evaluation import evaluate
+from ogbench.locomaze.ant import AntEnv
+from ogbench.locomaze.humanoid import HumanoidEnv
+from ogbench.manipspace.envs.cube_env import CubeEnv
 import numpy as np
 from ml_collections import ConfigDict
-import warnings
 
 
 def evaluate_wrapper(
@@ -35,23 +37,9 @@ def evaluate_wrapper(
     length_of_trajectories = [
         [len(traj["reward"]) for traj in trajs_task] for trajs_task in trajs
     ]
-    warnings.warn("evaluation is currently only supported for two-dimensional goals")
-    goal_start_distances = [
-        # [:2] -> two-dimensional
-        [
-            float(np.linalg.norm(traj["info"][0]["goal"][:2] - traj["info"][0]["xy"]))
-            for traj in trajs_task
-        ]
-        for trajs_task in trajs
-    ]
-    goal_end_distances = [
-        # [:2] -> two-dimensional
-        [
-            float(np.linalg.norm(traj["info"][-1]["goal"][:2] - traj["info"][-1]["xy"]))
-            for traj in trajs_task
-        ]
-        for trajs_task in trajs
-    ]
+
+    goal_start_distances, goal_end_distances = calc_goal_distances(trajs, env)
+
     for (
         eval_info_task,
         length_of_trajectories_task,
@@ -64,3 +52,65 @@ def evaluate_wrapper(
         eval_info_task["goal_start_distances"] = goal_start_distances_task
         eval_info_task["goal_end_distances"] = goal_end_distances_task
     return eval_info, eval_metrics, trajs, renders
+
+
+def calc_goal_distances(
+    trajectories, env
+) -> tuple[list[list[float]], list[list[float]]]:
+    if isinstance(env.unwrapped, (HumanoidEnv, AntEnv)):
+        goal_dimensionality = 2
+        goal_start_distances = [
+            [
+                float(
+                    np.linalg.norm(
+                        traj["info"][0]["goal"][:goal_dimensionality]
+                        - traj["info"][0]["xy"]
+                    )
+                )
+                for traj in trajs_task
+            ]
+            for trajs_task in trajectories
+        ]
+        goal_end_distances = [
+            [
+                float(
+                    np.linalg.norm(
+                        traj["info"][-1]["goal"][:goal_dimensionality]
+                        - traj["info"][-1]["xy"]
+                    )
+                )
+                for traj in trajs_task
+            ]
+            for trajs_task in trajectories
+        ]
+    elif isinstance(env.unwrapped, CubeEnv):
+
+        def info_to_distance(info: dict) -> float:
+            cube_positions = [
+                info[f"privileged/block_{i}_pos"]
+                for i in range(env.unwrapped._num_cubes)
+            ]
+            cube_goals = [
+                info[f"privileged/block_{i}_pos_goal"]
+                for i in range(env.unwrapped._num_cubes)
+            ]
+            goal_distances = [
+                float(np.linalg.norm(cube_position - cube_goal))
+                for cube_position, cube_goal in zip(cube_positions, cube_goals)
+            ]
+            return sum(goal_distances)
+
+        goal_start_distances = [
+            [info_to_distance(traj["info"][0]) for traj in trajs_task]
+            for trajs_task in trajectories
+        ]
+        goal_end_distances = [
+            [info_to_distance(traj["info"][-1]) for traj in trajs_task]
+            for trajs_task in trajectories
+        ]
+    else:
+        raise NotImplementedError(
+            f"{type(env.unwrapped)} not supported for goal distance calculation"
+        )
+
+    return goal_start_distances, goal_end_distances
