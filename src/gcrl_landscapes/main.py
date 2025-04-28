@@ -209,9 +209,7 @@ def run_config(
 
     # don't train until end if we don't use final timestep as fitness evaluation
     setup_eval_steps = setup["eval_steps"]
-    setup_save_steps = (
-        setup["save_steps"] if "save_steps" in setup else setup_eval_steps
-    )
+    setup_save_steps = setup["save_steps"] if "save_steps" in setup else [phase]
     if setup["final_step_is_phase"]:
         eval_steps = [step for step in setup_eval_steps if step <= phase]
         save_steps = [step for step in setup_save_steps if step <= phase]
