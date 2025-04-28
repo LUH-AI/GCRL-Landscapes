@@ -174,12 +174,14 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
                             "success": eval_result.success,
                             "eval_result": eval_result,
                             "path": str(path),
+                            "config_index": config["config_index"],
                         }
                         | {
                             f"hp.{key}": [
                                 value,
                             ]
                             for key, value in config.to_dict().items()
+                            if key != "config_index"
                         }
                     )
                     df = pd.concat(
@@ -223,6 +225,7 @@ def read_results_from_zip(
             with zip_file.open(configuration_path) as f:
                 configurations[configuration_idx] = FrozenConfigDict(
                     json.loads(f.read().decode(encoding="utf-8"))
+                    | {"config_index": configuration_idx}
                 )
         return configurations
 
