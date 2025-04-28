@@ -58,14 +58,10 @@ def calc_goal_distances(
     trajectories, env
 ) -> tuple[list[list[float]], list[list[float]]]:
     if isinstance(env.unwrapped, (HumanoidEnv, AntEnv)):
-        goal_dimensionality = 2
         goal_start_distances = [
             [
                 float(
-                    np.linalg.norm(
-                        traj["info"][0]["goal"][:goal_dimensionality]
-                        - traj["info"][0]["xy"]
-                    )
+                    np.linalg.norm(traj["info"][0]["xy_goal"] - traj["info"][0]["xy"])
                 )
                 for traj in trajs_task
             ]
@@ -74,10 +70,7 @@ def calc_goal_distances(
         goal_end_distances = [
             [
                 float(
-                    np.linalg.norm(
-                        traj["info"][-1]["goal"][:goal_dimensionality]
-                        - traj["info"][-1]["xy"]
-                    )
+                    np.linalg.norm(traj["info"][-1]["xy_goal"] - traj["info"][-1]["xy"])
                 )
                 for traj in trajs_task
             ]
