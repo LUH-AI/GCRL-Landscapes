@@ -100,8 +100,8 @@ def get_best_agent_path(
         & (result_pandas["seed"] == seed)
     ]
     assert len(best_df) == 1
-    best_path = best_df.iloc[0]["path"]
-    assert isinstance(best_path, Path)
+    best_path = Path(best_df.iloc[0]["path"])
+    assert best_path.exists()
     return best_path
 
 

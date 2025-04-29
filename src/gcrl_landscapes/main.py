@@ -166,8 +166,8 @@ def run_config(
         # delete unneeded checkpoints
         if clean_checkpoints:
             print("Cleaning checkpoints")
-            for path in phase_results["path"]:
-                if path != agent_path:
+            for path in map(Path, phase_results["path"]):
+                if str(path) != str(agent_path):
                     path.unlink(missing_ok=True)
     else:
         agent_path = None
@@ -347,7 +347,7 @@ def run_config_slurm_tasks_wrapper(
         seeds[r],
         tasks_per_node[r],
         # clean up unneeded checkpoints from last phase if we are job zero and task zero in array
-        clean_checkpoints=job_env.array_task_id == 0 and r == 0,
+        clean_checkpoints=int(job_env.array_task_id) == 0 and r == 0,
     )
 
 
