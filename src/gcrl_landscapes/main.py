@@ -296,7 +296,7 @@ def submit(args: argparse.Namespace) -> None:
             ),  # this overestimates, keep safety margin
             slurm_gpus_per_node=1,
             tasks_per_node=args.tasks_per_node,
-            slurm_mem_per_cpu=f"{3 * (1 if "visual" not in setup["dataset"] else 3)}G",
+            slurm_mem_per_cpu=args.mem_per_cpu,
             slurm_array_parallelism=50,
             slurm_partition=args.partition,
             slurm_job_name=args.jobname,
@@ -395,6 +395,9 @@ if __name__ == "__main__":
     slurm_subparser.add_argument("--logdir", type=Path, required=True)
     slurm_subparser.add_argument("--n_seeds", type=int, required=True)
     slurm_subparser.add_argument("--partition", type=str, default="ai")
+    slurm_subparser.add_argument(
+        "--mem_per_cpu", type=str, default="3G", required=False
+    )
     slurm_subparser.add_argument("--tasks_per_node", type=int, required=True)
     slurm_subparser.add_argument("--jobname", required=True, type=str)
     slurm_subparser.add_argument(
