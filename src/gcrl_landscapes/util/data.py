@@ -130,7 +130,7 @@ def get_phase_results(
     with NamedTemporaryFile(mode="w+b") as temp_f:
         with zipfile.ZipFile(temp_f, mode="w") as zip_f:
             for file in phase_nonbinary_logfiles:
-                zip_f.write(file, arcname=re.sub(r"^.*/logs/", "logs/", file))
+                zip_f.write(file, arcname=re.sub(r"^.*/logs[^/]*/", "logs/", file))
         temp_f.flush()
         results_from_zip = read_results_from_zip(Path(temp_f.name))
 
@@ -198,7 +198,7 @@ def read_results_from_zip(
     def get_prefix_run_mappings(
         filenames: list[str], zip_file: zipfile.ZipFile
     ) -> dict[str, dict[str, Any]]:
-        top_level_info_pattern = re.compile(r"^(logs/[^/]*/)info.toml")
+        top_level_info_pattern = re.compile(r"^(logs[^/]*/[^/]*/)info.toml")
         top_level_info_names = [
             filename for filename in filenames if top_level_info_pattern.match(filename)
         ]
