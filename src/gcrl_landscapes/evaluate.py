@@ -3,6 +3,7 @@ from ogbench.impls.utils.evaluation import evaluate
 from ogbench.locomaze.ant import AntEnv
 from ogbench.locomaze.humanoid import HumanoidEnv
 from ogbench.manipspace.envs.cube_env import CubeEnv
+from ogbench.powderworld.powderworld_env import PowderworldEnv
 import numpy as np
 from ml_collections import ConfigDict
 
@@ -99,6 +100,15 @@ def calc_goal_distances(
         ]
         goal_end_distances = [
             [info_to_distance(traj["info"][-1]) for traj in trajs_task]
+            for trajs_task in trajectories
+        ]
+    elif isinstance(env.unwrapped, PowderworldEnv):
+        goal_start_distances = [
+            [float(traj["info"][0]["error"]) for traj in trajs_task]
+            for trajs_task in trajectories
+        ]
+        goal_end_distances = [
+            [float(traj["info"][-1]["error"]) for traj in trajs_task]
             for trajs_task in trajectories
         ]
     else:

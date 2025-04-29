@@ -74,7 +74,7 @@ def run_setup(args: argparse.Namespace) -> None:
         args.agent,
         set(args.hyperparameters),
         seed=args.seed,
-        visual="visual" in args.dataset,
+        env=args.dataset,
     )
 
     def save_configurations():
