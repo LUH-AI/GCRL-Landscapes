@@ -335,7 +335,7 @@ if __name__ == "__main__":
     }
 
     for prefix, (run_info, results_df) in results_pandas.items():
-        run_match = re.match(r"^logs/([^/]*)/?", prefix)
+        run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
         if not run_match:
             raise ValueError("Naming inside of zipfile not as expected.")
         run_name = run_match.group(1)
