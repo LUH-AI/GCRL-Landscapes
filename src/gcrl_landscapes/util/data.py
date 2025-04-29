@@ -88,14 +88,22 @@ class PhaseResult(dict[FrozenConfigDict, list[EvalTrajectory]]):
 def get_best_agent_path(
     result_pandas: pd.DataFrame, eval_step: int | None = None
 ) -> Path:
-    final_eval_result = result_pandas[
-        result_pandas["eval_step"]
-        == (eval_step if eval_step else result_pandas["eval_step"].max())
-    ]
+    final_eval_step = eval_step if eval_step else result_pandas["eval_step"].max()
+    final_eval_result = result_pandas[result_pandas["eval_step"] == final_eval_step]
+    path_final = final_eval_result[
+        final_eval_result["success"] == final_eval_result["success"].max()
+    ].iloc[0]["path"]
+    eval_match = re.fullmatch(
+        r"^.*/configuration_\d+/phase_(?P<phase>\d+)/.*/params_(?P<tfinal>\d+).pkl$",
+        str(path_final),
+    )
+    if not eval_match:
+        raise Exception(f"agent path not in format expected: {path_final}")
+    eval_groupdict = eval_match.groupdict()
     return Path(
-        final_eval_result[
-            final_eval_result["success"] == final_eval_result["success"].max()
-        ].iloc[0]["path"]
+        str(path_final).replace(
+            f"{eval_groupdict['tfinal']}", f"{eval_groupdict['phase']}"
+        )
     )
 
 
