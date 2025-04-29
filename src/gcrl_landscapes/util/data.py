@@ -63,12 +63,13 @@ class EvalTrajectory(tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path
         )
 
 
-class PhaseResult(dict[FrozenConfigDict, list[EvalTrajectory]]):
+class PhaseResult(dict[FrozenConfigDict, dict[int, EvalTrajectory]]):
     def to_dict(self) -> dict:
         return {
-            config.to_json(): [
-                eval_trajectory.to_json() for eval_trajectory in eval_trajectories
-            ]
+            config.to_json(): {
+                seed: eval_trajectory.to_json()
+                for seed, eval_trajectory in eval_trajectories.items()
+            }
             for config, eval_trajectories in self.items()
         }
 
@@ -76,10 +77,10 @@ class PhaseResult(dict[FrozenConfigDict, list[EvalTrajectory]]):
     def from_dict(cls, raw_result: dict) -> "PhaseResult":
         return PhaseResult(
             {
-                FrozenConfigDict(json.loads(config)): [
-                    EvalTrajectory.from_json(eval_trajectory)
-                    for eval_trajectory in eval_trajectories
-                ]
+                FrozenConfigDict(json.loads(config)): {
+                    seed: EvalTrajectory.from_json(eval_trajectory)
+                    for seed, eval_trajectory in eval_trajectories.items()
+                }
                 for config, eval_trajectories in raw_result.items()
             }
         )
@@ -90,21 +91,18 @@ def get_best_agent_path(
 ) -> Path:
     final_eval_step = eval_step if eval_step else result_pandas["eval_step"].max()
     final_eval_result = result_pandas[result_pandas["eval_step"] == final_eval_step]
-    path_final = final_eval_result[
+    best_config, phase, seed = final_eval_result[
         final_eval_result["success"] == final_eval_result["success"].max()
-    ].iloc[0]["path"]
-    eval_match = re.fullmatch(
-        r"^.*/configuration_\d+/phase_(?P<phase>\d+)/.*/params_(?P<tfinal>\d+).pkl$",
-        str(path_final),
-    )
-    if not eval_match:
-        raise Exception(f"agent path not in format expected: {path_final}")
-    eval_groupdict = eval_match.groupdict()
-    return Path(
-        str(path_final).replace(
-            f"{eval_groupdict['tfinal']}", f"{eval_groupdict['phase']}"
-        )
-    )
+    ].iloc[0][["config_index", "phase", "seed"]]
+    best_df = result_pandas[
+        (result_pandas["eval_step"] == phase)
+        & (result_pandas["config_index"] == best_config)
+        & (result_pandas["seed"] == seed)
+    ]
+    assert len(best_df) == 1
+    best_path = best_df.iloc[0]["path"]
+    assert isinstance(best_path, Path)
+    return best_path
 
 
 def get_phase_results(
@@ -157,19 +155,21 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
     run_id = 0
     for phase_step, result in results.items():
         for config, eval_trajectories in result.items():
-            for eval_trajectory_seed, eval_trajectory in enumerate(eval_trajectories):
+            for seed, eval_trajectory in eval_trajectories.items():
                 for eval_step, (eval_result, path) in {
                     eval_step: (
                         eval_trajectory[0][eval_step],
-                        eval_trajectory[1][eval_step],
+                        eval_trajectory[1][eval_step]
+                        if eval_step in eval_trajectory[1]
+                        else None,
                     )
                     for eval_step in eval_trajectory[0].keys()
                 }.items():  # In EvalTrajectory both ResultsPerStep have the same keys
                     new_df = pd.DataFrame.from_dict(
                         {
                             "run_id": run_id,
-                            "eval_seed": eval_trajectory_seed,
-                            "phase_start": phase_step,
+                            "seed": seed,
+                            "phase": phase_step,
                             "eval_step": eval_step,
                             "success": eval_result.success,
                             "eval_result": eval_result,
