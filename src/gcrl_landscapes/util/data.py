@@ -253,8 +253,8 @@ def read_results_from_zip(
                 if phase not in results:
                     results[phase] = PhaseResult({})
                 if configurations[config_num] not in results[phase]:
-                    results[phase][configurations[config_num]] = []
-                results[phase][configurations[config_num]].append(
+                    results[phase][configurations[config_num]] = {}
+                results[phase][configurations[config_num]][seed] = (
                     EvalTrajectory.from_json(json.loads(file_content))
                 )
 
