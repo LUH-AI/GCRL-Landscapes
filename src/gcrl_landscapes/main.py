@@ -160,16 +160,17 @@ def run_config(
     already_trained_steps = (
         setup["phases"][last_phase_index] if last_phase_index >= 0 else 0
     )
-    phase_results = get_phase_results(already_trained_steps, logdir)
-    agent_path = (
-        get_best_agent_path(phase_results) if already_trained_steps > 0 else None
-    )
-    # delete unneeded checkpoints
-    if clean_checkpoints:
-        print("Cleaning checkpoints")
-        for path in phase_results["path"]:
-            if path != agent_path:
-                path.unlink(missing_ok=True)
+    if already_trained_steps > 0:
+        phase_results = get_phase_results(already_trained_steps, logdir)
+        agent_path = get_best_agent_path(phase_results)
+        # delete unneeded checkpoints
+        if clean_checkpoints:
+            print("Cleaning checkpoints")
+            for path in phase_results["path"]:
+                if path != agent_path:
+                    path.unlink(missing_ok=True)
+    else:
+        agent_path = None
 
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
