@@ -44,8 +44,8 @@ def generate_configurations(
     n: int,
     agent: str,
     hyperparameters: set[str],
+    env: str,
     seed: int = 0,
-    visual: bool = False,
 ) -> list[FrozenConfigDict]:
     logger.info(f"Generating {n} configurations for {agent} using {hyperparameters}")
     np.random.seed(seed)
@@ -55,48 +55,42 @@ def generate_configurations(
 
     agent_config_generators = {
         "CRL": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.crl.get_config().to_dict(), visual),
+            _adapt_base_config(ogbench.impls.agents.crl.get_config().to_dict(), env),
             n,
             hyperparameters,
         ),
         "CMD": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.cmd.get_config().to_dict(), visual),
+            _adapt_base_config(ogbench.impls.agents.cmd.get_config().to_dict(), env),
             n,
             hyperparameters,
         ),
         "GCBC": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.gcbc.get_config().to_dict(), visual)
+            _adapt_base_config(ogbench.impls.agents.gcbc.get_config().to_dict(), env)
             if "discount" not in hyperparameters
             else _adapt_base_config(
-                ogbench.impls.agents.gcbc.get_config().to_dict(), visual
+                ogbench.impls.agents.gcbc.get_config().to_dict(), env
             )
             | {"actor_geom_sample": True},
             n,
             hyperparameters,
         ),
         "GCIQL": lambda n: _generate_configurations(
-            _adapt_base_config(
-                ogbench.impls.agents.gciql.get_config().to_dict(), visual
-            ),
+            _adapt_base_config(ogbench.impls.agents.gciql.get_config().to_dict(), env),
             n,
             hyperparameters,
         ),
         "GCIVL": lambda n: _generate_configurations(
-            _adapt_base_config(
-                ogbench.impls.agents.gcivl.get_config().to_dict(), visual
-            ),
+            _adapt_base_config(ogbench.impls.agents.gcivl.get_config().to_dict(), env),
             n,
             hyperparameters,
         ),
         "HIQL": lambda n: _generate_configurations(
-            _adapt_base_config(
-                ogbench.impls.agents.hiql.get_config().to_dict(), visual
-            ),
+            _adapt_base_config(ogbench.impls.agents.hiql.get_config().to_dict(), env),
             n,
             hyperparameters,
         ),
         "QRL": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.qrl.get_config().to_dict(), visual),
+            _adapt_base_config(ogbench.impls.agents.qrl.get_config().to_dict(), env),
             n,
             hyperparameters,
         ),
@@ -178,8 +172,18 @@ def _generate_dummy_list(n: int, val: object) -> list[object]:
     return [val] * n
 
 
-def _adapt_base_config(config: dict, visual: bool) -> dict:
-    key_value_pairs = [("encoder", "impala_small", visual)]
+def _adapt_base_config(config: dict, env: str) -> dict:
+    visual = "visual" in env or "powderworld" in env
+    discrete = "powderworld" in env
+    awr = "actor_loss" in config.keys() and discrete
+    hiql_grad_propagation = "low_actor_rep_grad" in config.keys() and visual
+    key_value_pairs = [
+        ("encoder", "impala_small", visual),
+        ("discrete", True, discrete),
+        ("actor_loss", "awr", awr),
+        ("alpha", 3.0, awr),
+        ("low_actor_rep_grad", True, hiql_grad_propagation),
+    ]
     return config | {
         key: value for key, value, condition in key_value_pairs if condition
     }
