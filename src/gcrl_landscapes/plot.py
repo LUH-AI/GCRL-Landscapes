@@ -156,6 +156,9 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         output_folder: folder to save plots in
         run_info: info about the run/setup
     """
+    per_config_folder = output_folder / "per_config"
+    per_config_folder.mkdir(exist_ok=True)
+
     hp_full_list = results_pandas.columns[results_pandas.columns.str.startswith("hp.")]
     hp_list = [f"hp.{hp_name}" for hp_name in run_info["arguments"]["hyperparameters"]]
     assert all(hp in hp_full_list for hp in hp_list)
@@ -174,6 +177,8 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
     phase_results = compute_additional_information(phase_results)  # type: ignore
 
     for phase, phase_result in phase_results:
+        per_config_phase_folder = per_config_folder / f"phase_{phase}"
+        per_config_phase_folder.mkdir(exist_ok=True)
         phase_result_copy = phase_result.copy()
         phase_result_copy.loc[:, "run_id"], _ = pd.factorize(
             phase_result_copy["run_id"]
@@ -217,15 +222,38 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
 
         # Modality plots
         ## Plot return distributions
-        ### per configuration
-        fig = plt.figure()
-        ax = sns.histplot(
-            data=phase_result.explode("normalized_goal_distance_returns"),
-            x="normalized_goal_distance_returns",
+        RETURN_LIMITS = (-3, 1)
+        exploded_phase_result_copy = phase_result_copy.explode(
+            "normalized_goal_distance_returns"
         )
-        ax.set_xlim(-1, 1)
+        exploded_phase_result_copy["clipped_normalized_goal_distance_returns"] = (
+            exploded_phase_result_copy[
+                "normalized_goal_distance_returns"
+            ].clip(lower=RETURN_LIMITS[0], upper=RETURN_LIMITS[1])
+        )
+        ### per configuration
+        for config_index, group in exploded_phase_result_copy.groupby("config_index"):
+            fig = plt.figure()
+            sns.histplot(
+                data=group,
+                x="clipped_normalized_goal_distance_returns",
+                stat="probability",
+            )
+            plt.savefig(
+                per_config_phase_folder
+                / f"clipped_normalized_goal_distance_return_distribution-config_{config_index}-{phase}.png"
+            )
+            plt.close()
+        ### configuration marginalized
+        fig = plt.figure()
+        sns.histplot(
+            data=exploded_phase_result_copy,
+            x="clipped_normalized_goal_distance_returns",
+            stat="probability",
+        )
         plt.savefig(
-            output_folder / f"normalized_goal_distance_return_distribution-{phase}.png",
+            output_folder
+            / f"clipped_normalized_goal_distance_return_distribution-{phase}.png",
             bbox_inches="tight",
         )
         plt.close()
