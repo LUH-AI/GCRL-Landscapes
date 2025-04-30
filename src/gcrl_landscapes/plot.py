@@ -160,16 +160,16 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
     hp_list = [f"hp.{hp_name}" for hp_name in run_info["arguments"]["hyperparameters"]]
     assert all(hp in hp_full_list for hp in hp_list)
 
-    phase_starts = sorted(results_pandas["phase_start"].unique().tolist())
+    phases = sorted(results_pandas["phase"].unique().tolist())
     phase_results = [
         (
             phase,
             results_pandas[
                 (results_pandas["eval_step"] == phase)
-                & (results_pandas["phase_start"] == phase_start)
+                & (results_pandas["phase"] == phase)
             ],
         )
-        for phase_start, phase in zip(phase_starts, run_info["arguments"]["phases"])
+        for phase in phases
     ]
     phase_results = compute_additional_information(phase_results)  # type: ignore
 
