@@ -216,6 +216,20 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         )
 
         # Modality plots
+        ## Plot return distributions
+        ### per configuration
+        fig = plt.figure()
+        ax = sns.histplot(
+            data=phase_result.explode("normalized_goal_distance_returns"),
+            x="normalized_goal_distance_returns",
+        )
+        ax.set_xlim(-1, 1)
+        plt.savefig(
+            output_folder / f"normalized_goal_distance_return_distribution-{phase}.png",
+            bbox_inches="tight",
+        )
+        plt.close()
+
         # Create plot based on folding test of unimodality
         def eval_result_to_mean_over_tasks(
             eval_result: EvaluationResult,
