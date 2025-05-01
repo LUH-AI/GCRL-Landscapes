@@ -223,9 +223,9 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         # Modality plots
         ## Plot return distributions
         RETURN_LIMITS = (-3, 1)
-        exploded_phase_result_copy = phase_result_copy.explode(
-            "normalized_goal_distance_returns"
-        )
+        exploded_phase_result_copy = phase_result_copy[
+            ["normalized_goal_distance_returns", "config_index"]
+        ].explode("normalized_goal_distance_returns")
         exploded_phase_result_copy["clipped_normalized_goal_distance_returns"] = (
             exploded_phase_result_copy[
                 "normalized_goal_distance_returns"
@@ -238,6 +238,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
                 data=group,
                 x="clipped_normalized_goal_distance_returns",
                 stat="probability",
+                bins="sturges",
             )
             plt.savefig(
                 per_config_phase_folder
@@ -250,6 +251,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             data=exploded_phase_result_copy,
             x="clipped_normalized_goal_distance_returns",
             stat="probability",
+            bins="sturges",
         )
         plt.savefig(
             output_folder
