@@ -357,6 +357,7 @@ def grid_plot(
         ax.imshow(Image.open(imgpath))
         ax.axis("off")
         ax.set_title(f"{dataset}-{phase}")
+        ax.title.set_size(7)
     fig.savefig(output_folder / f"{title}.png", bbox_inches="tight")
     plt.close()
     return
