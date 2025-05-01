@@ -110,7 +110,7 @@ def plot_igpr(
         y_dim=1,
         z_dim=y_label if y_label else y_col,
         bounds=[0, 1],
-        filename=output_folder / f"igpr_{y_col}_{phase}.png",
+        filename=output_folder / f"igpr-{y_col}-{phase}.png",
         dim_label_mapping=map_labels,
     )
     create_contour_plot(
@@ -119,7 +119,7 @@ def plot_igpr(
         y_dim=1,
         z_dim=y_label if y_label else y_col,
         bounds=[None, None],
-        filename=output_folder / f"igpr_{y_col}_{phase}_scaled.png",
+        filename=output_folder / f"igpr-{y_col}-{phase}-scaled.png",
         dim_label_mapping=map_labels,
     )
 
@@ -144,7 +144,7 @@ def plot_igpr(
 
     c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
     plt.colorbar(c, label=y_label if y_label else y_col)
-    plt.savefig(output_folder / f"nearest_{y_label}_{phase}.png", bbox_inches="tight")
+    plt.savefig(output_folder / f"nearest_{y_label}-{phase}.png", bbox_inches="tight")
     plt.close()
 
 
@@ -222,7 +222,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
 
         # Modality plots
         ## Plot return distributions
-        RETURN_LIMITS = (-3, 1)
+        RETURN_LIMITS = (-1, 1)
         exploded_phase_result_copy = phase_result_copy[
             ["normalized_goal_distance_returns", "config_index"]
         ].explode("normalized_goal_distance_returns")
@@ -231,31 +231,35 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
                 "normalized_goal_distance_returns"
             ].clip(lower=RETURN_LIMITS[0], upper=RETURN_LIMITS[1])
         )
-        ### per configuration
+        ## per configuration
         for config_index, group in exploded_phase_result_copy.groupby("config_index"):
             fig = plt.figure()
-            sns.histplot(
+            ax = sns.histplot(
                 data=group,
                 x="clipped_normalized_goal_distance_returns",
                 stat="probability",
                 bins="sturges",
             )
+            ax.set_xlim(*RETURN_LIMITS)
+            ax.set_ylim(0, 1)
             plt.savefig(
                 per_config_phase_folder
-                / f"clipped_normalized_goal_distance_return_distribution-config_{config_index}-{phase}.png"
+                / f"returndistribution-clipped_normalized_goal_distance-config_{config_index}-{phase}.png"
             )
             plt.close()
         ### configuration marginalized
         fig = plt.figure()
-        sns.histplot(
+        ax = sns.histplot(
             data=exploded_phase_result_copy,
             x="clipped_normalized_goal_distance_returns",
             stat="probability",
             bins="sturges",
         )
+        ax.set_xlim(*RETURN_LIMITS)
+        ax.set_ylim(0, 1)
         plt.savefig(
             output_folder
-            / f"clipped_normalized_goal_distance_return_distribution-{phase}.png",
+            / f"returndistribution-clipped_normalized_goal_distance_-{phase}.png",
             bbox_inches="tight",
         )
         plt.close()
@@ -325,7 +329,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         cbar.ax.yaxis.set_minor_formatter(ticker.FixedFormatter(["MM", "N/A", "UM"]))
         cbar.ax.set_yticks([])
 
-        plt.savefig(output_folder / f"modality_{phase}.png", bbox_inches="tight")
+        plt.savefig(output_folder / f"modality-{phase}.png", bbox_inches="tight")
         plt.close()
 
 
@@ -391,7 +395,7 @@ if __name__ == "__main__":
 
     # Build igpr grid of plots (across datasets)
     imgpath_dataframe = pd.DataFrame(
-        columns=["phase", "agent", "path", "dataset", "y_col"]
+        columns=["plot_type", "phase", "agent", "path", "dataset", "y_col"]
     )  # type: ignore
     for experiment_name in os.listdir(plots_folder):
         if not Path(plots_folder / experiment_name).is_dir():
@@ -404,35 +408,42 @@ if __name__ == "__main__":
         agent = experiment_name_matches["agent"]
         dataset = experiment_name_matches["dataset"]
 
-        for unscaled_igpr_plotpath in [
+        for unscaled_plotpath in [
             plots_folder / experiment_name / filename
             for filename in os.listdir(plots_folder / experiment_name)
-            if re.match(r"^igpr_.*_\d+.png$", filename)
+            if re.match(r"^.*-.*-\d+.png$", filename)
         ]:
             plot_name_matches = re.match(
-                r".*/igpr_(?P<y_col>.*)_(?P<phase>\d+).png$",
-                str(unscaled_igpr_plotpath),
+                r".*/(?P<plot_type>[^-/]*)-(?P<y_col>[^-/]*)-(?P<phase>\d+).png$",
+                str(unscaled_plotpath),
             )
             if not plot_name_matches:
                 raise ValueError("Naming inside of plots folder not as expected.")
 
             imgpath_dataframe.loc[len(imgpath_dataframe)] = [
+                plot_name_matches["plot_type"],
                 int(plot_name_matches["phase"]),
                 agent,
-                str(unscaled_igpr_plotpath),
+                str(unscaled_plotpath),
                 dataset,
                 plot_name_matches["y_col"],
             ]
 
-    for agent, y_col in product(
-        imgpath_dataframe["agent"].unique(), imgpath_dataframe["y_col"].unique()
+    for plot_type, agent, y_col in product(
+        imgpath_dataframe["plot_type"].unique(),
+        imgpath_dataframe["agent"].unique(),
+        imgpath_dataframe["y_col"].unique(),
     ):
+        grid_df = imgpath_dataframe[
+            (imgpath_dataframe["plot_type"] == plot_type)
+            & (imgpath_dataframe["agent"] == agent)
+            & (imgpath_dataframe["y_col"] == y_col)
+        ]
+        if len(grid_df) == 0:
+            continue
         grid_plot(
-            imgpath_dataframe[
-                (imgpath_dataframe["agent"] == agent)
-                & (imgpath_dataframe["y_col"] == y_col)
-            ],  # type: ignore
+            grid_df,
             plots_folder,
-            f"{agent}_{y_col}",
+            f"{plot_type}-{agent}-{y_col}",
             grid_columns=("dataset", "phase"),
         )  # type: ignore
