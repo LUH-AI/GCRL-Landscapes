@@ -94,6 +94,7 @@ def run_config(
     seed: int,
     tasks_per_node: int,
     clean_checkpoints: bool = False,
+    agent_path: Path | None = None,
 ) -> None:
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
@@ -160,7 +161,8 @@ def run_config(
     already_trained_steps = (
         setup["phases"][last_phase_index] if last_phase_index >= 0 else 0
     )
-    if already_trained_steps > 0:
+    if not agent_path and already_trained_steps > 0:
+        print("No agent path given, finding best agent")
         phase_results = get_phase_results(already_trained_steps, logdir)
         agent_path = get_best_agent_path(phase_results)
         # delete unneeded checkpoints
@@ -169,8 +171,7 @@ def run_config(
             for path in map(Path, phase_results["path"]):
                 if str(path) != str(agent_path):
                     path.unlink(missing_ok=True)
-    else:
-        agent_path = None
+    print(f"Loading agent {agent_path}")
 
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
@@ -358,6 +359,7 @@ def run_config_wrapper(args: argparse.Namespace) -> None:
         args.configuration,
         args.seed,
         args.tasks_per_node,
+        agent_path=args.agent_path,
     )
 
 

@@ -81,7 +81,7 @@ def calc_goal_distances(
 
         def info_to_distance(info: dict) -> float:
             cube_positions = [
-                info[f"privileged/block_{i}_pos"]
+                info[f"privileged/block_{i}_pos_copied"]
                 for i in range(env.unwrapped._num_cubes)
             ]
             cube_goals = [
