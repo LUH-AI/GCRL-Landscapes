@@ -149,6 +149,10 @@ def run_config(
         GCIQLAgent,
         GCIVLAgent,
     )
+    import jax
+    from .util.misc import jax_has_gpu
+
+    print(f"Default backend: {jax.default_backend()}, running on gpu?: {jax_has_gpu()}")
 
     AGENT_CLASSES = {
         "CRL": CRLAgent,
@@ -327,7 +331,9 @@ def submit(args: argparse.Namespace) -> None:
             if array_id
             else {},
         )
-        jobs = executor.map_array(run_config_chunked_arguments_wrapper, *chunked_arguments)
+        jobs = executor.map_array(
+            run_config_chunked_arguments_wrapper, *chunked_arguments
+        )
         # parse job array number/array id without subtaskid
         array_id_match = re.fullmatch(r"^(?P<array_id>\d+)_\d+$", jobs[0].job_id)
         if not array_id_match:
@@ -468,7 +474,9 @@ if __name__ == "__main__":
         required=True,
         help="In which directory to save results. Has to be already initialized using setup",
     )
-    slurm_subparser.add_argument("--n_seeds", type=int, required=True, help="How many seeds to run")
+    slurm_subparser.add_argument(
+        "--n_seeds", type=int, required=True, help="How many seeds to run"
+    )
     slurm_subparser.add_argument(
         "--agent_path",
         required=False,
@@ -485,7 +493,11 @@ if __name__ == "__main__":
         help="On which slurm partition to schedule the jobs",
     )
     slurm_subparser.add_argument(
-        "--mem_per_cpu", type=str, default="3G", required=False, help="memory given to node per allocated cpu"
+        "--mem_per_cpu",
+        type=str,
+        default="3G",
+        required=False,
+        help="memory given to node per allocated cpu",
     )
     slurm_subparser.add_argument(
         "--tasks_per_node",
@@ -497,7 +509,11 @@ if __name__ == "__main__":
         "--jobname", required=True, type=str, help="How to name the job in slurm"
     )
     slurm_subparser.add_argument(
-        "--min_per_mill_steps", type=int, default=300, required=False, help="How many minutes should be allocated on slurm as limit per million steps taken"
+        "--min_per_mill_steps",
+        type=int,
+        default=300,
+        required=False,
+        help="How many minutes should be allocated on slurm as limit per million steps taken",
     )
     slurm_subparser.add_argument(
         "--basetime",
@@ -506,7 +522,13 @@ if __name__ == "__main__":
         default=30,
         help="Time allocation per Job independent from training steps",
     )
-    slurm_subparser.add_argument("--phases", required=False, nargs="+", type=int, help="Which phases to run. Will run all if not given")
+    slurm_subparser.add_argument(
+        "--phases",
+        required=False,
+        nargs="+",
+        type=int,
+        help="Which phases to run. Will run all if not given",
+    )
 
     slurm_subparser.set_defaults(func=submit)
 
