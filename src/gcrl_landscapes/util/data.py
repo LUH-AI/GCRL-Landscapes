@@ -16,11 +16,22 @@ T = TypeVar("T")
 
 
 class ResultsPerStep(dict[int, T], Generic[T]):
+    """Mapping of training step/phase step/... to some kind of result"""
+
     def get_final_result(self) -> T:
         return self[max(self.keys())]
 
 
 class EvaluationResult:
+    """Result of an evaluation run of an algorithm.
+    Usually contains the aggregated values for the whole evaluation run.
+
+    Attributes:
+        success: Success rate
+        metrics: all gathered metrics (usually mean)
+        info: evaluation info dictionary
+    """
+
     def __init__(self, success: float, metrics: dict[str, float], info: dict[str, Any]):
         self.success = success
         self.metrics = metrics
@@ -37,6 +48,8 @@ class EvaluationResult:
 
 
 class EvalTrajectory(tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path]]):
+    """A mapping of training step to evaluation result and checkpoint path."""
+
     def to_json(self) -> str:
         def convert_evaluation_results(results: ResultsPerStep[EvaluationResult]):
             return {step: result.to_dict() for step, result in results.items()}
@@ -64,6 +77,8 @@ class EvalTrajectory(tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path
 
 
 class PhaseResult(dict[FrozenConfigDict, dict[int, EvalTrajectory]]):
+    """Maps configurations to seed-EvalTrajectory pairs"""
+
     def to_dict(self) -> dict:
         return {
             config.to_json(): {
@@ -89,11 +104,23 @@ class PhaseResult(dict[FrozenConfigDict, dict[int, EvalTrajectory]]):
 def get_best_agent_path(
     result_pandas: pd.DataFrame, eval_step: int | None = None
 ) -> Path:
+    """Find the best agent for the given results for a phase.
+    Currently uses success as metric for gauging "best"
+    Uses highest evaluation step if not specified.
+
+    Args:
+        result_pandas: phase results as parsed by `get_phase_results`
+        eval_step: For which evaluation step to get best agent. Will use highest available if not specified
+
+    Returns:
+         Path to best agent checkpoint
+    """
     final_eval_step = eval_step if eval_step else result_pandas["eval_step"].max()
     final_eval_result = result_pandas[result_pandas["eval_step"] == final_eval_step]
     best_config, phase, seed = final_eval_result[
         final_eval_result["success"] == final_eval_result["success"].max()
     ].iloc[0][["config_index", "phase", "seed"]]
+    # now get entry at phase steps
     best_df = result_pandas[
         (result_pandas["eval_step"] == phase)
         & (result_pandas["config_index"] == best_config)
@@ -127,6 +154,7 @@ def get_phase_results(
         if phase_nonbinary_logfiles.count(file) > 1
     ]
 
+    # create temporary zip as it is currently needed to read results
     with NamedTemporaryFile(mode="w+b") as temp_f:
         with zipfile.ZipFile(temp_f, mode="w") as zip_f:
             for file in phase_nonbinary_logfiles:
@@ -142,6 +170,15 @@ def get_phase_results(
 
 
 def restore_agent(agent, path: Path):
+    """Restore agent from path
+
+    Args:
+        agent (): current agent object
+        path: path of checkpoint
+
+    Returns:
+        agent with loaded checkpoint
+    """
     with open(path, "rb") as f:
         load_dict = pickle.load(f)
 
@@ -149,6 +186,14 @@ def restore_agent(agent, path: Path):
 
 
 def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFrame:
+    """Create pandas dataframe from phase results
+
+    Args:
+        results: experiment results, look at type hints and classes for more documentation
+
+    Returns:
+        pandas dataframe constructed from results
+    """
     # [TODO: this code is a mess, rewrite it]
     df = pd.DataFrame()
     # results are unpacked here until every step has a column, all hyperparameters have a column and the performance has a column
@@ -195,7 +240,17 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
 def read_results_from_zip(
     zippath: Path,
 ) -> dict[str, tuple[dict, ResultsPerStep[PhaseResult]]]:
-    def get_prefix_run_mappings(
+    """read results from zip that mirrors file structure as constructed by training scripts.
+    This function heavily relies on regex and therefore proper file naming.
+
+    Args:
+        zippath: path to zip from experiment results. Root contains only folder "logs/"
+
+    Returns:
+        All experiment results inside of logs folder. Mapped by name
+    """
+
+    def get_prefix_runinfo_mappings(
         filenames: list[str], zip_file: zipfile.ZipFile
     ) -> dict[str, dict[str, Any]]:
         top_level_info_pattern = re.compile(r"^(logs[^/]*/[^/]*/)info.toml")
@@ -262,7 +317,7 @@ def read_results_from_zip(
 
     with zipfile.ZipFile(zippath, "r") as zip_file:
         filenames: list[str] = zip_file.namelist()
-        prefix_run_mapping = get_prefix_run_mappings(filenames, zip_file)
+        prefix_run_mapping = get_prefix_runinfo_mappings(filenames, zip_file)
         prefix_filenames_mapping = {
             prefix: [
                 filename for filename in filenames if re.match(f"^{prefix}.*", filename)
