@@ -247,7 +247,6 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             "1 - Percentile needed to reach CVaR of 0.5",
         )
 
-        # The following is more or less unused in the meantime but may be interesting again later on
         # Modality plots
         ## Plot return distributions
         RETURN_LIMITS = (-1, 1)
@@ -292,6 +291,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         )
         plt.close()
 
+        # The following is more or less unused in the meantime but may be interesting again later on
         # Create plot based on folding test of unimodality
         def eval_result_to_mean_over_tasks(
             eval_result: EvaluationResult,
