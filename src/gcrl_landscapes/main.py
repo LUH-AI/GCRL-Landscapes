@@ -18,28 +18,33 @@ from .util.data import get_best_agent_path, get_phase_results
 
 logger = logging.getLogger(__name__)
 
-# None to allow for lazy loading of ogbench
-AGENT_CLASSES = {
-    "CRL": None,
-    "CMD": None,
-    "GCBC": None,
-    "GCIQL": None,
-    "GCIVL": None,
-    "QRL": None,
-    "HIQL": None,
-}
-DATASET_CLASSES = {
-    "CRL": None,
-    "CMD": None,
-    "GCBC": None,
-    "GCIQL": None,
-    "GCIVL": None,
-    "QRL": None,
-    "HIQL": None,
-}
+
+SUPPORTED_AGENTS = [
+    "CRL",
+    "CMD",
+    "GCBC",
+    "GCIQL",
+    "GCIVL",
+    "QRL",
+    "HIQL",
+]
+SUPPORTED_DATASETS = [
+    "CRL",
+    "CMD",
+    "GCBC",
+    "GCIQL",
+    "GCIVL",
+    "QRL",
+    "HIQL",
+]
 
 
 def run_setup(args: argparse.Namespace) -> None:
+    """Create file structure and save common parameters for the whole experiment
+
+    Args:
+        args: parsed arguments, look into main or run from commandline to see documentation
+    """
     from .configurations import generate_configurations, get_config_space
 
     args.logdir.mkdir(parents=True, exist_ok=True)
@@ -96,6 +101,19 @@ def run_config(
     clean_checkpoints: bool = False,
     agent_path: Path | None = None,
 ) -> None:
+    """Run given config on GPU and collect data
+    This function is mainly organizational to e.g. find the best agent from the previous phase, prepare the environment and save metadata. It calls the train function to do the actual training.
+
+    Args:
+        logdir: logdir for current experiment where metadata resides. Will create its own subdirectory
+        phase: phase to run
+        agent_path: Which agent to load. Will load metadata from last phase if None to find the best agent itself
+        configuration_index: configuration to use for training
+        seed: seed for training
+        tasks_per_node: how many tasks will run on this node. Needed for environment setup
+    """
+    assert phase == 0 or agent_path
+
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
     # submitit just bypasses SIGTERM although it should end the job, overwrite that behaviour here
@@ -105,7 +123,7 @@ def run_config(
 
     signal.signal(signal.SIGTERM, handler)
 
-    # [TODO: do backend setting more cleanly]
+    # Set GPU training environment variables before loading modules
     import os
     import numpy as np
 
@@ -131,12 +149,7 @@ def run_config(
         GCIQLAgent,
         GCIVLAgent,
     )
-    import jax
-    from .util.misc import jax_has_gpu
 
-    print(f"Default backend: {jax.default_backend()}, running on gpu?: {jax_has_gpu()}")
-
-    # populate agent classes and dataset classes after loading ogbench
     AGENT_CLASSES = {
         "CRL": CRLAgent,
         "CMD": CMDAgent,
@@ -174,7 +187,6 @@ def run_config(
     print(f"Loading agent {agent_path}")
 
     setup = toml.load(args.logdir / "info.toml")["arguments"]
-
     run_log_dir = (
         logdir
         / "run_logs"
@@ -192,6 +204,7 @@ def run_config(
             "agent_path": agent_path,
             "configuration_index": configuration_index,
             "seed": seed,
+            "tasks_per_node": tasks_per_node,
         },
         "git": {
             "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
@@ -206,8 +219,8 @@ def run_config(
 
     retry_call(save_metadata)
 
+    # Set up training
     env, train_dataset, val_dataset = make_env_and_datasets(setup["dataset"])  # type: ignore
-
     with open(
         logdir / "configurations" / f"configuration_{configuration_index}.json", "r"
     ) as f:
@@ -251,8 +264,14 @@ def run_config(
 
 
 def submit(args: argparse.Namespace) -> None:
+    """Submit jobs on the cluster. Does also support local execution to some degree.
+
+    Args:
+        args: Look into main argument parser options or run from commandline for documentation
+    """
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
+    # Generate arguments for jobs
     configuration_indices = list(range(setup["n_configurations"]))
     seeds = list(range(args.n_seeds))
     array_id: int | None = None
@@ -266,6 +285,7 @@ def submit(args: argparse.Namespace) -> None:
             [args.tasks_per_node],
         )
         argument_columns = list(zip(*argument_lines))
+        # Chunk arguments so that every job can run multiple tasks
         chunked_arguments = [
             [
                 argument_columns[column_idx][i : i + args.tasks_per_node]
@@ -307,7 +327,7 @@ def submit(args: argparse.Namespace) -> None:
             if array_id
             else {},
         )
-        jobs = executor.map_array(run_config_slurm_tasks_wrapper, *chunked_arguments)
+        jobs = executor.map_array(run_config_chunked_arguments_wrapper, *chunked_arguments)
         # parse job array number/array id without subtaskid
         array_id_match = re.fullmatch(r"^(?P<array_id>\d+)_\d+$", jobs[0].job_id)
         if not array_id_match:
@@ -319,13 +339,17 @@ def submit(args: argparse.Namespace) -> None:
     return
 
 
-def run_config_slurm_tasks_wrapper(
+def run_config_chunked_arguments_wrapper(
     logdirs: list[Path],
     phases: list[int],
     configuration_indices: list[int],
     seeds: list[int],
     tasks_per_node: list[int],
 ):
+    """Run chunked arguments. This will typically be executed on a slurm node per task.
+    All tasks receive the same chunked arguments and we have to properly index them to pass to correct task.
+    For more documentation look at `run_config()` and `submit`
+    """
     assert (
         len(logdirs)
         == len(phases)
@@ -369,21 +393,65 @@ if __name__ == "__main__":
 
     # Setup subcommand parsing
     # Creates configurations and folder to log into
-    setup_subparser = subparsers.add_parser("setup")
-    setup_subparser.add_argument(
-        "--agent", required=True, type=str, choices=list(AGENT_CLASSES.keys())
+    setup_subparser = subparsers.add_parser(
+        "setup", description="Create folder structure with metadata for experiment."
     )
-    setup_subparser.add_argument("--phases", required=True, type=int, nargs="+")
-    setup_subparser.add_argument("--dataset", required=True, type=str)
-    setup_subparser.add_argument("--n_configurations", required=True, type=int)
     setup_subparser.add_argument(
-        "--hyperparameters", required=True, type=str, nargs="+"
+        "--agent",
+        required=True,
+        type=str,
+        choices=SUPPORTED_AGENTS,
+        help="Agent to run",
     )
-    setup_subparser.add_argument("--eval_steps", required=True, type=int, nargs="+")
-    setup_subparser.add_argument("--save_steps", required=False, type=int, nargs="+")
-    setup_subparser.add_argument("--eval_episodes", required=True, type=int)
-    setup_subparser.add_argument("--seed", type=int, default=0)
-    setup_subparser.add_argument("--logdir", type=Path, required=True)
+    setup_subparser.add_argument(
+        "--phases",
+        required=True,
+        type=int,
+        nargs="+",
+        help="Which phases should be run in the course of the experiment",
+    )
+    setup_subparser.add_argument(
+        "--dataset", required=True, type=str, help="Which dataset/environment to run"
+    )
+    setup_subparser.add_argument(
+        "--n_configurations",
+        required=True,
+        type=int,
+        help="How many configurations to run/sample across configuration space",
+    )
+    setup_subparser.add_argument(
+        "--hyperparameters",
+        required=True,
+        type=str,
+        nargs="+",
+        help="Which configuration space to use",
+    )
+    setup_subparser.add_argument(
+        "--eval_steps",
+        required=True,
+        type=int,
+        nargs="+",
+        help="At what steps to evaluate",
+    )
+    setup_subparser.add_argument(
+        "--save_steps",
+        required=False,
+        type=int,
+        nargs="+",
+        help="At what steps to save a checkpoint. Will save checkpoints for best configurations",
+    )
+    setup_subparser.add_argument(
+        "--eval_episodes",
+        required=True,
+        type=int,
+        help="How many evaluation episodes to run per evaluation",
+    )
+    setup_subparser.add_argument(
+        "--seed", type=int, default=0, help="Which seed to use"
+    )
+    setup_subparser.add_argument(
+        "--logdir", type=Path, required=True, help="in which directory to save results"
+    )
     setup_subparser.add_argument(
         "--final_step_is_phase",
         action="store_true",
@@ -394,16 +462,42 @@ if __name__ == "__main__":
     # Setup slurm parsing
     # Submits all jobs to slurm
     slurm_subparser = subparsers.add_parser("submit")
-    slurm_subparser.add_argument("--logdir", type=Path, required=True)
-    slurm_subparser.add_argument("--n_seeds", type=int, required=True)
-    slurm_subparser.add_argument("--partition", type=str, default="ai")
     slurm_subparser.add_argument(
-        "--mem_per_cpu", type=str, default="3G", required=False
+        "--logdir",
+        type=Path,
+        required=True,
+        help="In which directory to save results. Has to be already initialized using setup",
     )
-    slurm_subparser.add_argument("--tasks_per_node", type=int, required=True)
-    slurm_subparser.add_argument("--jobname", required=True, type=str)
+    slurm_subparser.add_argument("--n_seeds", type=int, required=True, help="How many seeds to run")
     slurm_subparser.add_argument(
-        "--min_per_mill_steps", type=int, default=300, required=False
+        "--agent_path",
+        required=False,
+        type=Path,
+        help="Which checkpoint to load. Will search best checkpoint itself if not given",
+    )
+    slurm_subparser.add_argument(
+        "--n_seeds", type=int, required=True, help="How many seeds to run"
+    )
+    slurm_subparser.add_argument(
+        "--partition",
+        type=str,
+        default="ai",
+        help="On which slurm partition to schedule the jobs",
+    )
+    slurm_subparser.add_argument(
+        "--mem_per_cpu", type=str, default="3G", required=False, help="memory given to node per allocated cpu"
+    )
+    slurm_subparser.add_argument(
+        "--tasks_per_node",
+        type=int,
+        required=True,
+        help="How many tasks/configurations should run per node in parallel",
+    )
+    slurm_subparser.add_argument(
+        "--jobname", required=True, type=str, help="How to name the job in slurm"
+    )
+    slurm_subparser.add_argument(
+        "--min_per_mill_steps", type=int, default=300, required=False, help="How many minutes should be allocated on slurm as limit per million steps taken"
     )
     slurm_subparser.add_argument(
         "--basetime",
@@ -412,22 +506,42 @@ if __name__ == "__main__":
         default=30,
         help="Time allocation per Job independent from training steps",
     )
-    slurm_subparser.add_argument("--phases", required=False, nargs="+", type=int)
+    slurm_subparser.add_argument("--phases", required=False, nargs="+", type=int, help="Which phases to run. Will run all if not given")
+
     slurm_subparser.set_defaults(func=submit)
 
     # Run subcommand parsing
     # Runs a configuration and a seed
     run_subparser = subparsers.add_parser("run")
-    run_subparser.add_argument("--logdir", type=Path, required=True)
-    run_subparser.add_argument("--phase", required=True, type=int)
-    run_subparser.add_argument("--agent_path", required=False, type=Path)
-    run_subparser.add_argument("--configuration", required=True, type=int)
-    run_subparser.add_argument("--seed", type=int, required=True)
+    run_subparser.add_argument(
+        "--logdir",
+        type=Path,
+        required=True,
+        help="In which directory to save results. Has to be already initialized using setup",
+    )
+    run_subparser.add_argument(
+        "--phase", required=True, type=int, help="Which phase to run"
+    )
+    run_subparser.add_argument(
+        "--agent_path",
+        required=False,
+        type=Path,
+        help="Which checkpoint to load. Will search best checkpoint if not given",
+    )
+    run_subparser.add_argument(
+        "--configuration",
+        required=True,
+        type=int,
+        help="which configuration (index) to run",
+    )
+    run_subparser.add_argument(
+        "--seed", type=int, required=True, help="Which seed to use for training"
+    )
     run_subparser.add_argument(
         "--tasks_per_node",
         type=int,
         default=1,
-        help="Limits jax gpu pre-allocation in case of multiple jobs running",
+        help="Limits jax gpu pre-allocation in case of multiple jobs running. See submit for more details",
     )
     run_subparser.set_defaults(func=run_config_wrapper)
 

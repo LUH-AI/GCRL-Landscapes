@@ -12,154 +12,11 @@ from typing import Callable, Any, Optional
 from .util.data import (
     EvaluationResult,
     EvalTrajectory,
-    PhaseResult,
     restore_agent,
     ResultsPerStep,
 )
 from .util.misc import retry_call
 import os
-from functools import reduce
-from deprecate import deprecated
-
-
-@deprecated(
-    target=None,
-    template_mgs="Deprecated in favor of manual running in parallel and collecting afterwards.",
-)
-def full_phased_run(
-    phase_steps: list[int],
-    configs: list[FrozenConfigDict],
-    agent_class: Callable[[Any, gym.Env, int], Any],
-    env: gym.Env,
-    train_datasets: list[GCDataset],
-    val_datasets: list[GCDataset],
-    eval_at_steps: list[int],
-    evaluate: Callable[
-        [Any, gym.Env, int, FrozenConfigDict],
-        tuple[list, dict[str, np.floating], list, list],
-    ],
-    save_at_steps: list[int] = [],
-    log_interval: int = 5000,
-    eval_episodes: int = 50,
-    log_dir: Path = Path("./logs"),
-    seed: int = 0,
-) -> ResultsPerStep[PhaseResult]:
-    # basically partial function application, but without the need of proper ordering
-    def run_phase_configured(
-        phase_step: int, already_trained_steps: int, agent_path: Optional[Path]
-    ) -> tuple[tuple[FrozenConfigDict, Path], PhaseResult]:
-        return run_phase(
-            configs=configs,
-            phase_steps=phase_step,
-            already_trained_steps=already_trained_steps,
-            agent_class=agent_class,
-            agent_path=agent_path,
-            env=env,
-            train_datasets=train_datasets,
-            val_datasets=val_datasets,
-            eval_at_steps=eval_at_steps,
-            evaluate=evaluate,
-            save_at_steps=save_at_steps,
-            log_interval=log_interval,
-            eval_episodes=eval_episodes,
-            log_dir=log_dir,
-            seed=seed,
-        )
-
-    def run_phase_and_collect(
-        agentstate_and_collector: tuple[
-            tuple[int, Optional[Path]], ResultsPerStep[PhaseResult]
-        ],
-        phase_step: int,
-    ) -> tuple[tuple[int, Path], ResultsPerStep[PhaseResult]]:
-        (already_trained_steps, agent_path), collector = agentstate_and_collector
-        best_config, results = run_phase_configured(
-            phase_step, already_trained_steps, agent_path
-        )
-        collector[phase_step] = results
-        return (phase_step, best_config[1]), collector
-
-    # Pass 'None' to randomly initialize agent, Type hint does not work here properly as it expects the result of the function passed to result
-    return reduce(run_phase_and_collect, phase_steps, [(0, None), ResultsPerStep()])[1]
-
-
-@deprecated(
-    target=None,
-    template_mgs="Deprecated in favor of manual running in parallel and collecting afterwards.",
-)
-def run_phase(
-    configs: list[FrozenConfigDict],
-    phase_steps: int,
-    already_trained_steps: int,
-    agent_class: Callable[[Any, gym.Env, int], Any],
-    agent_path: Optional[Path],
-    env: gym.Env,
-    train_datasets: list[GCDataset],
-    val_datasets: list[GCDataset],
-    eval_at_steps: list[int],
-    evaluate: Callable[
-        [Any, gym.Env, int, FrozenConfigDict],
-        tuple[list, dict[str, np.floating], list, list],
-    ],
-    save_at_steps: list[int] = [],
-    log_interval: int = 5000,
-    eval_episodes: int = 20,
-    log_dir: Path = Path("./logs"),
-    seed: int = 0,
-) -> tuple[tuple[FrozenConfigDict, Path], PhaseResult]:
-    """Run a single phase of the training. Return best configuration from that phase
-
-    Args:
-        configs: Configurations to test
-        phase_steps: How many steps this phase has (for saving of model)
-        agent_class: Class to create agent with
-        agent_path: Checkpoint to load from (None if starting from scratch)
-        env: gymnasium environment
-        train_dataset: offline dataset to train on
-        val_dataset: offline dataset to validate on
-        eval_at_steps: list of at which steps to evaluate
-        evaluate: Function to evaluate agent. Although not in type hint, has to support optional parameter `metrics`
-        save_at_steps: list of steps at which to save agent
-        log_interval: how often to log training metrics
-        eval_episodes: how many episodes to evaluate
-        log_dir: where to save logs
-        seed: seed for training
-
-    Returns:
-        first entry is the best configuration with the path to its checkpoint at phase_steps, second entry is all results for all configurations
-    """
-    assert phase_steps in eval_at_steps and phase_steps in save_at_steps
-    assert phase_steps > already_trained_steps
-
-    results = {
-        config: train(
-            agent_class=agent_class,
-            agent_path=agent_path,
-            env=env,
-            train_dataset=train_dataset,
-            val_dataset=val_dataset,
-            already_trained_steps=already_trained_steps,
-            eval_at_steps=eval_at_steps,
-            evaluate=evaluate,
-            config=config,
-            save_at_steps=save_at_steps,
-            log_interval=log_interval,
-            eval_episodes=eval_episodes,
-            log_dir=log_dir,
-            seed=seed,
-        )
-        for config, train_dataset, val_dataset in zip(
-            configs, train_datasets, val_datasets
-        )
-    }
-    # index 0 corresponds to returned metrics, then get final evaluation
-    best_config = max(
-        results, key=lambda config: results[config][0].get_final_result().success
-    )
-    return (
-        best_config,
-        results[best_config][1][phase_steps],
-    ), PhaseResult(results)
 
 
 def train(
@@ -173,6 +30,7 @@ def train(
     evaluate: Callable[
         [Any, gym.Env, int, FrozenConfigDict],
         tuple[list, dict[str, np.floating], list, list],
+        # there is an optional argument "metrics" here, not easily type hintable
     ],
     config: FrozenConfigDict,
     save_at_steps: list[int] = [],
