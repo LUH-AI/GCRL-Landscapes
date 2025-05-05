@@ -43,8 +43,17 @@ def map_labels(label: str) -> str:
 def compute_additional_information(
     phase_results: list[tuple[int, pd.DataFrame]],
 ) -> list[tuple[int, pd.DataFrame]]:
+    """Compute additional metrics which can be calculated given the data. E.g. CVaR, Dispersion
+
+    Args:
+        phase_results: all phase results in list
+
+    Returns:
+        new object with additional information with same layout as original one
+    """
     phase_results_copy = deepcopy(phase_results)
     for _, phase_result in phase_results_copy:
+        # Normalize goal end distances by start distance to get a distance in [1, inf)
         phase_result["normalized_goal_distances"] = phase_result["eval_result"].apply(
             lambda results_per_seed: np.array(
                 [
@@ -54,6 +63,7 @@ def compute_additional_information(
                 ]
             ).reshape(-1)
         )
+        # To see this as a "score", subtract from 1. Yields scores in (-inf, 1], where 1 is perfect, 0 neutral and below is bad
         phase_result["normalized_goal_distance_returns"] = phase_result[
             "normalized_goal_distances"
         ].apply(lambda distances: 1 - distances)
@@ -64,11 +74,14 @@ def compute_additional_information(
             "normalized_goal_distance_returns"
         ].apply(np.mean)
 
+        # Calculate CVaR
         phase_result["cvar_normalized_goal_distance_return"] = phase_result[
             "normalized_goal_distance_returns"
         ].apply(
             lambda distances: cvar(distances, confidence_level=CVAR_CONFIDENCE_LEVEL)
         )
+
+        # Calculate Dispersion on goal distance distribution
         phase_result["disp_normalized_goal_distance"] = phase_result[
             "normalized_goal_distance_returns"
         ].apply(lambda returns: iqr(returns, DISP_CONFIDENCE_LEVELS))
@@ -76,6 +89,8 @@ def compute_additional_information(
             1 - phase_result["disp_normalized_goal_distance"]
         )
         assert phase_result["disp_normalized_goal_distance_score"].max() <= 1
+
+        # Calculate inverse CVaR
         phase_result["cvar_normalized_goal_distance_return_half_percentile"] = (
             phase_result[
                 "normalized_goal_distance_returns"
@@ -88,7 +103,7 @@ def compute_additional_information(
     return phase_results_copy
 
 
-def plot_igpr(
+def plot_landscape(
     phase: int,
     phase_result: pd.DataFrame,
     y_col: str,
@@ -96,6 +111,16 @@ def plot_igpr(
     output_folder: Path,
     y_label: str | None,
 ):
+    """IGPR plot of given data. Fits gaussian process itself
+
+    Args:
+        phase: which phase is this. used for plot title
+        phase_result: results for this phase
+        y_col: column which we want to plot landscape for
+        hp_names: names of all hyperparameter columns (to create groups from dataframe)
+        output_folder: where to save plot to
+        y_label: How y should be labeled
+    """
     model = TripleGPModel(
         phase_result,
         np.float64,
@@ -104,6 +129,7 @@ def plot_igpr(
         configspace=get_config_space(""),
     )
     model.fit()
+    # One direct plot
     create_contour_plot(
         model,
         x_dim=0,
@@ -113,6 +139,7 @@ def plot_igpr(
         filename=output_folder / f"igpr-{y_col}-{phase}.png",
         dim_label_mapping=map_labels,
     )
+    # Scale results to [0, 1] to better see contours
     create_contour_plot(
         model,
         x_dim=0,
@@ -184,10 +211,10 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             phase_result_copy["run_id"]
         )  # TripleGPModel needs continuous run-ids starting at 0
 
-        plot_igpr(
+        plot_landscape(
             phase, phase_result_copy, "success", hp_list, output_folder, "Success Rate"
         )
-        plot_igpr(
+        plot_landscape(
             phase,
             phase_result_copy,
             "mean_normalized_goal_distance_return",
@@ -195,7 +222,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             output_folder,
             "Normalized Goal Distance Return",
         )
-        plot_igpr(
+        plot_landscape(
             phase,
             phase_result_copy,
             "cvar_normalized_goal_distance_return",
@@ -203,7 +230,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             output_folder,
             "CVaR of normalized goal distance return",
         )
-        plot_igpr(
+        plot_landscape(
             phase,
             phase_result_copy,
             "disp_normalized_goal_distance_score",
@@ -211,7 +238,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             output_folder,
             "Dispersion score of normalized goal distance return",
         )
-        plot_igpr(
+        plot_landscape(
             phase,
             phase_result_copy,
             "cvar_normalized_goal_distance_return_half_percentile_score",
@@ -220,6 +247,7 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             "1 - Percentile needed to reach CVaR of 0.5",
         )
 
+        # The following is more or less unused in the meantime but may be interesting again later on
         # Modality plots
         ## Plot return distributions
         RETURN_LIMITS = (-1, 1)
@@ -339,6 +367,14 @@ def grid_plot(
     title: str,
     grid_columns: tuple[str, str],
 ) -> None:
+    """Create a grid plot from all experiments.
+
+    Args:
+        imgpath_dataframe: Dataframe which maps combinatons of the grid columns to a plotpath
+        output_folder: folder to save plot to
+        title: title of the plot
+        grid_columns: columns to use for grid
+    """
     indexed_imgpath_series = imgpath_dataframe.set_index(
         list(grid_columns)
     ).sort_index()
@@ -372,17 +408,17 @@ if __name__ == "__main__":
     parser.add_argument("--zipfile", type=Path, required=True)
     args = parser.parse_args()
 
+    # Parse results
     plots_folder = Path("plots") / os.path.basename(args.zipfile)
-
     results: dict[str, tuple[dict, ResultsPerStep[PhaseResult]]] = (
         read_results_from_zip(args.zipfile)
     )
-
     results_pandas = {
         identifier: (run_info, phase_results_to_pandas(phase_results))
         for identifier, (run_info, phase_results) in results.items()
     }
 
+    # Run plot function for every experiment inside zip/dataframe
     for prefix, (run_info, results_df) in results_pandas.items():
         run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
         if not run_match:
@@ -394,6 +430,7 @@ if __name__ == "__main__":
         plot(results_df, folder, run_info)
 
     # Build igpr grid of plots (across datasets)
+    # first builds dataframe using plots inside subfolders
     imgpath_dataframe = pd.DataFrame(
         columns=["plot_type", "phase", "agent", "path", "dataset", "y_col"]
     )  # type: ignore
@@ -429,6 +466,7 @@ if __name__ == "__main__":
                 plot_name_matches["y_col"],
             ]
 
+    # Now actually plot all grid plots
     for plot_type, agent, y_col in product(
         imgpath_dataframe["plot_type"].unique(),
         imgpath_dataframe["agent"].unique(),
