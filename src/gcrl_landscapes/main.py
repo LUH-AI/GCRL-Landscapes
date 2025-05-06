@@ -110,7 +110,13 @@ if __name__ == "__main__":
         help="memory given to node per allocated cpu",
     )
     slurm_subparser.add_argument(
-        "--tasks_per_node",
+        "--tasks_per_node_total",
+        type=int,
+        required=True,
+        help="How many tasks/configurations should run per node in total",
+    )
+    slurm_subparser.add_argument(
+        "--tasks_per_node_parallel",
         type=int,
         required=True,
         help="How many tasks/configurations should run per node in parallel",
@@ -170,7 +176,7 @@ if __name__ == "__main__":
         "--seed", type=int, required=True, help="Which seed to use for training"
     )
     run_subparser.add_argument(
-        "--tasks_per_node",
+        "--tasks_per_node_parallel",
         type=int,
         default=1,
         help="Limits jax gpu pre-allocation in case of multiple jobs running. See submit for more details",
