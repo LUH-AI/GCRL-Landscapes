@@ -46,6 +46,7 @@ dependencies = [
   "submitit",
   "pyfolding",
   "pyDeprecate",
+  "more-itertools",
 ]
 
 [project.urls]

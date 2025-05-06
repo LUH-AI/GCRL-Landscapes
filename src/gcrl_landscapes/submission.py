@@ -15,6 +15,7 @@ from itertools import product
 from .util.misc import retry_call
 import re
 from .util.data import get_best_agent_path, get_phase_results
+from more_itertools import chunked, divide
 
 logger = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ def run_config(
     phase: int,
     configuration_index: int,
     seed: int,
-    tasks_per_node: int,
+    tasks_per_node_parallel: int,
     clean_checkpoints: bool = False,
     agent_path: Path | None = None,
 ) -> None:
@@ -110,7 +111,7 @@ def run_config(
         agent_path: Which agent to load. Will load metadata from last phase if None to find the best agent itself
         configuration_index: configuration to use for training
         seed: seed for training
-        tasks_per_node: how many tasks will run on this node. Needed for environment setup
+        tasks_per_node_parallel: how many tasks will run on this node. Needed for environment setup
     """
     assert phase == 0 or agent_path
 
@@ -130,7 +131,7 @@ def run_config(
     # This will set egl (nvidia) as the backend for mujoco and may lead to failure on other systems
     os.environ["MUJOCO_GL"] = "egl"
     # let jax only pre-allocate a fraction of gpus memory, so that all tasks on node can run
-    fraction_gpu_allocation = np.round(1 / (tasks_per_node + 1), 2)
+    fraction_gpu_allocation = np.round(1 / (tasks_per_node_parallel + 1), 2)
     fraction_only_decimal = f"{fraction_gpu_allocation}".split(".")[1]
     os.environ["XLA_PYTHON_CLIENT_MEM_FRACTION"] = (
         f".{fraction_only_decimal}"  # one more task to leave some space in gpu ram
@@ -208,7 +209,7 @@ def run_config(
             "agent_path": agent_path,
             "configuration_index": configuration_index,
             "seed": seed,
-            "tasks_per_node": tasks_per_node,
+            "tasks_per_node_parallel": tasks_per_node_parallel,
         },
         "git": {
             "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
@@ -281,23 +282,31 @@ def submit(args: argparse.Namespace) -> None:
     array_id: int | None = None
     phases = setup["phases"] if not args.phases else args.phases
     for phase in phases:
-        argument_lines = product(
-            [args.logdir],
-            [phase],
-            configuration_indices,
-            seeds,
-            [args.tasks_per_node],
+        argument_lines = [
+            {
+                "logdir": args.logdir,
+                "phase": phase,
+                "configuration_idx": configuration_idx,
+                "seed": seed,
+                "tasks_per_node_parallel": args.tasks_per_node_parallel,
+            }
+            for configuration_idx, seed in product(
+                configuration_indices,
+                seeds,
+            )
+        ]
+        # first chunk tasks by total tasks per node
+        chunked_tasks_per_node: list[list[dict]] = list(
+            chunked(argument_lines, args.tasks_per_node_total)
         )
-        argument_columns = list(zip(*argument_lines))
-        # Chunk arguments so that every job can run multiple tasks
-        chunked_arguments = [
+        # then create n tasks_per_node_parallel groups for parallel execution
+        # resulting dimensions: (node, parallel_groups, sequential_groups)
+        chunked_tasks_parallel: list[list[list[dict]]] = [
             [
-                argument_columns[column_idx][i : i + args.tasks_per_node]
-                for i in range(
-                    0, len(argument_columns[column_idx]), args.tasks_per_node
-                )
+                list(divided_chunk)
+                for divided_chunk in divide(args.tasks_per_node_parallel, task_chunk)
             ]
-            for column_idx in range(len(argument_columns))
+            for task_chunk in chunked_tasks_per_node
         ]
 
         last_phase_index = setup["phases"].index(phase) - 1
@@ -317,10 +326,10 @@ def submit(args: argparse.Namespace) -> None:
                 args.basetime
                 + args.min_per_mill_steps
                 * (steps_to_train / 1_000_000)
-                * args.tasks_per_node
+                * args.tasks_per_node_total
             ),  # this overestimates, keep safety margin
             slurm_gpus_per_node=1,
-            tasks_per_node=args.tasks_per_node,
+            tasks_per_node=args.tasks_per_node_parallel,
             slurm_mem_per_cpu=args.mem_per_cpu,
             slurm_array_parallelism=50,
             slurm_partition=args.partition,
@@ -332,7 +341,7 @@ def submit(args: argparse.Namespace) -> None:
             else {},
         )
         jobs = executor.map_array(
-            run_config_chunked_arguments_wrapper, *chunked_arguments
+            run_config_chunked_arguments_wrapper, chunked_tasks_parallel
         )
         # parse job array number/array id without subtaskid
         array_id_match = re.fullmatch(r"^(?P<array_id>\d+)_\d+$", jobs[0].job_id)
@@ -346,40 +355,36 @@ def submit(args: argparse.Namespace) -> None:
 
 
 def run_config_chunked_arguments_wrapper(
-    logdirs: list[Path],
-    phases: list[int],
-    configuration_indices: list[int],
-    seeds: list[int],
-    tasks_per_node: list[int],
+    arguments: list[list[dict]],
 ):
     """Run chunked arguments. This will typically be executed on a slurm node per task.
     All tasks receive the same chunked arguments and we have to properly index them to pass to correct task.
     For more documentation look at `run_config()` and `submit`
     """
-    assert (
-        len(logdirs)
-        == len(phases)
-        == len(configuration_indices)
-        == len(seeds)
-        == len(tasks_per_node)
-    )
     job_env = submitit.JobEnvironment()
+    r = job_env.local_rank
     print(f"There are {job_env.num_tasks} in this job")
     print(f"I'm the task #{job_env.local_rank} on the node {job_env.node}")
     print(f"I'm the task #{job_env.global_rank} in the job")
-    r = job_env.local_rank
-    if r >= len(logdirs):
-        print(f"Not enough jobs ({len(logdirs)}) for this node. Exiting ...")
+    print(f"I will run {len(arguments[r])} jobs")
+    if r >= len(arguments):
+        print(f"Not enough jobs ({len(arguments)}) for this node. Exiting ...")
         sys.exit(0)
-    return run_config(
-        logdirs[r],
-        phases[r],
-        configuration_indices[r],
-        seeds[r],
-        tasks_per_node[r],
-        # clean up unneeded checkpoints from last phase if we are job zero and task zero in array
-        clean_checkpoints=int(job_env.array_task_id) == 0 and r == 0,
-    )
+
+    first_job_and_task_in_array = int(job_env.array_task_id) == 0 and r == 0
+
+    results = [
+        run_config(
+            setup["logdir"],
+            setup["phase"],
+            setup["configuration_index"],
+            setup["seed"],
+            setup["tasks_per_node_parallel"],
+            clean_checkpoints=first_job_and_task_in_array and seq_idx == 0,
+        )
+        for seq_idx, setup in enumerate(arguments[r])
+    ]
+    return results
 
 
 def run_config_wrapper(args: argparse.Namespace) -> None:
@@ -388,6 +393,6 @@ def run_config_wrapper(args: argparse.Namespace) -> None:
         args.phase,
         args.configuration,
         args.seed,
-        args.tasks_per_node,
+        args.tasks_per_node_parallel,
         agent_path=args.agent_path,
     )
