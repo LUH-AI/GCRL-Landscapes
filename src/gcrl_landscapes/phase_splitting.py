@@ -4,6 +4,7 @@ from .util.data import read_results_from_zip, phase_results_to_pandas
 import pandas as pd
 import numpy as np
 from .plots.triple_gp import iqm
+from scipy.optimize import root_scalar, RootResults
 
 TARGET_EVAL_STEP = 1_000_000
 
@@ -12,11 +13,47 @@ def get_all_phases(
     agent: str,
     dataset: str,
     final_performance_percentage: int,
+    zippath: Path,
     phase_percentages: list[int] = [25, 50, 100],
-    mode: str = "linear_final",
+    mode: str = "target_ratio",
+    interpolation: str = "linear_target",
 ) -> list[int]:
-    return
+    """Get phases to run based on experimental performance results for long-term runs.
 
+    Args:
+        agent: Name of agent
+        dataset: Name of dataset
+        final_performance_percentage: percentage of final_performance to hit
+        zippath: zipfile with results. see `get_data` for more details.
+        phase_percentages: percentages at which a phase should be run
+        mode: may be "target_ratio" or "performance_ratio".
+              "performance_ratio" means given phase_percentages are percentages of the performance curve
+              "target_ratio" means, we only look at the steps needed to reach the target value. Basically linear function as interpolation
+        interpolation: Which interpolation mode to use. see `fit_function`
+    Returns:
+        phases as list
+    """
+    performance_function = fit_function(
+        get_data(agent, dataset, zippath), interpolation
+    )
+    final_performance = performance_function(TARGET_EVAL_STEP)
+    performance_target = final_performance * final_performance_percentage
+
+    if mode == "target_ratio":
+        root_result: RootResults = root_scalar(
+            lambda x: performance_function(x) - performance_target,
+            bracket=[0, TARGET_EVAL_STEP],
+            method="brentq",
+        )
+        if not root_result.success:
+            raise Exception("could not find final performance percentage given data")
+        performance_target_steps = root_result.root
+        return [
+            int(performance_target_steps * phase_percentage)
+            for phase_percentage in phase_percentages
+        ]
+
+    raise NotImplementedError(mode)
 
 
 def fit_function(
