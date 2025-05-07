@@ -2,6 +2,10 @@ from typing import Callable
 from pathlib import Path
 from .util.data import read_results_from_zip, phase_results_to_pandas
 import pandas as pd
+import numpy as np
+from .plots.triple_gp import iqm
+
+TARGET_EVAL_STEP = 1_000_000
 
 
 def get_all_phases(
@@ -14,8 +18,36 @@ def get_all_phases(
     return
 
 
-def fit_function(agent: str, dataset: str) -> Callable[[int], float]:
-    raise NotImplementedError()
+
+def fit_function(
+    data: pd.DataFrame, interpolation_mode: str
+) -> Callable[[np.ndarray | int], np.ndarray | float]:
+    """fit a function given mode to data.
+
+    Args:
+        data: pandas dataframe containing data
+        interpolation_mode: interpolation to apply
+
+    Returns:
+        [TODO: do we want success rate here?]
+        callable which maps training steps to success rate
+
+    Raises:
+        ValueError: TARGET_EVAL_STEP could not be found in data
+        NotImplementedError: interpolation mode is not known
+    """
+
+    if TARGET_EVAL_STEP not in data["eval_step"]:
+        raise ValueError(
+            f"{TARGET_EVAL_STEP} not in given data. Given max was {data['eval_step'].max()}."
+        )
+
+    if interpolation_mode == "linear_target":
+        ys_target = data["success"][data["eval_step"] == TARGET_EVAL_STEP]
+        y_iqm = iqm(ys_target)
+        return lambda x: (x / TARGET_EVAL_STEP) * y_iqm
+
+    raise NotImplementedError(f"no interpolation mode {interpolation_mode}")
 
 
 def get_data(agent: str, dataset: str, zippath: Path) -> pd.DataFrame:
@@ -30,8 +62,7 @@ def get_data(agent: str, dataset: str, zippath: Path) -> pd.DataFrame:
         zipf: zipfile with results
 
     Returns:
-        x and y datapoints, mapping training steps to success rate
-        [TODO: do we want success rate here?]
+        pandas dataframe of results for given agent-dataset-combination
     """
     results = read_results_from_zip(zippath)
 
