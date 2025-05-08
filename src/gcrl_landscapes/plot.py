@@ -32,7 +32,7 @@ DIM_LABEL_MAPPING = {
 
 FTU_SIGNIFICANCE_THRESHOLD = 0.05
 
-CVAR_CONFIDENCE_LEVEL = 10
+CVAR_CONFIDENCE_LEVELS = (10, 20, 30, 40)
 DISP_CONFIDENCE_LEVELS = (10, 90)
 
 
@@ -75,11 +75,14 @@ def compute_additional_information(
         ].apply(np.mean)
 
         # Calculate CVaR
-        phase_result["cvar_normalized_goal_distance_return"] = phase_result[
-            "normalized_goal_distance_returns"
-        ].apply(
-            lambda distances: cvar(distances, confidence_level=CVAR_CONFIDENCE_LEVEL)
-        )
+        for confidence_level in CVAR_CONFIDENCE_LEVELS:
+            phase_result[f"cvar{confidence_level}_normalized_goal_distance_return"] = (
+                phase_result[
+                    "normalized_goal_distance_returns"
+                ].apply(
+                    lambda distances: cvar(distances, confidence_level=confidence_level)
+                )
+            )
 
         # Calculate Dispersion on goal distance distribution
         phase_result["disp_normalized_goal_distance"] = phase_result[
@@ -205,17 +208,15 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             ("success", "Success Rate"),
             ("mean_normalized_goal_distance_return", "Normalized Goal Distance Return"),
             (
-                "cvar_normalized_goal_distance_return",
-                "CVaR of normalized goal distance return",
-            ),
-            (
                 "disp_normalized_goal_distance_score",
                 "Dispersion score of normalized goal distance return",
             ),
+        ] + [  # Gather all CVaR confidence levels
             (
-                "cvar_normalized_goal_distance_return_half_percentile_score",
-                "1 - Percentile needed to reach CVaR of 0.5",
-            ),
+                f"cvar{confidence_level}_normalized_goal_distance_return",
+                f"CVaR ({confidence_level}%)of normalized goal distance return",
+            )
+            for confidence_level in CVAR_CONFIDENCE_LEVELS
         ]
         for col, title in landscape_pairs:
             plot_landscape(phase, phase_result_copy, col, hp_list, output_folder, title)
