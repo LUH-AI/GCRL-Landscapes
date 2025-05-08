@@ -46,7 +46,11 @@ def run_setup(args: argparse.Namespace) -> None:
     Args:
         args: parsed arguments, look into main or run from commandline to see documentation
     """
-    from .configurations import generate_configurations, get_config_space
+    from .configurations import (
+        generate_configurations,
+        get_config_space,
+        get_adapted_default_config,
+    )
 
     args.logdir.mkdir(parents=True, exist_ok=True)
     logging.basicConfig(filename=args.logdir / "log.txt", level=logging.INFO)
@@ -75,13 +79,16 @@ def run_setup(args: argparse.Namespace) -> None:
     config_space = get_config_space(args.agent)
     config_space.to_json(config_dir / "configspace.json")
 
-    configurations = generate_configurations(
-        args.n_configurations,
-        args.agent,
-        set(args.hyperparameters),
-        seed=args.seed,
-        env=args.dataset,
-    )
+    if args.n_configurations > 1:
+        configurations = generate_configurations(
+            args.n_configurations,
+            args.agent,
+            set(args.hyperparameters),
+            seed=args.seed,
+            env=args.dataset,
+        )
+    else:
+        configurations = [get_adapted_default_config(args.agent, args.dataset)]
 
     def save_configurations():
         for i, config in enumerate(configurations):

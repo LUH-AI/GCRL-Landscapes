@@ -40,6 +40,33 @@ def get_config_space(agent: str) -> ConfigurationSpace:
     )
 
 
+def get_adapted_default_config(agent: str, env: str) -> FrozenConfigDict:
+    agent_config_generators = {
+        "CRL": lambda: _adapt_base_config(
+            ogbench.impls.agents.crl.get_config().to_dict(), env
+        ),
+        "CMD": lambda: _adapt_base_config(
+            ogbench.impls.agents.cmd.get_config().to_dict(), env
+        ),
+        "GCBC": lambda n: _adapt_base_config(
+            ogbench.impls.agents.gcbc.get_config().to_dict(), env
+        ),
+        "GCIQL": lambda: _adapt_base_config(
+            ogbench.impls.agents.gciql.get_config().to_dict(), env
+        ),
+        "GCIVL": lambda: _adapt_base_config(
+            ogbench.impls.agents.gcivl.get_config().to_dict(), env
+        ),
+        "HIQL": lambda: _adapt_base_config(
+            ogbench.impls.agents.hiql.get_config().to_dict(), env
+        ),
+        "QRL": lambda: _adapt_base_config(
+            ogbench.impls.agents.qrl.get_config().to_dict(), env
+        ),
+    }
+    return FrozenConfigDict(initial_dictionary=agent_config_generators[agent]())
+
+
 def generate_configurations(
     n: int,
     agent: str,
