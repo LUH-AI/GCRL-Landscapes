@@ -22,12 +22,33 @@ if __name__ == "__main__":
         choices=SUPPORTED_AGENTS,
         help="Agent to run",
     )
+    setup_phase_determination = setup_subparser.add_mutually_exclusive_group(
+        required=True
+    )
+
+    setup_phase_determination.add_argument(
+        "--convergence_zip",
+        type=Path,
+        help="zip file which contains logs to determine phases using training results",
+    )
+    setup_phase_determination.add_argument(
+        "--final_phase",
+        type=int,
+        help="How many steps the final phase has",
+    )
     setup_subparser.add_argument(
-        "--phases",
-        required=True,
+        "--final_performance_percentage",
+        required=False,
+        type=int,
+        default=95,
+        help="How much of the benchmarked performance the final evaluation should reach. Used for setting phase steps. Only used with convergence_zip",
+    )
+    setup_subparser.add_argument(
+        "--phase_percentages",
         type=int,
         nargs="+",
-        help="Which phases should be run in the course of the experiment",
+        default=[25, 50, 100],
+        help="At which percentages phases should be run",
     )
     setup_subparser.add_argument(
         "--dataset", required=True, type=str, help="Which dataset/environment to run"
@@ -46,14 +67,15 @@ if __name__ == "__main__":
         help="Which configuration space to use",
     )
     setup_subparser.add_argument(
-        "--eval_steps",
-        required=True,
+        "--extra_eval_steps",
+        required=False,
         type=int,
         nargs="+",
+        default=[],
         help="At what steps to evaluate",
     )
     setup_subparser.add_argument(
-        "--save_steps",
+        "--extra_save_steps",
         required=False,
         type=int,
         nargs="+",
@@ -139,11 +161,11 @@ if __name__ == "__main__":
         help="Time allocation per Job independent from training steps",
     )
     slurm_subparser.add_argument(
-        "--phases",
+        "--phase_indices",
         required=False,
         nargs="+",
         type=int,
-        help="Which phases to run. Will run all if not given",
+        help="Index of which phases to run. Will run all if not given",
     )
 
     slurm_subparser.set_defaults(func=submit)
@@ -158,7 +180,7 @@ if __name__ == "__main__":
         help="In which directory to save results. Has to be already initialized using setup",
     )
     run_subparser.add_argument(
-        "--phase", required=True, type=int, help="Which phase to run"
+        "--phase_idx", required=True, type=int, help="Which phase to run"
     )
     run_subparser.add_argument(
         "--agent_path",
