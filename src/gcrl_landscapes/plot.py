@@ -168,6 +168,54 @@ def plot_landscape(
     plt.close()
 
 
+def plot_return_distribution(
+    phase: int,
+    phase_result: pd.DataFrame,
+    y_col: str,
+    output_folder: Path,
+    output_per_config_folder: Path,
+    y_label: str | None,
+):
+    RETURN_LIMITS = (-1, 1)
+    exploded_phase_result = phase_result[[y_col, "config_index"]].explode(y_col)  # type: ignore
+    exploded_phase_result[f"clipped_{y_col}"] = exploded_phase_result[y_col].clip(
+        lower=RETURN_LIMITS[0], upper=RETURN_LIMITS[1]
+    )
+    # per configuration
+    for config_index, group in exploded_phase_result.groupby("config_index"):
+        _ = plt.figure()
+        ax = sns.histplot(
+            data=group,  # type: ignore
+            x=f"clipped_{y_col}",
+            stat="probability",
+            bins="sturges",
+        )
+        ax.set_xlim(*RETURN_LIMITS)
+        ax.set_ylim(0, 1)
+        plt.title(f"{y_label if y_label else y_col}", fontsize=18)
+        plt.savefig(
+            output_per_config_folder
+            / f"returndistribution-{y_col}-config_{config_index}-{phase}.png"
+        )
+        plt.close()
+    ## configuration marginalized
+    _ = plt.figure()
+    ax = sns.histplot(
+        data=exploded_phase_result,  # type: ignore
+        x=f"clipped_{y_col}",
+        stat="probability",
+        bins="sturges",
+    )
+    ax.set_xlim(*RETURN_LIMITS)
+    ax.set_ylim(0, 1)
+    plt.title(f"{y_label if y_label else y_col}", fontsize=18)
+    plt.savefig(
+        output_folder / f"returndistribution-{y_col}-{phase}.png",
+        bbox_inches="tight",
+    )
+    plt.close()
+
+
 def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, Any]):
     """Main plotting Code to generate the landscapes
 
@@ -221,49 +269,14 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         for col, title in landscape_pairs:
             plot_landscape(phase, phase_result_copy, col, hp_list, output_folder, title)
 
-        # Modality plots
-        ## Plot return distributions
-        RETURN_LIMITS = (-1, 1)
-        exploded_phase_result_copy = phase_result_copy[
-            ["normalized_goal_distance_returns", "config_index"]
-        ].explode("normalized_goal_distance_returns")
-        exploded_phase_result_copy["clipped_normalized_goal_distance_returns"] = (
-            exploded_phase_result_copy[
-                "normalized_goal_distance_returns"
-            ].clip(lower=RETURN_LIMITS[0], upper=RETURN_LIMITS[1])
+        plot_return_distribution(
+            phase,
+            phase_result_copy,
+            "normalized_goal_distance_returns",
+            output_folder,
+            per_config_phase_folder,
+            "Normalized Goal Distance Return Distribution",
         )
-        ## per configuration
-        for config_index, group in exploded_phase_result_copy.groupby("config_index"):
-            fig = plt.figure()
-            ax = sns.histplot(
-                data=group,
-                x="clipped_normalized_goal_distance_returns",
-                stat="probability",
-                bins="sturges",
-            )
-            ax.set_xlim(*RETURN_LIMITS)
-            ax.set_ylim(0, 1)
-            plt.savefig(
-                per_config_phase_folder
-                / f"returndistribution-clipped_normalized_goal_distance-config_{config_index}-{phase}.png"
-            )
-            plt.close()
-        ### configuration marginalized
-        fig = plt.figure()
-        ax = sns.histplot(
-            data=exploded_phase_result_copy,
-            x="clipped_normalized_goal_distance_returns",
-            stat="probability",
-            bins="sturges",
-        )
-        ax.set_xlim(*RETURN_LIMITS)
-        ax.set_ylim(0, 1)
-        plt.savefig(
-            output_folder
-            / f"returndistribution-clipped_normalized_goal_distance_-{phase}.png",
-            bbox_inches="tight",
-        )
-        plt.close()
 
         # The following is more or less unused in the meantime but may be interesting again later on
         # Create plot based on folding test of unimodality
