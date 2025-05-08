@@ -211,41 +211,24 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             phase_result_copy["run_id"]
         )  # TripleGPModel needs continuous run-ids starting at 0
 
-        plot_landscape(
-            phase, phase_result_copy, "success", hp_list, output_folder, "Success Rate"
-        )
-        plot_landscape(
-            phase,
-            phase_result_copy,
-            "mean_normalized_goal_distance_return",
-            hp_list,
-            output_folder,
-            "Normalized Goal Distance Return",
-        )
-        plot_landscape(
-            phase,
-            phase_result_copy,
-            "cvar_normalized_goal_distance_return",
-            hp_list,
-            output_folder,
-            "CVaR of normalized goal distance return",
-        )
-        plot_landscape(
-            phase,
-            phase_result_copy,
-            "disp_normalized_goal_distance_score",
-            hp_list,
-            output_folder,
-            "Dispersion score of normalized goal distance return",
-        )
-        plot_landscape(
-            phase,
-            phase_result_copy,
-            "cvar_normalized_goal_distance_return_half_percentile_score",
-            hp_list,
-            output_folder,
-            "1 - Percentile needed to reach CVaR of 0.5",
-        )
+        landscape_pairs = [
+            ("success", "Success Rate"),
+            ("mean_normalized_goal_distance_return", "Normalized Goal Distance Return"),
+            (
+                "cvar_normalized_goal_distance_return",
+                "CVaR of normalized goal distance return",
+            ),
+            (
+                "disp_normalized_goal_distance_score",
+                "Dispersion score of normalized goal distance return",
+            ),
+            (
+                "cvar_normalized_goal_distance_return_half_percentile_score",
+                "1 - Percentile needed to reach CVaR of 0.5",
+            ),
+        ]
+        for col, title in landscape_pairs:
+            plot_landscape(phase, phase_result_copy, col, hp_list, output_folder, title)
 
         # Modality plots
         ## Plot return distributions
