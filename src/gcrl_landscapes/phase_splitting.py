@@ -14,7 +14,7 @@ def get_all_phases(
     dataset: str,
     final_performance_percentage: int,
     zippath: Path,
-    phase_percentages: list[int] = [25, 50, 100],
+    phase_percentages: list[int],
     mode: str = "target_ratio",
     interpolation: str = "linear_target",
 ) -> list[int]:
@@ -37,7 +37,7 @@ def get_all_phases(
         get_data(agent, dataset, zippath), interpolation
     )
     final_performance = performance_function(TARGET_EVAL_STEP)
-    performance_target = final_performance * final_performance_percentage
+    performance_target = final_performance * (final_performance_percentage / 100)
 
     if mode == "target_ratio":
         root_result: RootResults = root_scalar(
@@ -49,7 +49,7 @@ def get_all_phases(
             raise Exception("could not find final performance percentage given data")
         performance_target_steps = root_result.root
         return [
-            int(performance_target_steps * phase_percentage)
+            int(performance_target_steps * (phase_percentage / 100))
             for phase_percentage in phase_percentages
         ]
 

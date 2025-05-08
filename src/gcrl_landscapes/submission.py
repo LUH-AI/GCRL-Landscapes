@@ -15,6 +15,7 @@ from itertools import product
 from .util.misc import retry_call
 import re
 from .util.data import get_best_agent_path, get_phase_results
+from .phase_splitting import get_all_phases
 from more_itertools import chunked, divide
 
 logger = logging.getLogger(__name__)
@@ -56,9 +57,27 @@ def run_setup(args: argparse.Namespace) -> None:
     logging.basicConfig(filename=args.logdir / "log.txt", level=logging.INFO)
     logging.info("Set up for later running")
 
+    phases = (
+        [
+            get_all_phases(
+                args.agent,
+                args.dataset,
+                args.final_performance_percentage,
+                args.convergence_zip,
+                args.phase_percentages,
+                mode="target_ratio",
+                interpolation="linear_target",
+            )
+        ]
+        if args.convergence_zip
+        else [
+            int((phase_percentage / 100) * args.final_phase)
+            for phase_percentage in args.phase_percentages
+        ]
+    )
     # Log metadata to file
     metadata = {
-        "arguments": args.__dict__,
+        "arguments": args.__dict__ | {"phases": phases},
         "git": {
             "commit": git.Repo(".", search_parent_directories=True).head.object.hexsha,
             "branch": git.Repo(".", search_parent_directories=True).active_branch.name,
@@ -102,7 +121,7 @@ def run_setup(args: argparse.Namespace) -> None:
 
 def run_config(
     logdir: Path,
-    phase: int,
+    phase_idx: int,
     configuration_index: int,
     seed: int,
     tasks_per_node_parallel: int,
@@ -120,9 +139,10 @@ def run_config(
         seed: seed for training
         tasks_per_node_parallel: how many tasks will run on this node. Needed for environment setup
     """
-    assert phase == 0 or agent_path
+    assert phase_idx > 0 or agent_path
 
     setup = toml.load(logdir / "info.toml")["arguments"]
+    phase = setup["phases"][phase_idx]
 
     # submitit just bypasses SIGTERM although it should end the job, overwrite that behaviour here
     def handler(signum, frame):
@@ -182,10 +202,7 @@ def run_config(
     }
 
     # Find best agent for last phase
-    last_phase_index = setup["phases"].index(phase) - 1
-    already_trained_steps = (
-        setup["phases"][last_phase_index] if last_phase_index >= 0 else 0
-    )
+    already_trained_steps = setup["phases"][phase_idx - 1] if phase_idx - 1 >= 0 else 0
     if not agent_path and already_trained_steps > 0:
         print("No agent path given, finding best agent")
         phase_results = get_phase_results(already_trained_steps, logdir)
@@ -198,7 +215,6 @@ def run_config(
                     path.unlink(missing_ok=True)
     print(f"Loading agent {agent_path}")
 
-    setup = toml.load(logdir / "info.toml")["arguments"]
     run_log_dir = (
         logdir
         / "run_logs"
@@ -239,8 +255,12 @@ def run_config(
         configuration = FrozenConfigDict(json.loads(f.read()))
 
     # don't train until end if we don't use final timestep as fitness evaluation
-    setup_eval_steps = setup["eval_steps"]
-    setup_save_steps = setup["save_steps"] if "save_steps" in setup else [phase]
+    setup_eval_steps = sorted(setup["extra_eval_steps"] + setup["phases"])
+    setup_save_steps = (
+        sorted(setup["extra_save_steps"] + [phase])
+        if "extra_save_steps" in setup
+        else [phase]
+    )
     if setup["final_step_is_phase"]:
         eval_steps = [step for step in setup_eval_steps if step <= phase]
         save_steps = [step for step in setup_save_steps if step <= phase]
@@ -287,12 +307,16 @@ def submit(args: argparse.Namespace) -> None:
     configuration_indices = list(range(setup["n_configurations"]))
     seeds = list(range(args.n_seeds))
     array_id: int | None = None
-    phases = setup["phases"] if not args.phases else args.phases
-    for phase in phases:
+    phase_indices = (
+        list(range(len(setup["phases"])))
+        if not args.phase_indices
+        else args.phase_indices
+    )
+    for phase_idx in phase_indices:
         argument_lines = [
             {
                 "logdir": args.logdir,
-                "phase": phase,
+                "phase_idx": phase_idx,
                 "configuration_idx": configuration_idx,
                 "seed": seed,
                 "tasks_per_node_parallel": args.tasks_per_node_parallel,
@@ -316,15 +340,14 @@ def submit(args: argparse.Namespace) -> None:
             for task_chunk in chunked_tasks_per_node
         ]
 
-        last_phase_index = setup["phases"].index(phase) - 1
         already_trained_steps = (
-            setup["phases"][last_phase_index] if last_phase_index >= 0 else 0
+            setup["phases"][phase_idx - 1] if phase_idx - 1 >= 0 else 0
         )
 
         steps_to_train = (
             max(setup["eval_steps"]) - already_trained_steps
             if not setup["final_step_is_phase"]
-            else phase - already_trained_steps
+            else setup["phases"][phase_idx] - already_trained_steps
         )
         executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
         executor.update_parameters(
@@ -383,7 +406,7 @@ def run_config_chunked_arguments_wrapper(
     results = [
         run_config(
             setup["logdir"],
-            setup["phase"],
+            setup["phase_idx"],
             setup["configuration_index"],
             setup["seed"],
             setup["tasks_per_node_parallel"],
@@ -397,7 +420,7 @@ def run_config_chunked_arguments_wrapper(
 def run_config_wrapper(args: argparse.Namespace) -> None:
     return run_config(
         args.logdir,
-        args.phase,
+        args.phase_idx,
         args.configuration,
         args.seed,
         args.tasks_per_node_parallel,
