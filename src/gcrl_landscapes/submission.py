@@ -29,6 +29,7 @@ SUPPORTED_AGENTS = [
     "GCIVL",
     "QRL",
     "HIQL",
+    "SAC",
 ]
 SUPPORTED_DATASETS = [
     "CRL",
@@ -38,6 +39,7 @@ SUPPORTED_DATASETS = [
     "GCIVL",
     "QRL",
     "HIQL",
+    "SAC",
 ]
 
 
@@ -176,6 +178,7 @@ def run_config(
         HIQLAgent,
         GCIQLAgent,
         GCIVLAgent,
+        SACAgent,
     )
     import jax
     from .util.misc import jax_has_gpu
@@ -190,6 +193,7 @@ def run_config(
         "GCIVL": GCIVLAgent,
         "QRL": QRLAgent,
         "HIQL": HIQLAgent,
+        "SAC": SACAgent,
     }
     DATASET_CLASSES = {
         "CRL": GCDataset,
@@ -199,6 +203,7 @@ def run_config(
         "GCIVL": GCDataset,
         "QRL": GCDataset,
         "HIQL": HGCDataset,
+        "SAC": GCDataset,
     }
 
     # Find best agent for last phase
