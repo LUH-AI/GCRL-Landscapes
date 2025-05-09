@@ -49,7 +49,7 @@ def get_adapted_default_config(agent: str, env: str) -> FrozenConfigDict:
         "CMD": lambda: _adapt_base_config(
             ogbench.impls.agents.cmd.get_config().to_dict(), env
         ),
-        "GCBC": lambda n: _adapt_base_config(
+        "GCBC": lambda: _adapt_base_config(
             ogbench.impls.agents.gcbc.get_config().to_dict(), env
         ),
         "GCIQL": lambda: _adapt_base_config(
