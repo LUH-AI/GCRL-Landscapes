@@ -3,8 +3,8 @@
 logdir="./logs"
 hyperparameters="discount actor_p_trajgoal"
 numconfigurations="32"
-phases="50000 100000 200000"
-evalsteps="${phases}"
+finalphase="200000"
+phasepercentages="25 50 100"
 numevalepisodes="50"
 nseeds="5"
 taskspernodetotal="16"
@@ -56,7 +56,7 @@ for environment in "${environments[@]}"; do
     echo "Starting job for ${agent}"
     full_log_dir="${logdir}/${agent}_${environment}_${numconfigurations}c_${hyperparameters// /-}"
 
-    python -m gcrl_landscapes.main setup --agent "$agent" --dataset "$environment" --n_configurations "$numconfigurations" --phases $phases --eval_steps $evalsteps --eval_episodes "$numevalepisodes" --hyperparameters $hyperparameters --logdir "$full_log_dir" --final_step_is_phase
+    python -m gcrl_landscapes.main setup --agent "$agent" --dataset "$environment" --n_configurations "$numconfigurations" --final_phase $finalphase --phase_percentages $phasepercentages --eval_episodes "$numevalepisodes" --hyperparameters $hyperparameters --logdir "$full_log_dir" --final_step_is_phase
     python -m gcrl_landscapes.main submit --logdir "$full_log_dir" --n_seeds "$nseeds" --tasks_per_node_total "$taskspernodetotal" --tasks_per_node_parallel "$taskspernodeparallel" --mem_per_cpu "$mempercpu" --jobname "${agent}-${environment}" --partition "$partitions" --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}"
   done
 done
