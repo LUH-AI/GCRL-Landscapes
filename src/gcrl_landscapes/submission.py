@@ -412,7 +412,7 @@ def run_config_chunked_arguments_wrapper(
         run_config(
             setup["logdir"],
             setup["phase_idx"],
-            setup["configuration_index"],
+            setup["configuration_idx"],
             setup["seed"],
             setup["tasks_per_node_parallel"],
             clean_checkpoints=first_job_and_task_in_array and seq_idx == 0,
