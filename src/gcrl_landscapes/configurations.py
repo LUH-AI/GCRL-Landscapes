@@ -9,6 +9,7 @@ import ogbench.impls.agents.cmd
 import ogbench.impls.agents.gcbc
 import ogbench.impls.agents.qrl
 import ogbench.impls.agents.hiql
+import ogbench.impls.agents.sac
 import warnings
 import numpy as np
 import logging
@@ -62,6 +63,9 @@ def get_adapted_default_config(agent: str, env: str) -> FrozenConfigDict:
         ),
         "QRL": lambda: _adapt_base_config(
             ogbench.impls.agents.qrl.get_config().to_dict(), env
+        ),
+        "SAC": lambda: _adapt_base_config(
+            ogbench.impls.agents.sac.get_config().to_dict(), env
         ),
     }
     return FrozenConfigDict(initial_dictionary=agent_config_generators[agent]())
@@ -118,6 +122,11 @@ def generate_configurations(
         ),
         "QRL": lambda n: _generate_configurations(
             _adapt_base_config(ogbench.impls.agents.qrl.get_config().to_dict(), env),
+            n,
+            hyperparameters,
+        ),
+        "SAC": lambda n: _generate_configurations(
+            _adapt_base_config(ogbench.impls.agents.sac.get_config().to_dict(), env),
             n,
             hyperparameters,
         ),
