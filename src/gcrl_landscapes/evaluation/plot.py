@@ -1,5 +1,5 @@
 import argparse
-from .util.data import (
+from gcrl_landscapes.util.data import (
     ResultsPerStep,
     PhaseResult,
     phase_results_to_pandas,
@@ -7,9 +7,9 @@ from .util.data import (
     EvaluationResult,
 )
 from pathlib import Path
-from .plots.triple_gp import TripleGPModel, create_contour_plot
+from gcrl_landscapes.plots.triple_gp import TripleGPModel, create_contour_plot
 import numpy as np
-from .configurations import get_config_space
+from gcrl_landscapes.configurations import get_config_space
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
