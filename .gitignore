@@ -4,3 +4,4 @@ MUJOCO_LOG.TXT
 logs/
 *.zip
 /plots/
+/log_zips/
