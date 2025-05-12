@@ -3,7 +3,7 @@ from pathlib import Path
 from .util.data import read_results_from_zip, phase_results_to_pandas
 import pandas as pd
 import numpy as np
-from .plots.triple_gp import iqm
+from scipy.stats import trim_mean
 from scipy.optimize import root_scalar, RootResults
 
 TARGET_EVAL_STEP = 1_000_000
@@ -16,7 +16,7 @@ def get_all_phases(
     zippath: Path,
     phase_percentages: list[int],
     mode: str = "target_ratio",
-    interpolation: str = "linear_target",
+    interpolation: str = "linear",
 ) -> list[int]:
     """Get phases to run based on experimental performance results for long-term runs.
 
@@ -33,16 +33,27 @@ def get_all_phases(
     Returns:
         phases as list
     """
-    performance_function = fit_function(
-        get_data(agent, dataset, zippath), interpolation
+    data = get_data(agent, dataset, zippath)
+    performance_xs, performance_ys = zip(
+        *[
+            (group["eval_step"].iloc[0], trim_mean(group["success"].to_numpy(), 0.25))
+            for _, group in data.groupby(by=["eval_step"])
+        ]
     )
+
+    performance_function = fit_function(performance_xs, performance_ys, interpolation)
     final_performance = performance_function(TARGET_EVAL_STEP)
     performance_target = final_performance * (final_performance_percentage / 100)
+
+    # Find first bracket which contains performance_target based on data
+    # -> find leftmost root
+    bracket_idx_right = np.min(np.where(performance_ys >= performance_target)[0])
+    bracket = (performance_xs[bracket_idx_right - 1], performance_xs[bracket_idx_right])
 
     if mode == "target_ratio":
         root_result: RootResults = root_scalar(
             lambda x: performance_function(x) - performance_target,
-            bracket=[0, TARGET_EVAL_STEP],
+            bracket=bracket,
             method="brentq",
         )
         if not root_result.converged:
@@ -57,7 +68,7 @@ def get_all_phases(
 
 
 def fit_function(
-    data: pd.DataFrame, interpolation_mode: str
+    xs: list[float], ys: list[float], interpolation_mode: str
 ) -> Callable[[np.ndarray | int], np.ndarray | float]:
     """fit a function given mode to data.
 
@@ -74,15 +85,15 @@ def fit_function(
         NotImplementedError: interpolation mode is not known
     """
 
-    if TARGET_EVAL_STEP not in data["eval_step"]:
+    if TARGET_EVAL_STEP not in xs:
         raise ValueError(
-            f"{TARGET_EVAL_STEP} not in given data. Given max was {data['eval_step'].max()}."
+            f"{TARGET_EVAL_STEP} not in given data. Given max was {max(ys)}."
         )
 
     if interpolation_mode == "linear_target":
-        ys_target = data["success"][data["eval_step"] == TARGET_EVAL_STEP]
-        y_iqm = iqm(ys_target)
-        return lambda x: (x / TARGET_EVAL_STEP) * y_iqm
+        return lambda x: (x / TARGET_EVAL_STEP) * ys[xs.index(TARGET_EVAL_STEP)]
+    elif interpolation_mode == "linear":
+        return lambda x: np.interp(x, xs, ys)
 
     raise NotImplementedError(f"no interpolation mode {interpolation_mode}")
 
