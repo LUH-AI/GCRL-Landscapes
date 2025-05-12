@@ -22,7 +22,13 @@ LEARNING_RATE_UPPER = 1e-3
 DISCOUNT_FACTOR_LOWER = 0.8
 DISCOUNT_FACTOR_UPPER = 0.99
 
-SUPPORTED_HPS = set(["lr", "discount", "actor_p_trajgoal"])
+AWR_TEMPERATURE_LOWER = 1.0
+AWR_TEMPERATURE_UPPER = 20.0
+
+DDPGBC_BC_COEFF_LOWER = 0.0
+DDPGBC_BC_COEFF_UPPER = 0.5
+
+SUPPORTED_HPS = set(["lr", "discount", "actor_p_trajgoal", "alpha"])
 
 
 def get_config_space(agent: str) -> ConfigurationSpace:
@@ -161,7 +167,26 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
     actor_p_randomgoals = list(
         np.ones(len(actor_p_trajgoals)) - np.array(actor_p_trajgoals)
     )
+    # Set alpha hyperparameter (AWR temperature or ddpgbc bc coefficient)
+    ## may be unused if algorithm uses ddpgbc
+    awr_temperatures = (
+        _generate_awr_temperatures(n)
+        if "alpha" in hyperparameters
+        else _generate_dummy_list(n, base_config["alpha"])
+    )
+    ## may be unused if algorithm uses awr
+    ddpgbc_bc_coeffs = (
+        _generate_ddpgbc_bc_coeffs(n)
+        if "alpha" in hyperparameters
+        else _generate_dummy_list(n, base_config["alpha"])
+    )
 
+    # choose between awr temperature and ddpgbc bc coefficient
+    # use given actor loss as information, otherwise look at size of default alpha
+    if "actor_loss" in base_config:
+        actor_loss = base_config["actor_loss"]
+    else:
+        actor_loss = "ddpgbc" if base_config["alpha"] < 1.0 else "awr"
     return [
         FrozenConfigDict(
             initial_dictionary=base_config
@@ -171,14 +196,17 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
                 "actor_p_curgoal": actor_p_curgoal,
                 "actor_p_trajgoal": actor_p_trajgoal,
                 "actor_p_randomgoal": actor_p_randomgoal,
+                "alpha": ddpgbc_bc_coeff if actor_loss == "ddpgbc" else awr_temperature,
             }
         )
-        for lr, df, actor_p_curgoal, actor_p_trajgoal, actor_p_randomgoal in zip(
+        for lr, df, actor_p_curgoal, actor_p_trajgoal, actor_p_randomgoal, awr_temperature, ddpgbc_bc_coeff in zip(
             learning_rates,
             discount_factors,
             actor_p_curgoals,
             actor_p_trajgoals,
             actor_p_randomgoals,
+            awr_temperatures,
+            ddpgbc_bc_coeffs,
         )
     ]
 
@@ -196,6 +224,22 @@ def _generate_discount_factors(n: int) -> list[float]:
         Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
         * (DISCOUNT_FACTOR_UPPER - DISCOUNT_FACTOR_LOWER)
         + DISCOUNT_FACTOR_LOWER
+    )
+
+
+def _generate_awr_temperatures(n: int) -> list[float]:
+    return list(
+        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
+        * (AWR_TEMPERATURE_UPPER - AWR_TEMPERATURE_LOWER)
+        + AWR_TEMPERATURE_LOWER
+    )
+
+
+def _generate_ddpgbc_bc_coeffs(n: int) -> list[float]:
+    return list(
+        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
+        * (DDPGBC_BC_COEFF_UPPER - DDPGBC_BC_COEFF_LOWER)
+        + DDPGBC_BC_COEFF_LOWER
     )
 
 
