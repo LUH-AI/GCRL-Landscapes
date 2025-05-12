@@ -60,17 +60,15 @@ def run_setup(args: argparse.Namespace) -> None:
     logging.info("Set up for later running")
 
     phases = (
-        [
-            get_all_phases(
-                args.agent,
-                args.dataset,
-                args.final_performance_percentage,
-                args.convergence_zip,
-                args.phase_percentages,
-                mode="target_ratio",
-                interpolation="linear_target",
-            )
-        ]
+        get_all_phases(
+            args.agent,
+            args.dataset,
+            args.final_performance_percentage,
+            args.convergence_zip,
+            args.phase_percentages,
+            mode="target_ratio",
+            interpolation="linear",
+        )
         if args.convergence_zip
         else [
             int((phase_percentage / 100) * args.final_phase)
