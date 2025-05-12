@@ -45,7 +45,7 @@ def get_all_phases(
             bracket=[0, TARGET_EVAL_STEP],
             method="brentq",
         )
-        if not root_result.success:
+        if not root_result.converged:
             raise Exception("could not find final performance percentage given data")
         performance_target_steps = root_result.root
         return [
