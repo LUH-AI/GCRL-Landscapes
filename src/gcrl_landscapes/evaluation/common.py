@@ -2,6 +2,11 @@ import pandas as pd
 import numpy as np
 from copy import deepcopy
 from gcrl_landscapes.util.eval import cvar, iqr
+from gcrl_landscapes.util.data import (
+    PhaseResult,
+    ResultsPerStep,
+    phase_results_to_pandas,
+)
 
 
 DIM_LABEL_MAPPING = {
@@ -73,3 +78,17 @@ def compute_additional_information(
         assert phase_result["disp_normalized_goal_distance_score"].max() <= 1
 
     return phase_results_copy
+
+
+def merge_experiments(
+    results: dict[str, tuple[dict, ResultsPerStep[PhaseResult]]],
+) -> pd.DataFrame:
+    return pd.concat(
+        [
+            phase_results_to_pandas(result).assign(
+                agent=run_info["arguments"]["agent"],
+                dataset=run_info["arguments"]["dataset"],
+            )
+            for run_info, result in results.values()
+        ]
+    )
