@@ -158,6 +158,8 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         output_folder: folder to save plots in
         run_info: info about the run/setup
     """
+    results_pandas = compute_additional_information(results_pandas)
+
     per_config_folder = output_folder / "per_config"
     per_config_folder.mkdir(exist_ok=True)
 
@@ -176,7 +178,6 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         )
         for phase in phases
     ]
-    phase_results = compute_additional_information(phase_results)  # type: ignore
 
     for phase, phase_result in phase_results:
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
