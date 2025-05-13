@@ -5,7 +5,11 @@ from gcrl_landscapes.util.data import (
 from pathlib import Path
 import pandas as pd
 import os
-from .common import compute_additional_information, merge_experiments
+from .common import (
+    compute_additional_information,
+    merge_experiments,
+    CVAR_CONFIDENCE_LEVELS,
+)
 
 
 def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
@@ -32,13 +36,26 @@ def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
         for phase in phases
     ]
 
-    for phase, phase_result in phase_results:
-        per_config_phase_folder = per_config_folder / f"phase_{phase}"
-        per_config_phase_folder.mkdir(exist_ok=True)
-        phase_result_copy = phase_result.copy()
-        phase_result_copy.loc[:, "run_id"], _ = pd.factorize(
-            phase_result_copy["run_id"]
-        )  # TripleGPModel needs continuous run-ids starting at 0
+    results_only_final_eval_df = pd.concat(
+        (results_df for _, results_df in phase_results)
+    )
+    return results_only_final_eval_df.groupby(by=["agent", "dataset", "phase"]).agg(
+        **{
+            "mean_normalized_goal_distance_return": pd.NamedAgg(
+                column="mean_normalized_goal_distance_return", aggfunc="mean"
+            ),
+            "mean_dispersion_score_normalized_goal_distance_return": pd.NamedAgg(
+                column="disp_normalized_goal_distance_score", aggfunc="mean"
+            ),
+            **{
+                f"mean_cvar{cvar_level}": pd.NamedAgg(
+                    column=f"cvar{cvar_level}_normalized_goal_distance_return",
+                    aggfunc="mean",
+                )
+                for cvar_level in CVAR_CONFIDENCE_LEVELS
+            },
+        }
+    )
 
 
 if __name__ == "__main__":
