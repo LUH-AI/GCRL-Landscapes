@@ -39,16 +39,17 @@ def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
     results_only_final_eval_df = pd.concat(
         (results_df for _, results_df in phase_results)
     )
-    return results_only_final_eval_df.groupby(by=["agent", "dataset", "phase"]).agg(
+
+    table = results_only_final_eval_df.groupby(by=["agent", "dataset", "phase"]).agg(
         **{
-            "mean_normalized_goal_distance_return": pd.NamedAgg(
+            "Goal Distance Score": pd.NamedAgg(
                 column="mean_normalized_goal_distance_return", aggfunc="mean"
             ),
-            "mean_dispersion_score_normalized_goal_distance_return": pd.NamedAgg(
+            "Dispersion Score": pd.NamedAgg(
                 column="disp_normalized_goal_distance_score", aggfunc="mean"
             ),
             **{
-                f"mean_cvar{cvar_level}": pd.NamedAgg(
+                f"CVaR{cvar_level} score": pd.NamedAgg(
                     column=f"cvar{cvar_level}_normalized_goal_distance_return",
                     aggfunc="mean",
                 )
@@ -56,6 +57,15 @@ def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
             },
         }
     )
+
+    with open(output_folder / "table.md", "w") as f:
+        f.write(table.to_markdown())
+
+    with open(output_folder / "table.tex", "w") as f:
+        f.write(table.to_latex())
+
+    with open(output_folder / "table.csv", "w") as f:
+        f.write(table.to_csv())
 
 
 if __name__ == "__main__":
