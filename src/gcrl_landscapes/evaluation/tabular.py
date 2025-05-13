@@ -15,6 +15,8 @@ def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
         results_pandas: pandas dataframe containing all results (all phases) for one experiment
         output_folder: folder to save plots in
     """
+    results_pandas = compute_additional_information(results_pandas)  # type: ignore
+
     per_config_folder = output_folder / "per_config"
     per_config_folder.mkdir(exist_ok=True)
 
@@ -29,7 +31,6 @@ def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
         )
         for phase in phases
     ]
-    phase_results = compute_additional_information(phase_results)  # type: ignore
 
     for phase, phase_result in phase_results:
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
