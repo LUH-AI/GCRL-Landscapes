@@ -139,8 +139,6 @@ def run_config(
         seed: seed for training
         tasks_per_node_parallel: how many tasks will run on this node. Needed for environment setup
     """
-    assert phase_idx == 0 or agent_path
-
     setup = toml.load(logdir / "info.toml")["arguments"]
     phase = setup["phases"][phase_idx]
 
