@@ -157,8 +157,8 @@ if __name__ == "__main__":
         "--basetime",
         type=int,
         required=False,
-        default=30,
-        help="Time allocation per Job independent from training steps",
+        default=5,
+        help="Time allocation per task independent from training steps",
     )
     slurm_subparser.add_argument(
         "--phase_indices",

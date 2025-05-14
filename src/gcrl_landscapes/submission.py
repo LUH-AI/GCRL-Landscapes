@@ -354,7 +354,7 @@ def submit(args: argparse.Namespace) -> None:
         executor.update_parameters(
             cpus_per_task=3,
             slurm_time=int(
-                args.basetime
+                args.basetime * args.tasks_per_node_total
                 + args.min_per_mill_steps
                 * (steps_to_train / 1_000_000)
                 * args.tasks_per_node_total
