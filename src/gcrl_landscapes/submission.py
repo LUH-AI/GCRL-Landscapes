@@ -13,6 +13,7 @@ import signal
 import sys
 from itertools import product
 from .util.misc import retry_call
+from .util.datasets import mix_datasets
 import re
 from .util.data import get_best_agent_path, get_phase_results
 from .phase_splitting import get_all_phases
@@ -165,6 +166,7 @@ def run_config(
     from .training import train
     from .evaluate import evaluate_wrapper
     from ogbench import make_env_and_datasets
+    from ogbench.utils import DEFAULT_DATASET_DIR
     from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
     from ogbench.impls.agents import (
         CRLAgent,
@@ -249,7 +251,26 @@ def run_config(
     retry_call(save_metadata)
 
     # Set up training
-    env, train_dataset, val_dataset = make_env_and_datasets(setup["dataset"])  # type: ignore
+
+    ## mix in explore and cache it if wanted
+    explore_mix_match = re.fullmatch(
+        r"^.*explore(?P<explore_share>\d+)(?P<secondtype>[^-]*).*$", setup["dataset"]
+    )
+    if explore_mix_match:
+        base_dataset = re.sub(r"explore\d+", "", setup["dataset"])
+        explore_dataset = re.sub(r"explore\d+[^-]*", "explore", setup["dataset"])
+        dataset_dir = mix_datasets(
+            base_dataset,
+            explore_dataset,
+            explore_mix_match.groupdict()["explore_share"],
+        ).parents[0]
+    else:
+        dataset_dir = DEFAULT_DATASET_DIR
+
+    env, train_dataset, val_dataset = make_env_and_datasets(
+        setup["dataset"], dataset_dir=dataset_dir
+    )  # type: ignore
+
     with open(
         logdir / "configurations" / f"configuration_{configuration_index}.json", "r"
     ) as f:
