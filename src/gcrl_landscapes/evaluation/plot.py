@@ -307,7 +307,16 @@ def grid_plot(
         111,
         nrows_ncols=(
             len(indexed_imgpath_series.index.get_level_values(0).unique()),
-            len(indexed_imgpath_series.index.get_level_values(1).unique()),
+            # get index 0 of first level and count unique phases. Pandas doesn't properly support that
+            len(
+                indexed_imgpath_series.iloc[
+                    indexed_imgpath_series.index.get_loc(
+                        indexed_imgpath_series.index.levels[0][0]
+                    )
+                ]
+                .index.get_level_values(1)
+                .unique()
+            ),
         ),
         axes_pad=0.1,
     )
