@@ -39,6 +39,13 @@ def get_config_space(agent: str) -> ConfigurationSpace:
             "discount": Float(
                 "discount", (DISCOUNT_FACTOR_LOWER, DISCOUNT_FACTOR_UPPER)
             ),
+            "alpha": Float(
+                "alpha",
+                (
+                    min(AWR_TEMPERATURE_LOWER, DDPGBC_BC_COEFF_LOWER),
+                    max(AWR_TEMPERATURE_UPPER, DDPGBC_BC_COEFF_UPPER),
+                ),
+            ),
             "actor_p_trajgoal": Float("actor_p_trajgoal", (0, 1)),
             "actor_p_randomgoal": Float("actor_p_randomgoal", (0, 1)),
             "actor_p_curgoal": Float("actor_p_curgoal", (0, 1)),
