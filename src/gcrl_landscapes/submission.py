@@ -259,11 +259,14 @@ def run_config(
     if explore_mix_match:
         base_dataset = re.sub(r"explore\d+", "", setup["dataset"])
         explore_dataset = re.sub(r"explore\d+[^-]*", "explore", setup["dataset"])
-        dataset_dir = mix_datasets(
+        dataset_dir = "/tmp"
+        mix_datasets(
             base_dataset,
             explore_dataset,
-            explore_mix_match.groupdict()["explore_share"],
-        ).parents[0]
+            setup["dataset"],
+            int(explore_mix_match.groupdict()["explore_share"]),
+            output_dir=Path(dataset_dir),
+        )
     else:
         dataset_dir = DEFAULT_DATASET_DIR
 
