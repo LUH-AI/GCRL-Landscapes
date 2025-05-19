@@ -75,6 +75,7 @@ if __name__ == "__main__":
 
     # Parse results
     output_folder = Path("tables") / os.path.basename(args.zipfile)
+    output_folder.mkdir(exist_ok=True)
     merged_results_df = merge_experiments(read_results_from_zip(args.zipfile))
 
     create_tables(merged_results_df, output_folder)
