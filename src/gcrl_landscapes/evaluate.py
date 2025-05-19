@@ -80,17 +80,9 @@ def calc_goal_distances(
     elif isinstance(env.unwrapped, CubeEnv):
 
         def info_to_distance(info: dict) -> float:
-            cube_positions = [
-                info[f"privileged/block_{i}_pos_copied"]
-                for i in range(env.unwrapped._num_cubes)
-            ]
-            cube_goals = [
-                info[f"privileged/block_{i}_pos_goal"]
-                for i in range(env.unwrapped._num_cubes)
-            ]
             goal_distances = [
-                float(np.linalg.norm(cube_position - cube_goal))
-                for cube_position, cube_goal in zip(cube_positions, cube_goals)
+                float(info[f"privileged/block_{i}_dist"])
+                for i in range(env.unwrapped._num_cubes)
             ]
             return sum(goal_distances)
 
