@@ -398,6 +398,10 @@ def submit(args: argparse.Namespace) -> None:
         jobs = executor.map_array(
             run_config_chunked_arguments_wrapper, chunked_tasks_parallel
         )
+
+        if len(phase_indices) == 1:
+            break
+
         # parse job array number/array id without subtaskid
         array_id_match = re.fullmatch(r"^(?P<array_id>\d+)_\d+$", jobs[0].job_id)
         if not array_id_match:
