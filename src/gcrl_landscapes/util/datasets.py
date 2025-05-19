@@ -9,7 +9,7 @@ def mix_datasets(
     second_dataset_name: str,
     target_name: str,
     second_share: int,
-    seed: int = None,
+    seed: int = 0,
     output_dir: Path = Path("/tmp"),
 ) -> tuple[Path, Path]:
     # load datasets
@@ -32,7 +32,7 @@ def mix_datasets(
     )
     array2_indices = rng.choice(
         second_dataset_size,
-        floor(second_dataset_size * (second_share / 100)),
+        floor(base_dataset_size * (second_share / 100)),
         replace=False,
     )
 
@@ -45,7 +45,7 @@ def mix_datasets(
     )
     array2_val_indices = rng.choice(
         second_val_dataset_size,
-        floor(second_val_dataset_size * (second_share / 100)),
+        floor(base_val_dataset_size * (second_share / 100)),
         replace=False,
     )
 
