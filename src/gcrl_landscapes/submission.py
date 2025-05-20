@@ -13,7 +13,7 @@ import signal
 import sys
 from itertools import product
 from .util.misc import retry_call
-from .util.datasets import mix_datasets
+from .util.datasets import MixedDataset
 import re
 from .util.data import get_best_agent_path, get_phase_results
 from .phase_splitting import get_all_phases
@@ -166,7 +166,6 @@ def run_config(
     from .training import train
     from .evaluate import evaluate_wrapper
     from ogbench import make_env_and_datasets
-    from ogbench.utils import DEFAULT_DATASET_DIR
     from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
     from ogbench.impls.agents import (
         CRLAgent,
@@ -252,6 +251,16 @@ def run_config(
 
     # Set up training
 
+    with open(
+        logdir / "configurations" / f"configuration_{configuration_index}.json", "r"
+    ) as f:
+        configuration = FrozenConfigDict(json.loads(f.read()))
+
+    def dataset_constructor(dataset_raw):
+        return DATASET_CLASSES[setup["agent"]](
+            Dataset.create(**dataset_raw), configuration
+        )
+
     ## mix in explore and cache it if wanted
     explore_mix_match = re.fullmatch(
         r"^.*explore(?P<explore_share>\d+)(?P<secondtype>[^-]*).*$", setup["dataset"]
@@ -259,25 +268,24 @@ def run_config(
     if explore_mix_match:
         base_dataset = re.sub(r"explore\d+", "", setup["dataset"])
         explore_dataset = re.sub(r"explore\d+[^-]*", "explore", setup["dataset"])
-        dataset_dir = "/tmp"
-        mix_datasets(
-            base_dataset,
-            explore_dataset,
-            setup["dataset"],
+        env, train_dataset1_raw, val_dataset1_raw = make_env_and_datasets(base_dataset)  # type: ignore
+        _, train_dataset2_raw, val_dataset2_raw = make_env_and_datasets(explore_dataset)  # type: ignore
+        train_dataset = MixedDataset(
+            dataset_constructor(train_dataset1_raw),
+            dataset_constructor(train_dataset2_raw),
             int(explore_mix_match.groupdict()["explore_share"]),
-            output_dir=Path(dataset_dir),
+        )
+        val_dataset = MixedDataset(
+            dataset_constructor(val_dataset1_raw),
+            dataset_constructor(val_dataset2_raw),
+            int(explore_mix_match.groupdict()["explore_share"]),
         )
     else:
-        dataset_dir = DEFAULT_DATASET_DIR
-
-    env, train_dataset, val_dataset = make_env_and_datasets(
-        setup["dataset"], dataset_dir=dataset_dir
-    )  # type: ignore
-
-    with open(
-        logdir / "configurations" / f"configuration_{configuration_index}.json", "r"
-    ) as f:
-        configuration = FrozenConfigDict(json.loads(f.read()))
+        env, train_dataset_raw, val_dataset_raw = make_env_and_datasets(
+            setup["dataset"]
+        )  # type: ignore
+        train_dataset = dataset_constructor(train_dataset_raw)
+        val_dataset = dataset_constructor(val_dataset_raw)
 
     # don't train until end if we don't use final timestep as fitness evaluation
     setup_eval_steps = sorted(setup["extra_eval_steps"] + setup["phases"])
@@ -297,12 +305,8 @@ def run_config(
         agent_class=AGENT_CLASSES[setup["agent"]],
         agent_path=agent_path,
         env=env,
-        train_dataset=DATASET_CLASSES[setup["agent"]](
-            Dataset.create(**train_dataset), configuration
-        ),
-        val_dataset=DATASET_CLASSES[setup["agent"]](
-            Dataset.create(**val_dataset), configuration
-        ),
+        train_dataset=train_dataset,
+        val_dataset=val_dataset,
         already_trained_steps=already_trained_steps,
         eval_at_steps=eval_steps,
         evaluate=evaluate_wrapper,

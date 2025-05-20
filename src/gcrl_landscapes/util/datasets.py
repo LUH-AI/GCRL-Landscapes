@@ -1,74 +1,66 @@
-from pathlib import Path
-from ogbench import make_env_and_datasets
+from ogbench.impls.utils.datasets import GCDataset
 import numpy as np
 from math import ceil, floor
+import warnings
 
 
-def mix_datasets(
-    base_dataset_name: str,
-    second_dataset_name: str,
-    target_name: str,
-    second_share: int,
-    seed: int = 0,
-    output_dir: Path = Path("/tmp"),
-) -> tuple[Path, Path]:
-    # load datasets
-    base_dataset: dict[str, np.ndarray]
-    base_val_dataset: dict[str, np.ndarray]
-    second_dataset: dict[str, np.ndarray]
-    second_val_dataset: dict[str, np.ndarray]
-    _, base_dataset, base_val_dataset = make_env_and_datasets(base_dataset_name)
-    _, second_dataset, second_val_dataset = make_env_and_datasets(second_dataset_name)
+class MixedDataset(GCDataset):
+    def __init__(self, dataset1, dataset2, second_share: int, freeze=True):
+        self.dataset1 = dataset1
+        self.dataset2 = dataset2
+        self.second_share_factor = second_share / 100
 
-    # mix
-    rng = np.random.default_rng(seed=seed)
-
-    base_dataset_size = list(base_dataset.values())[0].shape[0]
-    second_dataset_size = list(second_dataset.values())[0].shape[0]
-    array1_indices = rng.choice(
-        base_dataset_size,
-        ceil(base_dataset_size * (1 - (second_share / 100))),
-        replace=False,
-    )
-    array2_indices = rng.choice(
-        second_dataset_size,
-        floor(base_dataset_size * (second_share / 100)),
-        replace=False,
-    )
-
-    base_val_dataset_size = list(base_val_dataset.values())[0].shape[0]
-    second_val_dataset_size = list(second_val_dataset.values())[0].shape[0]
-    array1_val_indices = rng.choice(
-        base_val_dataset_size,
-        ceil(base_val_dataset_size * (1 - (second_share / 100))),
-        replace=False,
-    )
-    array2_val_indices = rng.choice(
-        second_val_dataset_size,
-        floor(base_val_dataset_size * (second_share / 100)),
-        replace=False,
-    )
-
-    mixed_dataset = {
-        key: np.concatenate(
-            (value_base[array1_indices], second_dataset[key][array2_indices])
+        self.size = self.dataset1.size + self.dataset2.size
+        self.terminal_locs = np.concatenate(
+            (self.dataset1.terminal_locs, self.dataset2.terminal_locs)
         )
-        for key, value_base in base_dataset.items()
-    }
-    mixed_dataset_val = {
-        key: np.concatenate(
-            (
-                value_base[array1_val_indices],
-                second_val_dataset[key][array2_val_indices],
+        self.initial_locs = np.concatenate(
+            (self.dataset1.initial_locs, self.dataset2.initial_locs)
+        )
+
+    def _split_indices(self, idxs):
+        idxs1 = idxs[idxs < self.dataset1.size] if idxs else None
+        idxs2 = idxs[idxs >= self.dataset1.size] - self.dataset1.size if idxs else None
+
+        return idxs1, idxs2
+
+    def sample(self, batch_size, idxs=None, evaluation=False):
+        if idxs is not None:
+            warnings.warn(
+                "setting idxs for sampling from MixedDataset disregards set ratio between datasets"
             )
+        idxs1, idxs2 = self._split_indices(idxs)
+        batch1_size = ceil((1 - self.second_share_factor) * batch_size)
+        batch2_size = floor(self.second_share_factor * batch_size)
+
+        batch1 = self.dataset1.sample(batch1_size, idxs=idxs1, evaluation=evaluation)
+        batch2 = self.dataset2.sample(batch2_size, idxs=idxs2, evaluation=evaluation)
+
+        return {
+            key: np.concatenate((batch1[key], batch2[key])) for key in batch1.keys()
+        }
+
+    def sample_goals(self, idxs, p_curgoal, p_trajgoal, p_randomgoal, geom_sample):
+        idxs1, idxs2 = self._split_indices(idxs)
+        goals1 = self.dataset1.sample_goals(
+            idxs1, p_curgoal, p_trajgoal, p_randomgoal, geom_sample
         )
-        for key, value_base in base_val_dataset.items()
-    }
+        goals2 = self.dataset2.sample_goals(
+            idxs2, p_curgoal, p_trajgoal, p_randomgoal, geom_sample
+        )
 
-    # save
-    mixed_dataset_path = output_dir / f"{target_name}.npz"
-    mixed_dataset_val_path = output_dir / f"{target_name}-val.npz"
-    np.savez(mixed_dataset_path, **mixed_dataset)
-    np.savez(mixed_dataset_val_path, **mixed_dataset_val)
+        return np.concatenate((goals1, goals2))
 
-    return mixed_dataset_path, mixed_dataset_val_path
+    def get_observations(self, idxs):
+        idxs1, idxs2 = self._split_indices(idxs)
+        obs1 = self.dataset1.get_observations(idxs1)
+        obs2 = self.dataset1.get_observations(idxs2)
+
+        return np.concatenate((obs1, obs2))
+
+    def get_stacked_observations(self, idxs):
+        idxs1, idxs2 = self._split_indices(idxs)
+        obs1 = self.dataset1.get_observations(idxs1)
+        obs2 = self.dataset1.get_observations(idxs2)
+
+        return np.concatenate((obs1, obs2))
