@@ -268,17 +268,21 @@ def run_config(
     if explore_mix_match:
         base_dataset = re.sub(r"explore\d+", "", setup["dataset"])
         explore_dataset = re.sub(r"explore\d+[^-]*", "explore", setup["dataset"])
+        explore_share = int(explore_mix_match.groupdict()["explore_share"])
+        print(
+            f"Found mixed dataset, mixing {explore_dataset} into {base_dataset} ({explore_share}%)"
+        )
         env, train_dataset1_raw, val_dataset1_raw = make_env_and_datasets(base_dataset)  # type: ignore
         _, train_dataset2_raw, val_dataset2_raw = make_env_and_datasets(explore_dataset)  # type: ignore
         train_dataset = MixedDataset(
             dataset_constructor(train_dataset1_raw),
             dataset_constructor(train_dataset2_raw),
-            int(explore_mix_match.groupdict()["explore_share"]),
+            explore_share,
         )
         val_dataset = MixedDataset(
             dataset_constructor(val_dataset1_raw),
             dataset_constructor(val_dataset2_raw),
-            int(explore_mix_match.groupdict()["explore_share"]),
+            explore_share,
         )
     else:
         env, train_dataset_raw, val_dataset_raw = make_env_and_datasets(
