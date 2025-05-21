@@ -196,8 +196,10 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
     # use given actor loss as information, otherwise look at size of default alpha
     if "actor_loss" in base_config:
         actor_loss = base_config["actor_loss"]
-    else:
+    elif "alpha" in base_config:
         actor_loss = "ddpgbc" if base_config["alpha"] < 1.0 else "awr"
+    else:
+        actor_loss = None
     return [
         FrozenConfigDict(
             initial_dictionary=base_config
