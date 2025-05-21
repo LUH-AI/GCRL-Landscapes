@@ -179,13 +179,17 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
     awr_temperatures = (
         _generate_awr_temperatures(n)
         if "alpha" in hyperparameters
-        else _generate_dummy_list(n, base_config["alpha"])
+        else _generate_dummy_list(
+            n, base_config["alpha"] if "alpha" in base_config else None
+        )
     )
     ## may be unused if algorithm uses awr
     ddpgbc_bc_coeffs = (
         _generate_ddpgbc_bc_coeffs(n)
         if "alpha" in hyperparameters
-        else _generate_dummy_list(n, base_config["alpha"])
+        else _generate_dummy_list(
+            n, base_config["alpha"] if "alpha" in base_config else None
+        )
     )
 
     # choose between awr temperature and ddpgbc bc coefficient
