@@ -438,7 +438,9 @@ def run_config_chunked_arguments_wrapper(
         print(f"Not enough jobs ({len(arguments)}) for this node. Exiting ...")
         sys.exit(0)
 
-    first_job_and_task_in_array = int(job_env.array_task_id) == 0 and r == 0
+    first_job_and_task_in_array = (
+        int(job_env.array_task_id) == 0 and r == 0 if job_env.array_task_id else True
+    )
 
     results = [
         run_config(
