@@ -9,10 +9,12 @@
 #SBATCH --mem-per-cpu=4G
 #SBATCH --mail-user=m.toepperwien@stud.uni-hannover.de
 #SBATCH --mail-type=END,FAIL
+#SBATCH --get-user-env
 
 ZIPNAME=`date -u +%Y-%m-%dT%H:%M:%S%Z`.zip
 zip -r "$ZIPNAME" "$1" -x 'logs*/**/*.pkl' -x 'logs*/**/submitit/*'
 
-module load Miniforge3
-python -m gcrl_landscapes.evaluation.plot --zipfile "$ZIPNAME"
-python -m gcrl_landscapes.evaluation.tabular --zipfile "$ZIPNAME"
+module load GCC/12.2.0 OpenMPI/4.1.4 Armadillo
+export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${BIGWORK}/usr/lib"
+$2 -m gcrl_landscapes.evaluation.plot --zipfile "$ZIPNAME"
+$2 -m gcrl_landscapes.evaluation.tabular --zipfile "$ZIPNAME"

@@ -61,6 +61,6 @@ for environment in "${environments[@]}"; do
     # Automatically zip and plot after all runs done
     # Currently this waits for all jobs belonging to user and not only the ones submitted here
     dependencies=`squeue --me -l -r | tail -n +3 | tr -s ' ' | cut -d ' ' -f2 | cut -d '_' -f1 | sort | uniq | paste -s -d':'`
-    sbatch -d "afterok:${dependencies}" ./zip_and_plot.sh
+    sbatch -d "afterok:${dependencies}" ./zip_and_plot.sh "$logdir" `which python`
     done
 done
