@@ -2,7 +2,6 @@
 
 #SBATCH --partition=ai,tnt
 #SBATCH --job-name=ZipAndPlot
-#SBATCH --output=ZipAndPlot.out
 #SBATCH --time=02:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=2
@@ -11,7 +10,8 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 
-ZIPNAME=`date -u +%Y-%m-%dT%H:%M:%S%Z`.zip
+DATE=`date -u +%Y-%m-%d`
+ZIPNAME="${DATE}-${1/\.\//}.zip"
 zip -r "$ZIPNAME" "$1" -x 'logs*/**/*.pkl' -x 'logs*/**/submitit/*'
 
 module load GCC/12.2.0 OpenMPI/4.1.4 Armadillo

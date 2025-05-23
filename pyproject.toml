@@ -47,6 +47,7 @@ dependencies = [
   "pyfolding",
   "pyDeprecate",
   "more-itertools",
+  "jinja2",
 ]
 
 [project.urls]
