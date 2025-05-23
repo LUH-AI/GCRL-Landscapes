@@ -39,6 +39,7 @@ def get_config_space(agent: str) -> ConfigurationSpace:
             "discount": Float(
                 "discount", (DISCOUNT_FACTOR_LOWER, DISCOUNT_FACTOR_UPPER)
             ),
+            "actor_loss": Categorical("actor_loss", ("original", "ddpgbc", "awr")),
             "alpha": Float(
                 "alpha",
                 (
@@ -54,31 +55,33 @@ def get_config_space(agent: str) -> ConfigurationSpace:
     )
 
 
-def get_adapted_default_config(agent: str, env: str) -> FrozenConfigDict:
+def get_adapted_default_config(
+    agent: str, env: str, actor_loss: str | None = None
+) -> FrozenConfigDict:
     agent_config_generators = {
         "CRL": lambda: _adapt_base_config(
-            ogbench.impls.agents.crl.get_config().to_dict(), env
+            ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss
         ),
         "CMD": lambda: _adapt_base_config(
-            ogbench.impls.agents.cmd.get_config().to_dict(), env
+            ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss
         ),
         "GCBC": lambda: _adapt_base_config(
-            ogbench.impls.agents.gcbc.get_config().to_dict(), env
+            ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss
         ),
         "GCIQL": lambda: _adapt_base_config(
-            ogbench.impls.agents.gciql.get_config().to_dict(), env
+            ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss
         ),
         "GCIVL": lambda: _adapt_base_config(
-            ogbench.impls.agents.gcivl.get_config().to_dict(), env
+            ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss
         ),
         "HIQL": lambda: _adapt_base_config(
-            ogbench.impls.agents.hiql.get_config().to_dict(), env
+            ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss
         ),
         "QRL": lambda: _adapt_base_config(
-            ogbench.impls.agents.qrl.get_config().to_dict(), env
+            ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss
         ),
         "SAC": lambda: _adapt_base_config(
-            ogbench.impls.agents.sac.get_config().to_dict(), env
+            ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss
         ),
     }
     return FrozenConfigDict(initial_dictionary=agent_config_generators[agent]())
@@ -90,6 +93,7 @@ def generate_configurations(
     hyperparameters: set[str],
     env: str,
     seed: int = 0,
+    actor_loss: str | None = None,
 ) -> list[FrozenConfigDict]:
     logger.info(f"Generating {n} configurations for {agent} using {hyperparameters}")
     np.random.seed(seed)
@@ -99,47 +103,63 @@ def generate_configurations(
 
     agent_config_generators = {
         "CRL": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.crl.get_config().to_dict(), env),
+            _adapt_base_config(
+                ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss
+            ),
             n,
             hyperparameters,
         ),
         "CMD": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.cmd.get_config().to_dict(), env),
+            _adapt_base_config(
+                ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss
+            ),
             n,
             hyperparameters,
         ),
         "GCBC": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.gcbc.get_config().to_dict(), env)
+            _adapt_base_config(
+                ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss
+            )
             if "discount" not in hyperparameters
             else _adapt_base_config(
-                ogbench.impls.agents.gcbc.get_config().to_dict(), env
+                ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss
             )
             | {"actor_geom_sample": True},
             n,
             hyperparameters,
         ),
         "GCIQL": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.gciql.get_config().to_dict(), env),
+            _adapt_base_config(
+                ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss
+            ),
             n,
             hyperparameters,
         ),
         "GCIVL": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.gcivl.get_config().to_dict(), env),
+            _adapt_base_config(
+                ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss
+            ),
             n,
             hyperparameters,
         ),
         "HIQL": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.hiql.get_config().to_dict(), env),
+            _adapt_base_config(
+                ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss
+            ),
             n,
             hyperparameters,
         ),
         "QRL": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.qrl.get_config().to_dict(), env),
+            _adapt_base_config(
+                ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss
+            ),
             n,
             hyperparameters,
         ),
         "SAC": lambda n: _generate_configurations(
-            _adapt_base_config(ogbench.impls.agents.sac.get_config().to_dict(), env),
+            _adapt_base_config(
+                ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss
+            ),
             n,
             hyperparameters,
         ),
@@ -265,10 +285,12 @@ def _generate_dummy_list(n: int, val: object) -> list[object]:
     return [val] * n
 
 
-def _adapt_base_config(config: dict, env: str) -> dict:
+def _adapt_base_config(config: dict, env: str, actor_loss: str | None) -> dict:
     visual = "visual" in env or "powderworld" in env
     discrete = "powderworld" in env
-    awr = "actor_loss" in config.keys() and discrete
+    awr = "actor_loss" in config.keys() and (
+        discrete or config["actor_loss"] == "awr" or actor_loss == "awr"
+    )
     hiql_grad_propagation = "low_actor_rep_grad" in config.keys() and visual
     key_value_pairs = [
         ("encoder", "impala_small", visual),

@@ -106,6 +106,7 @@ def run_setup(args: argparse.Namespace) -> None:
             set(args.hyperparameters),
             seed=args.seed,
             env=args.dataset,
+            actor_loss=args.actor_loss,
         )
     else:
         configurations = [get_adapted_default_config(args.agent, args.dataset)]
