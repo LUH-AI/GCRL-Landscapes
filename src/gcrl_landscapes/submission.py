@@ -180,6 +180,9 @@ def run_config(
     import jax
     from .util.misc import jax_has_gpu
 
+    jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
+    jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
+    jax.config.update("jax_persistent_cache_enable_xla_caches", "all")
     print(f"Default backend: {jax.default_backend()}, running on gpu?: {jax_has_gpu()}")
 
     AGENT_CLASSES = {

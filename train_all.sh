@@ -58,9 +58,10 @@ for environment in "${environments[@]}"; do
 
     python -m gcrl_landscapes.main setup --agent "$agent" --dataset "$environment" --n_configurations "$numconfigurations" --final_phase $finalphase --phase_percentages $phasepercentages --eval_episodes "$numevalepisodes" --hyperparameters $hyperparameters --logdir "$full_log_dir" --final_step_is_phase
     python -m gcrl_landscapes.main submit --logdir "$full_log_dir" --n_seeds "$nseeds" --tasks_per_node_total "$taskspernodetotal" --tasks_per_node_parallel "$taskspernodeparallel" --mem_per_cpu "$mempercpu" --jobname "${agent}-${environment}" --partition "$partitions" --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}"
-    # Automatically zip and plot after all runs done
-    # Currently this waits for all jobs belonging to user and not only the ones submitted here
-    dependencies=`squeue --me -l -r | tail -n +3 | tr -s ' ' | cut -d ' ' -f2 | cut -d '_' -f1 | sort | uniq | paste -s -d':'`
-    sbatch -d "afterok:${dependencies}" ./zip_and_plot.sh "$logdir" `which python`
     done
 done
+
+# Automatically zip and plot after all runs done
+# Currently this waits for all jobs belonging to user and not only the ones submitted here
+dependencies=`squeue --me -l -r | tail -n +3 | tr -s ' ' | cut -d ' ' -f2 | cut -d '_' -f1 | sort | uniq | paste -s -d':'`
+sbatch --output "${logdir}/zip_and_plot_log.txt" -d "afterok:${dependencies}" ./zip_and_plot.sh "$logdir" `which python`
