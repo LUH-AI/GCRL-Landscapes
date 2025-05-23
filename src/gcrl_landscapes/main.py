@@ -98,6 +98,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Train configs in phase only till end of phase.",
     )
+    setup_subparser.add_argument(
+        "--actor_loss",
+        required=False,
+        type=str,
+        help="Sets actor_loss in configuration. May be ignored by some algorithms",
+    )
     setup_subparser.set_defaults(func=run_setup)
 
     # Setup slurm parsing
