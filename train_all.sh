@@ -3,8 +3,9 @@
 logdir="./logs"
 hyperparameters="discount actor_p_trajgoal"
 numconfigurations="32"
-finalphase="200000"
+convergencezip="./convergence.zip"
 phasepercentages="25 50 100"
+finalperformancepercentage="90"
 numevalepisodes="50"
 nseeds="5"
 taskspernodetotal="16"
@@ -31,7 +32,15 @@ declare -A -r agent_min_per_mill_steps=(
 
 declare -a -r environments=(
   "antmaze-medium-navigate-v0"
+  "antmaze-medium-explore10navigate-v0"
+  "antmaze-medium-explore20navigate-v0"
+  "antmaze-medium-explore40navigate-v0"
+  "antmaze-medium-explore80navigate-v0"
   "antmaze-medium-stitch-v0"
+  "antmaze-medium-explore10stitch-v0"
+  "antmaze-medium-explore20stitch-v0"
+  "antmaze-medium-explore40stitch-v0"
+  "antmaze-medium-explore80stitch-v0"
   "antmaze-large-navigate-v0"
   "antmaze-large-stitch-v0"
   "humanoidmaze-medium-navigate-v0"
@@ -56,7 +65,7 @@ for environment in "${environments[@]}"; do
     echo "Starting job for ${agent}"
     full_log_dir="${logdir}/${agent}_${environment}_${numconfigurations}c_${hyperparameters// /-}"
 
-    python -m gcrl_landscapes.main setup --agent "$agent" --dataset "$environment" --n_configurations "$numconfigurations" --final_phase $finalphase --phase_percentages $phasepercentages --eval_episodes "$numevalepisodes" --hyperparameters $hyperparameters --logdir "$full_log_dir" --final_step_is_phase
+    python -m gcrl_landscapes.main setup --agent "$agent" --dataset "$environment" --n_configurations "$numconfigurations" --convergence_zip "$convergencezip" --phase_percentages $phasepercentages --final_performance_percentage $finalperformancepercentage --eval_episodes "$numevalepisodes" --hyperparameters $hyperparameters --logdir "$full_log_dir" --final_step_is_phase
     python -m gcrl_landscapes.main submit --logdir "$full_log_dir" --n_seeds "$nseeds" --tasks_per_node_total "$taskspernodetotal" --tasks_per_node_parallel "$taskspernodeparallel" --mem_per_cpu "$mempercpu" --jobname "${agent}-${environment}" --partition "$partitions" --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}"
     done
 done
