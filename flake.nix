@@ -19,7 +19,6 @@
       libfolding_pkg = libfolding.packages.${system}.libfolding;
     in {
       packages = flake-utils.lib.flattenTree {
-        inherit (pkgs) hello;
       };
 
       devShells.default = let
@@ -42,14 +41,11 @@
         NIX_LD = pkgs.runCommand "ld.so" {} ''
           ln -s "$(cat '${pkgs.stdenv.cc}/nix-support/dynamic-linker')" $out
         '';
-        LD_LIBRARY_PATH = NIX_LD_LIBRARY_PATH;
+        # commented out for now as it does make problems with the normal system. may fix problems with packages
+        #LD_LIBRARY_PATH = NIX_LD_LIBRARY_PATH;
         QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}:${pkgs.qt6.qtwayland}/${pkgs.qt6.qtbase.qtPluginPrefix}";
         # lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
         buildInputs = (with pkgs; [
-          pythonPackages.python
-          pythonPackages.venvShellHook
-          pythonPackages.mujoco
-          pythonPackages.black
           glxinfo
           hatch
           stdenv.cc
@@ -61,6 +57,11 @@
           python
           venvShellHook
           tkinter
+          jax
+          jaxlib
+          flax
+          mujoco
+          black
         ]) ++ [ libfolding_pkg ];
         nativeBuildInputs = (with pkgs; [
             ruff
