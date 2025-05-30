@@ -35,10 +35,16 @@ def get_all_phases(
     """
     data = get_data(agent, dataset, zippath)
     performance_xs, performance_ys = zip(
-        *[
-            (group["eval_step"].iloc[0], trim_mean(group["success"].to_numpy(), 0.25))
-            for _, group in data.groupby(by=["eval_step"])
-        ]
+        *(
+            [(0, 0)]
+            + [
+                (
+                    group["eval_step"].iloc[0],
+                    trim_mean(group["success"].to_numpy(), 0.25),
+                )
+                for _, group in data.groupby(by=["eval_step"])
+            ]
+        )
     )
 
     performance_function = fit_function(performance_xs, performance_ys, interpolation)
