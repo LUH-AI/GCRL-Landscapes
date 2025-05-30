@@ -12,6 +12,7 @@ TARGET_EVAL_STEP = 1_000_000
 def get_all_phases(
     agent: str,
     dataset: str,
+    actor_loss: str,
     final_performance_percentage: int,
     zippath: Path,
     phase_percentages: list[int],
@@ -23,6 +24,7 @@ def get_all_phases(
     Args:
         agent: Name of agent
         dataset: Name of dataset
+        loss: Which actor-loss to use for agent
         final_performance_percentage: percentage of final_performance to hit
         zippath: zipfile with results. see `get_data` for more details.
         phase_percentages: percentages at which a phase should be run
@@ -33,7 +35,7 @@ def get_all_phases(
     Returns:
         phases as list
     """
-    data = get_data(agent, dataset, zippath)
+    data = get_data(agent, dataset, actor_loss, zippath)
     performance_xs, performance_ys = zip(
         *(
             [(0, 0)]
@@ -104,7 +106,7 @@ def fit_function(
     raise NotImplementedError(f"no interpolation mode {interpolation_mode}")
 
 
-def get_data(agent: str, dataset: str, zippath: Path) -> pd.DataFrame:
+def get_data(agent: str, dataset: str, actor_loss: str, zippath: Path) -> pd.DataFrame:
     """Gather data from zipfile for agent-dataset-combination.
     Expects a zipfile with "logs/" in root as created by the runners.
     Here only only *one configuration*, *one phase* and *one agent-dataset-combination* is allowed.
@@ -113,6 +115,7 @@ def get_data(agent: str, dataset: str, zippath: Path) -> pd.DataFrame:
     Args:
         agent: Name of agent. Used for getting correct experiment from zip
         dataset: Name of dataset. Used for getting correct experiment from zip
+        actor_loss: which loss to use for actor
         zipf: zipfile with results
 
     Returns:
@@ -123,13 +126,19 @@ def get_data(agent: str, dataset: str, zippath: Path) -> pd.DataFrame:
     # find matching prefix
     try:
         matching_prefixes = [
-            prefix for prefix in results.keys() if agent in prefix and dataset in prefix
+            prefix
+            for prefix in results.keys()
+            if agent in prefix and dataset in prefix and actor_loss in prefix
         ]
         if len(matching_prefixes) != 1:
-            raise ValueError(f"{zippath} has more than one agent-dataset-combination.")
+            raise ValueError(
+                f"{zippath} has more than one agent-dataset-loss-combination."
+            )
         prefix = matching_prefixes[0]
     except StopIteration:
-        raise ValueError(f"Could not find prefix for {agent}-{dataset} in {zippath}")
+        raise ValueError(
+            f"Could not find prefix for {agent}-{dataset}-{actor_loss} in {zippath}"
+        )
 
     result = phase_results_to_pandas(results[prefix][1])
     # sanity checks

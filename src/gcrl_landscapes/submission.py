@@ -60,10 +60,15 @@ def run_setup(args: argparse.Namespace) -> None:
     logging.basicConfig(filename=args.logdir / "log.txt", level=logging.INFO)
     logging.info("Set up for later running")
 
+    adapted_default_config = get_adapted_default_config(
+        args.agent, args.dataset, args.actor_loss
+    )
+
     phases = (
         get_all_phases(
             args.agent,
             args.dataset,
+            adapted_default_config["actor_loss"],  # type: ignore
             args.final_performance_percentage,
             args.convergence_zip,
             args.phase_percentages,
@@ -109,7 +114,7 @@ def run_setup(args: argparse.Namespace) -> None:
             actor_loss=args.actor_loss,
         )
     else:
-        configurations = [get_adapted_default_config(args.agent, args.dataset)]
+        configurations = [adapted_default_config]
 
     def save_configurations():
         for i, config in enumerate(configurations):
