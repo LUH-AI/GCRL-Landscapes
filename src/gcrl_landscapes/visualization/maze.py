@@ -4,6 +4,32 @@ from matplotlib import figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 
+def to_trajectories(
+    dataset: dict[str, np.ndarray], batch_size: int | None = None, replace: bool = False
+) -> list[dict[str, np.ndarray]]:
+    assert all(
+        [dataset_member in dataset for dataset_member in ["observations", "terminals"]]
+    )
+
+    trajectory_ends = np.where(dataset["terminals"] > 0)[0]
+    assert isinstance(trajectory_ends, np.ndarray)
+
+    trajectory_starts = np.insert(trajectory_ends[:-1] + 1, 0, [0])
+    trajectory_indices = np.column_stack((trajectory_starts, trajectory_ends))
+
+    if not batch_size:
+        batch_size = len(trajectory_indices)
+    return [
+        {key: value[traj_start : traj_end + 1] for key, value in dataset.items()}
+        for traj_start, traj_end in trajectory_indices[
+            np.random.choice(
+                trajectory_indices.shape[0], size=batch_size, replace=replace
+            ),
+            :,
+        ]
+    ]
+
+
 def get_2d_colors(points, min_point, max_point):
     """Get colors corresponding to 2-D points.
     Adapted from OGBench (Park et al. 2025).
