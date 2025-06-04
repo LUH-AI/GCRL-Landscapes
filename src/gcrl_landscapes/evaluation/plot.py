@@ -28,6 +28,8 @@ from .common import (
     map_labels,
     compute_additional_information,
 )
+import toml
+import zipfile
 
 
 def plot_landscape(
@@ -363,18 +365,38 @@ if __name__ == "__main__":
     # Build igpr grid of plots (across datasets)
     # first builds dataframe using plots inside subfolders
     imgpath_dataframe = pd.DataFrame(
-        columns=["plot_type", "phase", "agent", "path", "dataset", "y_col"]
+        columns=[
+            "plot_type",
+            "phase",
+            "agent",
+            "path",
+            "dataset",
+            "actor_loss",
+            "y_col",
+        ]
     )  # type: ignore
     for experiment_name in os.listdir(plots_folder):
         if not Path(plots_folder / experiment_name).is_dir():
             continue
-        experiment_name_matches = re.match(
-            r"^(?P<agent>[^_]*)_(?P<dataset>[^_]*)_", experiment_name
-        )
-        if not experiment_name_matches:
-            raise ValueError("Naming inside of plots folder not as expected.")
-        agent = experiment_name_matches["agent"]
-        dataset = experiment_name_matches["dataset"]
+
+        zipf = zipfile.ZipFile(args.zipfile, "r")
+        zipfiles = zipf.namelist()
+        matching_info = [
+            filename
+            for filename in zipf.namelist()
+            if re.fullmatch(r"^.*/" + experiment_name + r"/info.toml$", filename)
+        ]
+        if not len(matching_info):
+            raise ValueError("given zip seemingly contains experiment multiple times")
+        setup = toml.loads(zipf.read(matching_info[0]).decode(encoding="utf-8"))[
+            "arguments"
+        ]
+        agent = setup["agent"]
+        dataset = setup["dataset"]
+        if "actor_loss" in setup:
+            actor_loss = setup["actor_loss"]
+        else:
+            actor_loss = "default"
 
         for unscaled_plotpath in [
             plots_folder / experiment_name / filename
@@ -394,25 +416,28 @@ if __name__ == "__main__":
                 agent,
                 str(unscaled_plotpath),
                 dataset,
+                actor_loss,
                 plot_name_matches["y_col"],
             ]
 
     # Now actually plot all grid plots
-    for plot_type, agent, y_col in product(
+    for plot_type, agent, y_col, actor_loss in product(
         imgpath_dataframe["plot_type"].unique(),
         imgpath_dataframe["agent"].unique(),
         imgpath_dataframe["y_col"].unique(),
+        imgpath_dataframe["actor_loss"].unique(),
     ):
         grid_df = imgpath_dataframe[
             (imgpath_dataframe["plot_type"] == plot_type)
             & (imgpath_dataframe["agent"] == agent)
             & (imgpath_dataframe["y_col"] == y_col)
+            & (imgpath_dataframe["actor_loss"] == actor_loss)
         ]
         if len(grid_df) == 0:
             continue
         grid_plot(
             grid_df,
             plots_folder,
-            f"{plot_type}-{agent}-{y_col}",
+            f"{plot_type}-{agent}-{y_col}-{actor_loss}",
             grid_columns=("dataset", "phase"),
         )  # type: ignore
