@@ -15,7 +15,6 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
 from typing import Any
 import re
-from pyfolding import FTU
 import seaborn as sns
 import matplotlib.ticker as ticker
 from mpl_toolkits.axes_grid1 import ImageGrid
@@ -214,75 +213,6 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             per_config_phase_folder,
             "Normalized Goal Distance Return Distribution",
         )
-
-        # The following is more or less unused in the meantime but may be interesting again later on
-        # Create plot based on folding test of unimodality
-        def eval_result_to_mean_over_tasks(
-            eval_result: EvaluationResult,
-        ) -> list[float]:
-            all_success_trajectories = np.array(
-                [task["success_all"] for task in eval_result.info]
-            )  # type: ignore
-            return np.mean(all_success_trajectories, axis=0)
-
-        phase_result_copy["success_all_mean_over_tasks"] = phase_result_copy[
-            "eval_result"
-        ].apply(eval_result_to_mean_over_tasks)
-
-        def aggregate_mean_task_results(series: pd.Series) -> FTU:
-            eval_results = series.tolist()
-            success_per_seed_task = np.array(eval_results)
-            return FTU(success_per_seed_task.reshape(-1), routine="c++")  # type: ignore  # the type is correct, there seems to be an import problem
-
-        # group by configuration to apply statistic over seeds
-        ftu_object_per_configuration = phase_result_copy.groupby(["run_id"] + hp_list)[
-            "normalized_goal_distances"
-        ].aggregate(aggregate_mean_task_results)
-        ftu_result_per_configuration = ftu_object_per_configuration.apply(
-            lambda ftu: ftu.folding_statistics
-            if ftu.p_value <= FTU_SIGNIFICANCE_THRESHOLD
-            else 1.0
-        )
-
-        # get configurations as x
-        x_unscaled = np.array(ftu_result_per_configuration.index.tolist())[:, 1:]
-        x_scaled = (x_unscaled - x_unscaled.min(axis=0)) / (
-            x_unscaled.max(axis=0) - x_unscaled.min(axis=0)
-        )
-        # Replace nan values with 1.0, which means undecided
-        y = np.nan_to_num(np.array(ftu_result_per_configuration.tolist()), nan=1.0)
-        y_discrete = np.copy(y)
-        y_discrete[y_discrete > 1.0] = 2.0
-        y_discrete[y_discrete < 1.0] = 0.0
-        x0_grid, x1_grid = np.meshgrid(
-            np.linspace(x_scaled[:, 0].min(), x_scaled[:, 0].max(), 1000),
-            np.linspace(x_scaled[:, 1].min(), x_scaled[:, 1].max(), 1000),
-        )
-        y_grid = griddata(
-            (x_scaled[:, 0], x_scaled[:, 1]),
-            y_discrete,
-            (x0_grid, x1_grid),
-            method="nearest",
-        )
-        assert y_grid.min() >= 0.0 and y_grid.max() <= 2.0
-
-        fig = plt.figure()
-        c = plt.contourf(
-            x0_grid,
-            x1_grid,
-            y_grid,
-            cmap=sns.color_palette("vlag", as_cmap=True),
-            vmin=0.0,
-            vmax=2.0,
-        )
-        cbar = fig.colorbar(c, label="Modality")
-
-        cbar.ax.yaxis.set_minor_locator(ticker.FixedLocator([0.0, 1.0, 2.0]))
-        cbar.ax.yaxis.set_minor_formatter(ticker.FixedFormatter(["MM", "N/A", "UM"]))
-        cbar.ax.set_yticks([])
-
-        plt.savefig(output_folder / f"modality-{phase}.png", bbox_inches="tight")
-        plt.close()
 
 
 def grid_plot(

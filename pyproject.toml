@@ -44,7 +44,6 @@ dependencies = [
   "pandas",
   "scikit-learn",
   "submitit",
-  "pyfolding",
   "pyDeprecate",
   "more-itertools",
   "jinja2",
