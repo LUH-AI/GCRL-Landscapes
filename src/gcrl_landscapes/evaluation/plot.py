@@ -103,6 +103,51 @@ def plot_landscape(
     plt.close()
 
 
+def plot_eval_curve(
+    phase: int,
+    phase_result: pd.DataFrame,
+    y_col: str,
+    output_folder: Path,
+    output_per_config_folder: Path,
+    y_label: str | None,
+):
+    exploded_phase_result = phase_result[[y_col, "config_index", "eval_step"]].explode(
+        y_col
+    )  # type: ignore
+    # per configuration
+    for config_index, group in exploded_phase_result.groupby("config_index"):
+        _ = plt.figure()
+        ax = sns.lineplot(
+            data=group,  # type: ignore
+            x="eval_step",
+            y=y_col,
+            errorbar=("ci", 95),
+        )
+        plt.title(f"{y_label if y_label else y_col}", fontsize=18)
+        ax.set_ylim(0, 1)
+        plt.savefig(
+            output_per_config_folder
+            / f"eval-{y_col}-config_{config_index}-{phase}.png",
+            bbox_inches="tight",
+        )
+        plt.close()
+    ## configuration marginalized
+    _ = plt.figure()
+    ax = sns.lineplot(
+        data=exploded_phase_result,  # type: ignore
+        x="eval_step",
+        y=y_col,
+        errorbar=("ci", 95),
+    )
+    plt.title(f"{y_label if y_label else y_col}", fontsize=18)
+    ax.set_ylim(0, 1)
+    plt.savefig(
+        output_folder / f"eval-{y_col}-{phase}.png",
+        bbox_inches="tight",
+    )
+    plt.close()
+
+
 def plot_return_distribution(
     phase: int,
     phase_result: pd.DataFrame,
@@ -212,6 +257,14 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
             output_folder,
             per_config_phase_folder,
             "Normalized Goal Distance Return Distribution",
+        )
+        plot_eval_curve(
+            phase,
+            results_pandas[results_pandas["phase"] == phase],
+            "normalized_goal_distance_returns",
+            output_folder,
+            per_config_phase_folder,
+            "Normalized Goal Distance Return",
         )
 
 
