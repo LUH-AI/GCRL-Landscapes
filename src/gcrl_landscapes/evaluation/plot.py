@@ -175,7 +175,8 @@ def plot_return_distribution(
         plt.title(f"{y_label if y_label else y_col}", fontsize=18)
         plt.savefig(
             output_per_config_folder
-            / f"returndistribution-{y_col}-config_{config_index}-{phase}.png"
+            / f"returndistribution-{y_col}-config_{config_index}-{phase}.png",
+            bbox_inches="tight",
         )
         plt.close()
     ## configuration marginalized
@@ -348,7 +349,7 @@ if __name__ == "__main__":
     # Build igpr grid of plots (across datasets)
     # first builds dataframe using plots inside subfolders
     imgpath_dataframe = pd.DataFrame(
-        columns=[
+        columns=[  # type: ignore
             "plot_type",
             "phase",
             "agent",
