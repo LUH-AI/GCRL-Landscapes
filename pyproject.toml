@@ -48,6 +48,7 @@ dependencies = [
   "more-itertools",
   "jinja2",
   "smac >= 2.3.1",
+  "swig",
 ]
 
 [project.urls]
