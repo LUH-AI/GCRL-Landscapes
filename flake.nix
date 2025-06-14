@@ -44,8 +44,6 @@
         buildInputs = (with pkgs; [
           glxinfo
           hatch
-          stdenv.cc
-          stdenv.cc.cc.lib
           openssl
           swig
           zlib
@@ -62,6 +60,7 @@
         nativeBuildInputs = (with pkgs; [
             ruff
             pre-commit
+            gcc11
           ]);
       };
     });
