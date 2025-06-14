@@ -19,7 +19,7 @@
       };
 
       devShells.default = let
-        pythonPackages = pkgs.python312Packages;
+        pythonPackages = pkgs.python310Packages;
       in pkgs.mkShell rec {
         venvDir = "./.venv";
         NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
@@ -47,15 +47,14 @@
           openssl
           swig
           zlib
+          redis
         ]) ++ (with pythonPackages; [
           python
           venvShellHook
           tkinter
           jax
           jaxlib
-          flax
           mujoco
-          black
         ]);
         nativeBuildInputs = (with pkgs; [
             ruff
