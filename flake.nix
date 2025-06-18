@@ -38,7 +38,7 @@
           ln -s "$(cat '${pkgs.stdenv.cc}/nix-support/dynamic-linker')" $out
         '';
         # commented out for now as it does make problems with the normal system. may fix problems with packages
-        #LD_LIBRARY_PATH = NIX_LD_LIBRARY_PATH;
+        LD_LIBRARY_PATH = NIX_LD_LIBRARY_PATH;
         QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}:${pkgs.qt6.qtwayland}/${pkgs.qt6.qtbase.qtPluginPrefix}";
         # lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
         buildInputs = (with pkgs; [
@@ -51,10 +51,6 @@
         ]) ++ (with pythonPackages; [
           python
           venvShellHook
-          tkinter
-          jax
-          jaxlib
-          mujoco
         ]);
         nativeBuildInputs = (with pkgs; [
             ruff

@@ -1,0 +1,12 @@
+name: ddpgbc
+
+actor_loss: ddpgbc
+
+hydra:
+  sweeper:
+    search_space:
+      hyperparameters:
+        alpha:
+          type: uniform_float
+          lower: 0.0
+          upper: 1.0
