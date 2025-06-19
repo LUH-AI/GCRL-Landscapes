@@ -68,6 +68,27 @@ def xy_to_ij(
     return np.column_stack((i, j))
 
 
+def lerp_color(c1: tuple[int], c2: tuple[int], t: float):
+    return tuple(int(a + (b - a) * t) for a, b in zip(c1, c2))
+
+
+def draw_gradient_line(
+    draw: ImageDraw.ImageDraw,
+    points: list[tuple],
+    color_start: tuple[int],
+    color_end: tuple[int],
+    width: int = 20,
+):
+    for i, ((x0, y0), (x1, y1)) in enumerate(zip(points, points[1:])):
+        color = lerp_color(color_start, color_end, i / len(points))
+        print(color)
+        draw.line([(x0, y0), (x1, y1)], fill=color, width=width)
+
+
+def convert_color(color):
+    return tuple([round(channel * 255) for channel in matplotlib_color_to_rgb(color)])
+
+
 def visualize_trajs(
     trajs: list[dict[str, np.ndarray]], background: Image.Image, env
 ) -> Image.Image:
@@ -75,16 +96,28 @@ def visualize_trajs(
     visualized_image = background.copy()
     draw = ImageDraw.Draw(visualized_image)
 
-    colors = [colormaps.get_cmap("tab20")(i) for i in range(len(trajs))]
-    for traj, color in zip(trajs, colors):
-        ij = xy_to_ij(traj["observations"][:, :2], env)
-        draw.line(
+    if len(trajs) == 1:
+        ij = xy_to_ij(trajs[0]["observations"][:, :2], env)
+        draw_gradient_line(
+            draw,
             ((ij + 0.5) / env.maze_map.transpose().shape * background.size).tolist(),
+            (0, 0, 255),  # type: ignore
+            (255, 0, 0),  # type: ignore
             width=2 * SUPERSAMPLING_FACTOR,
-            fill=tuple(
-                [round(channel * 255) for channel in matplotlib_color_to_rgb(color)]
-            ),
         )
+    else:
+        colors = [colormaps.get_cmap("tab20")(i) for i in range(len(trajs) + 1)]
+        for traj, color in zip(trajs, colors):
+            ij = xy_to_ij(traj["observations"][:, :2], env)
+            draw.line(
+                (
+                    (ij + 0.5) / env.maze_map.transpose().shape * background.size
+                ).tolist(),
+                width=2 * SUPERSAMPLING_FACTOR,
+                fill=tuple(
+                    [round(channel * 255) for channel in matplotlib_color_to_rgb(color)]
+                ),
+            )
 
     return visualized_image
 
