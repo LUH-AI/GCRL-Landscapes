@@ -288,7 +288,8 @@ def _generate_dummy_list(n: int, val: object) -> list[object]:
 def _adapt_base_config(config: dict, env: str, actor_loss: str | None) -> dict:
     visual = "visual" in env or "powderworld" in env
     discrete = "powderworld" in env
-    awr = "actor_loss" in config.keys() and (
+    # [TODO: name GCBCs loss properly. For now it says AWR]
+    awr = config["agent_name"].lower() in ["gciql", "gcivl", "hiql", "gcbc"] or (
         discrete or config["actor_loss"] == "awr" or actor_loss == "awr"
     )
     hiql_grad_propagation = "low_actor_rep_grad" in config.keys() and visual
