@@ -5,12 +5,12 @@ hyperparameters:
     upper: 1.0
     default_value: 3e-4
   batch_size:
-    type: uniform_float
+    type: uniform_int
     lower: 1
     upper: 4096
     default_value: 1024
   latent_dim:
-    type: uniform_float
+    type: uniform_int
     lower: 8
     upper: 4096
     default_value: 512

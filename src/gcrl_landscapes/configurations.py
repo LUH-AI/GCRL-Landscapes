@@ -41,6 +41,7 @@ def hydra_to_ogbench_config(hydra_config: DictConfig) -> FrozenConfigDict:
     )
 
     hydra_config_modified: dict = dict(hydra_config)
+    hydra_config_modified["training_steps"] = round(hydra_config["training_steps"])
     if "actor_p_curgoalshare" in hydra_config:
         hydra_config_modified["actor_p_curgoal"] = (
             1 - hydra_config["actor_p_trajgoal"]
