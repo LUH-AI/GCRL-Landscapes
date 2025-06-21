@@ -1,5 +1,9 @@
 defaults:
   - _self_
+  - search_space:
+    - crl
+    - awr
+  - smac
   - override hydra/sweeper: HyperSMAC
 
 agent_name: "crl"
@@ -12,69 +16,17 @@ value_geom_sample: true
 actor_p_trajgoal: 1.0
 actor_p_curgoalshare: 1.0
 actor_geom_sample: false
+alpha: 0.0
 
 seed: 0
+training_steps: 1000000
 
-# [TODO: actor_loss + alpha]
-
+_base_search_:
 
 hydra:
   sweeper:
-    n_trials: 10
-    sweeper_kwargs:
-      seeds: [0, 1, 2]
-      optimizer_kwargs:
-        smac_facade:
-          _target_: smac.facade.blackbox_facade.BlackBoxFacade
-          _partial_: true
-          logging_level: 20  # 10 DEBUG, 20 INFO
-        scenario:
-          seed: 42
-          n_trials: ${hydra.sweeper.n_trials}
-          deterministic: true
-          n_workers: 4
-          output_directory: ${hydra.sweep.dir}
-    search_space:
-      hyperparameters:
-        lr:
-          type: uniform_float
-          lower: 1e-6
-          upper: 1e-3
-          default_value: 3e-4
-        batch_size:
-          type: uniform_float
-          lower: 1
-          upper: 4096
-          default_value: 1024
-        latent_dim:
-          type: uniform_float
-          lower: 8
-          upper: 4096
-          default_value: 512
-        discount:
-          type: uniform_float
-          lower: 0.8
-          upper: 0.9999
-          default_value: 0.99
-        const_std:
-          type: categorical
-          choices: [ true, false ]
-          default_value: true
-        value_geom_sample:
-          type: categorical
-          choices: [ true, false ]
-          default_value: true
-        actor_p_trajgoal:
-          type: uniform_float
-          lower: 0.0
-          upper: 1.0
-          default_value: 1.0
-        actor_p_curgoalshare:
-          type: uniform_float
-          lower: 0.0
-          upper: 1.0
-          default_value: 1.0
-        actor_geom_sample:
-          type: categorical
-          choices: [ true, false ]
-          default_value: false
+    search_space: ${search_space}
+  run:
+    dir: ./tmp/smac/
+  sweep:
+    dir: ./tmp/smac/
