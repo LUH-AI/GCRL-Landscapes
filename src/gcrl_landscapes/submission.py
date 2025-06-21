@@ -15,7 +15,7 @@ from itertools import product
 from .util.misc import retry_call
 from .util.datasets import MixedDataset
 import re
-from .util.data import get_best_agent_path, get_phase_results
+from .util.data import get_best_agent_path, get_phase_results, EvalTrajectory
 from .phase_splitting import get_all_phases
 from more_itertools import chunked, divide
 from typing_extensions import deprecated
@@ -142,7 +142,7 @@ def execute_config(
 
 def train_wrapper(
     agent_name: str,
-    agent_path: Path,
+    agent_path: Path | None,
     dataset_name: str,
     already_trained_steps: int,
     eval_steps: list[int],
@@ -152,7 +152,7 @@ def train_wrapper(
     run_log_dir: Path,
     tasks_per_node_parallel: int,
     seed: int = 0,
-) -> None:
+) -> EvalTrajectory:
     # Set GPU training environment variables before loading modules
     import os
     import numpy as np
@@ -263,6 +263,8 @@ def train_wrapper(
             f.write(eval_trajectory.to_json())
 
     retry_call(save_results)
+
+    return eval_trajectory
 
 
 @deprecated("Deprecated in favor of splitted `train_wrapper` and `execute_config`")
