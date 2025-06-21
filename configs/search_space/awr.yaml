@@ -1,0 +1,5 @@
+hyperparameters:
+  alpha:
+    type: uniform_float
+    lower: 0.0
+    upper: 30.0
