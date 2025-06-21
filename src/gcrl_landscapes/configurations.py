@@ -17,7 +17,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 LEARNING_RATE_LOWER = 1e-6
-LEARNING_RATE_UPPER = 1e-3
+LEARNING_RATE_UPPER = 1e-2
 
 DISCOUNT_FACTOR_LOWER = 0.8
 DISCOUNT_FACTOR_UPPER = 0.99
