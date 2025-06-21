@@ -13,6 +13,7 @@ import ogbench.impls.agents.sac
 import warnings
 import numpy as np
 import logging
+from omegaconf import DictConfig
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,41 @@ EPS_QRL_LOWER = 0.0
 EPS_QRL_UPPER = 1.0
 
 SUPPORTED_HPS = set(["lr", "discount", "actor_p_trajgoal", "alpha", "eps"])
+
+
+def hydra_to_ogbench_config(hydra_config: DictConfig) -> FrozenConfigDict:
+    get_adapted_default_config(
+        hydra_config["agent_name"], hydra_config["env"], hydra_config["actor_loss"]
+    )
+
+    hydra_config_modified: dict = dict(hydra_config)
+    if "actor_p_curgoalshare" in hydra_config:
+        hydra_config_modified["actor_p_curgoal"] = (
+            1 - hydra_config["actor_p_trajgoal"]
+        ) * hydra_config["actor_p_curgoalshare"]
+        hydra_config_modified["actor_p_randomgoal"] = (
+            1 - hydra_config["actor_p_trajgoal"]
+        ) * (1 - hydra_config["actor_p_curgoalshare"])
+        del hydra_config_modified["actor_p_curgoalshare"]
+    if "value_p_curgoalshare" in hydra_config:
+        hydra_config_modified["value_p_curgoal"] = (
+            1 - hydra_config["value_p_trajgoal"]
+        ) * hydra_config["value_p_curgoalshare"]
+        hydra_config_modified["value_p_randomgoal"] = (
+            1 - hydra_config["value_p_trajgoal"]
+        ) * (1 - hydra_config["value_p_curgoalshare"])
+        del hydra_config_modified["value_p_curgoalshare"]
+
+    return FrozenConfigDict(
+        initial_dictionary=dict(
+            get_adapted_default_config(
+                hydra_config["agent_name"],
+                hydra_config["env"],
+                hydra_config["actor_loss"],
+            )
+        )
+        | hydra_config_modified
+    )
 
 
 def get_config_space(agent: str) -> ConfigurationSpace:
@@ -63,32 +99,32 @@ def get_adapted_default_config(
     agent: str, env: str, actor_loss: str | None = None
 ) -> FrozenConfigDict:
     agent_config_generators = {
-        "CRL": lambda: _adapt_base_config(
+        "crl": lambda: _adapt_base_config(
             ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss
         ),
-        "CMD": lambda: _adapt_base_config(
+        "cmd": lambda: _adapt_base_config(
             ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss
         ),
-        "GCBC": lambda: _adapt_base_config(
+        "gcbc": lambda: _adapt_base_config(
             ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss
         ),
-        "GCIQL": lambda: _adapt_base_config(
+        "gciql": lambda: _adapt_base_config(
             ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss
         ),
-        "GCIVL": lambda: _adapt_base_config(
+        "gcivl": lambda: _adapt_base_config(
             ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss
         ),
-        "HIQL": lambda: _adapt_base_config(
+        "hiql": lambda: _adapt_base_config(
             ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss
         ),
-        "QRL": lambda: _adapt_base_config(
+        "qrl": lambda: _adapt_base_config(
             ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss
         ),
-        "SAC": lambda: _adapt_base_config(
+        "sac": lambda: _adapt_base_config(
             ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss
         ),
     }
-    return FrozenConfigDict(initial_dictionary=agent_config_generators[agent]())
+    return FrozenConfigDict(initial_dictionary=agent_config_generators[agent.lower()]())
 
 
 def generate_configurations(

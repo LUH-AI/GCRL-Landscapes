@@ -3,3 +3,6 @@ hyperparameters:
     type: uniform_float
     lower: 0.0
     upper: 30.0
+  actor_loss:
+    type: categorical
+    choices: [ "awr" ]
