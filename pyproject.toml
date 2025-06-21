@@ -48,6 +48,7 @@ dependencies = [
   "more-itertools",
   "jinja2",
   "hydra-core",
+  "omegaconf",
   "hydra-submitit-launcher",
   "smac >= 2.3.1",
   "hypersweeper @ git+https://github.com/jmtoepperwien/hypersweeper",
