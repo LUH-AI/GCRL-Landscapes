@@ -212,7 +212,9 @@ def train_wrapper(
     run_log_dir.mkdir(parents=True, exist_ok=False)
 
     def dataset_constructor(dataset_raw):
-        return DATASET_CLASSES[agent_name](Dataset.create(**dataset_raw), configuration)
+        return DATASET_CLASSES[agent_name.upper()](
+            Dataset.create(**dataset_raw), configuration
+        )
 
     ## mix in explore and cache it if wanted
     explore_mix_match = re.fullmatch(
@@ -243,7 +245,7 @@ def train_wrapper(
         val_dataset = dataset_constructor(val_dataset_raw)
 
     eval_trajectory = train(
-        agent_class=AGENT_CLASSES[agent_name],
+        agent_class=AGENT_CLASSES[agent_name.upper()],
         agent_path=agent_path,
         env=env,
         train_dataset=train_dataset,
