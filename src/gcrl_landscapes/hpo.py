@@ -3,10 +3,19 @@ import hydra
 from omegaconf import DictConfig
 from .configurations import hydra_to_ogbench_config
 from .submission import train_wrapper
+import signal
+import sys
 
 
 @hydra.main(config_path="../../configs", config_name="hpo_crl", version_base="1.1")
 def hpo_target(hydra_config: DictConfig) -> float:
+    # submitit just bypasses SIGTERM although it should end the job, overwrite that behaviour here
+    def handler(signum, frame):
+        print(f"Received {signal.Signals(signum).name} ({signum}), stopping!")
+        sys.exit(1)
+
+    signal.signal(signal.SIGTERM, handler)
+
     config = hydra_to_ogbench_config(hydra_config)
     eval_trajectory = train_wrapper(
         agent_name=config["agent_name"],  # type: ignore
