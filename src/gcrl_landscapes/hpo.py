@@ -13,12 +13,12 @@ def hpo_target(hydra_config: DictConfig) -> float:
         agent_path=None,
         dataset_name=config["env"],  # type: ignore
         already_trained_steps=0,
-        eval_steps=config["training_steps"],  # type: ignore
+        eval_steps=[config["training_steps"]],  # type: ignore
         save_steps=[],
-        eval_episodes=50,
+        eval_episodes=config["eval_episodes"],  # type: ignore
         configuration=config,
-        run_log_dir=Path("./"),
-        tasks_per_node_parallel=4,
+        run_log_dir=Path("./run_log") / f"{str(hash(config))[:8]}",
+        tasks_per_node_parallel=config["tasks_per_node_parallel"],  # type: ignore
         seed=config["seed"],  # type: ignore
     )
     eval_results = eval_trajectory[0]

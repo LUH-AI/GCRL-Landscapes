@@ -23,6 +23,6 @@ training_steps: 1000000
 
 hydra:
   run:
-    dir: ./tmp/smac/
+    dir: ./smac_log/crl
   sweep:
-    dir: ./tmp/smac/
+    dir: ./smac_log/crl
