@@ -17,7 +17,7 @@ hyperparameters:
     default_value: 0.99
   tau:
     type: uniform_float
-    lower: 0.0
+    lower: 1e-4
     upper: 1.0
     log: true
     default_value: 0.005
