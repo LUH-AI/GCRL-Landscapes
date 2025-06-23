@@ -1,5 +1,5 @@
 defaults:
-  - hydra/sweeper/search_space/crl
+  - hydra/sweeper/search_space/qrl
   - hydra/sweeper/search_space/awr
   - smac
   - launcher
@@ -7,12 +7,15 @@ defaults:
   - override hydra/sweeper: HyperSMAC
   - override hydra/launcher: submitit_slurm
 
-agent_name: "crl"
+agent_name: "qrl"
 lr: 3e-4
 batch_size: 1024
 latent_dim: 512
 discount: 0.99
+eps: 0.05
 const_std: true
+value_p_trajgoal: 0.0
+value_p_curgoalshare: 0.0
 value_geom_sample: true
 actor_p_trajgoal: 1.0
 actor_p_curgoalshare: 1.0
