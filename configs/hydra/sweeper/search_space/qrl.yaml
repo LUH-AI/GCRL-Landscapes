@@ -23,7 +23,7 @@ hyperparameters:
     default_value: 0.99
   eps:
     type: uniform_float
-    lower: 0.0
+    lower: 1e-6
     upper: 1.0
     log: true
     default_value: 0.05
