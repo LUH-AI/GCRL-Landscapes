@@ -12,10 +12,15 @@
 
 if [ -z "$1" ]
   then
+    echo "No agent supplied"
+fi
+
+if [ -z "$2" ]
+  then
     echo "No environment supplied"
 fi
 
 module load Miniforge3
 conda activate gcrl
 
-python -m gcrl_landscapes.hpo --multirun +env="$1" hydra.run.dir="./smac_log/crl/$1" hydra.sweep.dir="./smac_log/crl/$1"
+python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +env="$2" hydra.run.dir="./smac_log/crl/$2" hydra.sweep.dir="./smac_log/crl/$2"
