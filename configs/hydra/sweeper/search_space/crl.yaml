@@ -12,7 +12,7 @@ hyperparameters:
   latent_dim:
     type: uniform_int
     lower: 8
-    upper: 4096
+    upper: 2048
     default_value: 512
   discount:
     type: uniform_float

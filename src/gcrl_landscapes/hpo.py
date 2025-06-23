@@ -5,6 +5,7 @@ from .configurations import hydra_to_ogbench_config
 from .submission import train_wrapper
 import signal
 import sys
+import os
 
 
 @hydra.main(config_path="../../configs", config_name="hpo_crl", version_base="1.1")
@@ -31,8 +32,10 @@ def hpo_target(hydra_config: DictConfig) -> float:
         seed=config["seed"],  # type: ignore
     )
     eval_results = eval_trajectory[0]
-    return eval_results[max(eval_results.keys())].success
+    return -eval_results[max(eval_results.keys())].success
 
 
 if __name__ == "__main__":
+    for key in [key for key in os.environ.keys() if "SLURM" in key]:
+        del os.environ[key]
     hpo_target()
