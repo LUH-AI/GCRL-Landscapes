@@ -1,19 +1,21 @@
 hyperparameters:
   lr:
     type: uniform_float
-    lower: 0.0
+    lower: 1e-6
     upper: 1.0
     default_value: 3e-4
+    log: true
   batch_size:
     type: uniform_int
     lower: 1
     upper: 4096
     default_value: 1024
-  latent_dim:
-    type: uniform_int
-    lower: 8
-    upper: 2048
-    default_value: 512
+  # Part of architecture
+  # latent_dim:
+  #   type: uniform_int
+  #   lower: 8
+  #   upper: 2048
+  #   default_value: 512
   discount:
     type: uniform_float
     lower: 0.8
@@ -36,7 +38,7 @@ hyperparameters:
     type: uniform_float
     lower: 0.0
     upper: 1.0
-    default_value: 1.0
+    default_value: 0.0
   actor_geom_sample:
     type: categorical
     choices: [ true, false ]
