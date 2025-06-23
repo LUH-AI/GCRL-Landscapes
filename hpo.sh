@@ -10,7 +10,12 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 
+if [ -z "$1" ]
+  then
+    echo "No environment supplied"
+fi
+
 module load Miniforge3
 conda activate gcrl
 
-python -m gcrl_landscapes.hpo --multirun +env="antmaze-medium-navigate-v0"
+python -m gcrl_landscapes.hpo --multirun +env="$1" hydra.run.dir="./smac_log/crl/$1" hydra.sweep.dir="./smac_log/crl/$1"
