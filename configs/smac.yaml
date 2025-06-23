@@ -2,6 +2,10 @@ eval_episodes: 50
 tasks_per_node_parallel: 1
 
 hydra:
+  run:
+    dir: ./smac_log/${agent_name}/${env}
+  sweep:
+    dir: ./smac_log/${agent_name}/${env}
   sweeper:
     n_trials: 128
     budget_variable: training_steps

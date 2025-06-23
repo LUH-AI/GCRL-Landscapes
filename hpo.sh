@@ -23,4 +23,4 @@ fi
 module load Miniforge3
 conda activate gcrl
 
-python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +env="$2" hydra.run.dir="./smac_log/crl/$2" hydra.sweep.dir="./smac_log/crl/$2"
+python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +env="$2"
