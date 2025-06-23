@@ -1,5 +1,5 @@
 eval_episodes: 50
-tasks_per_node_parallel: 4
+tasks_per_node_parallel: 1
 
 hydra:
   sweeper:
@@ -19,8 +19,7 @@ hydra:
           n_trials: ${hydra.sweeper.n_trials}
           seed: ${seed}
           min_budget: 50000
-          max_budget: 1000000
+          max_budget: 200000
           deterministic: true
           use_default_config: true
-          n_workers: 4
           output_directory: ${hydra.sweep.dir}
