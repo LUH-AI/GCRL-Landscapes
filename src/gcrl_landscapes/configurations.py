@@ -28,7 +28,10 @@ AWR_TEMPERATURE_UPPER = 20.0
 DDPGBC_BC_COEFF_LOWER = 0.0
 DDPGBC_BC_COEFF_UPPER = 0.5
 
-SUPPORTED_HPS = set(["lr", "discount", "actor_p_trajgoal", "alpha"])
+EPS_QRL_LOWER = 0.0
+EPS_QRL_UPPER = 1.0
+
+SUPPORTED_HPS = set(["lr", "discount", "actor_p_trajgoal", "alpha", "eps"])
 
 
 def get_config_space(agent: str) -> ConfigurationSpace:
@@ -51,6 +54,7 @@ def get_config_space(agent: str) -> ConfigurationSpace:
             "actor_p_randomgoal": Float("actor_p_randomgoal", (0, 1)),
             "actor_p_curgoal": Float("actor_p_curgoal", (0, 1)),
             "actor_geom_sample": Categorical("actor_geom_sample", (True, False)),
+            "eps": Float("eps", (0, 1)),
         }
     )
 
@@ -212,6 +216,10 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
         )
     )
 
+    # Set epsilon for QRL
+    ## unused for other algorithms
+    epss = _generate_epss(n)
+
     # choose between awr temperature and ddpgbc bc coefficient
     # use given actor loss as information, otherwise look at size of default alpha
     if "actor_loss" in base_config:
@@ -230,9 +238,10 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
                 "actor_p_trajgoal": actor_p_trajgoal,
                 "actor_p_randomgoal": actor_p_randomgoal,
                 "alpha": ddpgbc_bc_coeff if actor_loss == "ddpgbc" else awr_temperature,
+                **({"eps": eps} if "eps" in hyperparameters else {}),
             }
         )
-        for lr, df, actor_p_curgoal, actor_p_trajgoal, actor_p_randomgoal, awr_temperature, ddpgbc_bc_coeff in zip(
+        for lr, df, actor_p_curgoal, actor_p_trajgoal, actor_p_randomgoal, awr_temperature, ddpgbc_bc_coeff, eps in zip(
             learning_rates,
             discount_factors,
             actor_p_curgoals,
@@ -240,6 +249,7 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
             actor_p_randomgoals,
             awr_temperatures,
             ddpgbc_bc_coeffs,
+            epss,
         )
     ]
 
@@ -279,6 +289,14 @@ def _generate_ddpgbc_bc_coeffs(n: int) -> list[float]:
 def _generate_actor_p_trajgoals(n: int) -> list[float]:
     # Already in [0, 1], no need for scaling
     return list(Sobol(1).random_base2(round(log(n, 2))).reshape(-1))
+
+
+def _generate_epss(n: int) -> list[float]:
+    return list(
+        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
+        * (EPS_QRL_UPPER - EPS_QRL_LOWER)
+        + EPS_QRL_LOWER
+    )
 
 
 def _generate_dummy_list(n: int, val: object) -> list[object]:
