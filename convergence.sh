@@ -16,7 +16,6 @@ actorloss="awr"
 hyperparameters="discount actor_p_trajgoal" # these don't matter
 numconfigurations="1"
 phasepercentages="100"
-finalperformancepercentage="90"
 finalphase="1000000"
 numevalepisodes="50"
 extraevalsteps="1000 2500 5000 7500 10000 20000 30000 40000 50000 75000 100000 150000 200000 300000 400000 500000 600000 700000 800000 900000 100000"
@@ -87,9 +86,8 @@ for environment in "${environments[@]}"; do
       --agent "$agent" \
       --dataset "$environment" \
       --n_configurations "$numconfigurations" \
-      --convergence_zip "$convergencezip" \
       --phase_percentages $phasepercentages \
-      --final_performance_percentage $finalperformancepercentage \
+      --final_phase $finalphase \
       --eval_episodes "$numevalepisodes" \
       --hyperparameters $hyperparameters \
       --logdir "$full_log_dir" \
