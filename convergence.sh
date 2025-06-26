@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+#SBATCH --partition=ai,tnt
+#SBATCH --job-name=ConvergenceSetup
+#SBATCH --time=01:00:00
+#SBATCH --ntasks=1
+#SBATCH --cpus-per-task=8
+#SBATCH --mem-per-cpu=1G
+#SBATCH --mail-user=m.toepperwien@stud.uni-hannover.de
+#SBATCH --mail-type=END,FAIL
+#SBATCH --get-user-env
+
+
 logdir="./logs_convergence"
 actorloss="awr"
 hyperparameters="discount actor_p_trajgoal" # these don't matter
