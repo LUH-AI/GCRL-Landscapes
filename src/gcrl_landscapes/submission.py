@@ -19,6 +19,7 @@ from .util.data import get_best_agent_path, get_phase_results, EvalTrajectory
 from .phase_splitting import get_all_phases
 from more_itertools import chunked, divide
 from typing_extensions import deprecated
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -487,6 +488,11 @@ def submit(args: argparse.Namespace) -> None:
     Args:
         args: Look into main argument parser options or run from commandline for documentation
     """
+    # delete slurm environment keys
+    # slurm uses these but we want to provide them only using submitit
+    for key in [key for key in os.environ.keys() if "SLURM" in key]:
+        del os.environ[key]
+
     setup = toml.load(args.logdir / "info.toml")["arguments"]
 
     # Generate arguments for jobs
