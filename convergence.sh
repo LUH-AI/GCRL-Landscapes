@@ -91,9 +91,7 @@ for environment in "${environments[@]}"; do
       --tasks_per_node_total "$taskspernodetotal" \
       --tasks_per_node_parallel "$taskspernodeparallel" \
       --mem_per_cpu "$mempercpu" \
-      --jobname "${agent \
-      -${environment \
-      -${actorloss}" \
+      --jobname "${agent}-${environment}-${actorloss}" \
       --partition "$partitions" \
       --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}" \
       --basetime 120
