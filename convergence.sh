@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 
-logdir="./logs"
-hyperparameters="discount actor_p_trajgoal"
-numconfigurations="32"
-convergencezip="./convergence.zip"
-phasepercentages="25 50 100"
+logdir="./logs_convergence"
+actorloss="awr"
+hyperparameters="discount actor_p_trajgoal"  # these don't matter
+numconfigurations="1"
+phasepercentages="100"
 finalperformancepercentage="90"
+finalphase="1000000"
 numevalepisodes="50"
+extraevalsteps="1000 2500 5000 7500 10000 20000 30000 40000 50000 75000 100000 150000 200000 300000 400000 500000 600000 700000 800000 900000 100000"
 nseeds="5"
-taskspernodetotal="16"
-taskspernodeparallel="4"
+taskspernodetotal="5"
+taskspernodeparallel="5"
 partitions="ai,tnt"
 mempercpu="3G"
 
@@ -31,6 +33,7 @@ declare -A -r agent_min_per_mill_steps=(
 )
 
 declare -a -r environments=(
+  "antmaze-medium-explore-v0"
   "antmaze-medium-navigate-v0"
   "antmaze-medium-explore10navigate-v0"
   "antmaze-medium-explore20navigate-v0"
@@ -43,6 +46,10 @@ declare -a -r environments=(
   "antmaze-medium-explore80stitch-v0"
   "antmaze-large-navigate-v0"
   "antmaze-large-stitch-v0"
+  "antmaze-large-explore-v0"
+  "antmaze-teleport-navigate-v0"
+  "antmaze-teleport-stitch-v0"
+  "antmaze-teleport-explore-v0"
   "humanoidmaze-medium-navigate-v0"
   "humanoidmaze-medium-stitch-v0"
   "humanoidmaze-large-navigate-v0"
@@ -65,8 +72,8 @@ for environment in "${environments[@]}"; do
     echo "Starting job for ${agent}"
     full_log_dir="${logdir}/${agent}_${environment}_${numconfigurations}c_${hyperparameters// /-}"
 
-    python -m gcrl_landscapes.main setup --agent "$agent" --dataset "$environment" --n_configurations "$numconfigurations" --convergence_zip "$convergencezip" --phase_percentages $phasepercentages --final_performance_percentage $finalperformancepercentage --eval_episodes "$numevalepisodes" --hyperparameters $hyperparameters --logdir "$full_log_dir" --final_step_is_phase
-    python -m gcrl_landscapes.main submit --logdir "$full_log_dir" --n_seeds "$nseeds" --tasks_per_node_total "$taskspernodetotal" --tasks_per_node_parallel "$taskspernodeparallel" --mem_per_cpu "$mempercpu" --jobname "${agent}-${environment}" --partition "$partitions" --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}"
+    python -m gcrl_landscapes.main setup --agent "$agent" --dataset "$environment" --n_configurations "$numconfigurations" --convergence_zip "$convergencezip" --phase_percentages $phasepercentages --final_performance_percentage $finalperformancepercentage --eval_episodes "$numevalepisodes" --hyperparameters $hyperparameters --logdir "$full_log_dir" --final_step_is_phase --extra_eval_steps $extraevalsteps --basetime 120 --actor_loss "$actorloss"
+    python -m gcrl_landscapes.main submit --logdir "$full_log_dir" --n_seeds "$nseeds" --tasks_per_node_total "$taskspernodetotal" --tasks_per_node_parallel "$taskspernodeparallel" --mem_per_cpu "$mempercpu" --jobname "${agent}-${environment}-${actorloss}" --partition "$partitions" --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}"
     done
 done
 
