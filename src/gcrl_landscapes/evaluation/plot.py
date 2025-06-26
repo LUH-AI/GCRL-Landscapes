@@ -4,7 +4,6 @@ from gcrl_landscapes.util.data import (
     PhaseResult,
     phase_results_to_pandas,
     read_results_from_zip,
-    EvaluationResult,
 )
 from pathlib import Path
 from gcrl_landscapes.plots.triple_gp import TripleGPModel, create_contour_plot
@@ -16,13 +15,11 @@ from scipy.interpolate import griddata
 from typing import Any
 import re
 import seaborn as sns
-import matplotlib.ticker as ticker
 from mpl_toolkits.axes_grid1 import ImageGrid
 from PIL import Image
 import os
 from itertools import product
 from .common import (
-    FTU_SIGNIFICANCE_THRESHOLD,
     CVAR_CONFIDENCE_LEVELS,
     map_labels,
     compute_additional_information,
@@ -197,7 +194,13 @@ def plot_return_distribution(
     plt.close()
 
 
-def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, Any]):
+def plot(
+    results_pandas: pd.DataFrame,
+    output_folder: Path,
+    run_info: dict[str, Any],
+    plot_return_distributions: bool = False,
+    plot_eval_curves: bool = False,
+):
     """Main plotting Code to generate the landscapes
 
     Args:
@@ -251,22 +254,24 @@ def plot(results_pandas: pd.DataFrame, output_folder: Path, run_info: dict[str, 
         for col, title in landscape_pairs:
             plot_landscape(phase, phase_result_copy, col, hp_list, output_folder, title)
 
-        plot_return_distribution(
-            phase,
-            phase_result_copy,
-            "normalized_goal_distance_returns",
-            output_folder,
-            per_config_phase_folder,
-            "Normalized Goal Distance Return Distribution",
-        )
-        plot_eval_curve(
-            phase,
-            results_pandas[results_pandas["phase"] == phase],
-            "normalized_goal_distance_returns",
-            output_folder,
-            per_config_phase_folder,
-            "Normalized Goal Distance Return",
-        )
+        if plot_return_distributions:
+            plot_return_distribution(
+                phase,
+                phase_result_copy,
+                "normalized_goal_distance_returns",
+                output_folder,
+                per_config_phase_folder,
+                "Normalized Goal Distance Return Distribution",
+            )
+        if plot_eval_curves:
+            plot_eval_curve(
+                phase,
+                results_pandas[results_pandas["phase"] == phase],
+                "normalized_goal_distance_returns",
+                output_folder,
+                per_config_phase_folder,
+                "Normalized Goal Distance Return",
+            )
 
 
 def grid_plot(
@@ -323,6 +328,8 @@ def grid_plot(
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--zipfile", type=Path, required=True)
+    parser.add_argument("--plot_return_distributions", action="store_true")
+    parser.add_argument("--plot_eval_curves", action="store_true")
     args = parser.parse_args()
 
     # Parse results
