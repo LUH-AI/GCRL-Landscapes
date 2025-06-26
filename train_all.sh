@@ -32,6 +32,7 @@ declare -A -r agent_min_per_mill_steps=(
 )
 
 declare -a -r environments=(
+  "antmaze-medium-explore-v0"
   "antmaze-medium-navigate-v0"
   "antmaze-medium-explore10navigate-v0"
   "antmaze-medium-explore20navigate-v0"
@@ -44,6 +45,10 @@ declare -a -r environments=(
   "antmaze-medium-explore80stitch-v0"
   "antmaze-large-navigate-v0"
   "antmaze-large-stitch-v0"
+  "antmaze-large-explore-v0"
+  "antmaze-teleport-navigate-v0"
+  "antmaze-teleport-stitch-v0"
+  "antmaze-teleport-explore-v0"
   "humanoidmaze-medium-navigate-v0"
   "humanoidmaze-medium-stitch-v0"
   "humanoidmaze-large-navigate-v0"
