@@ -23,6 +23,7 @@ value_geom_sample: true
 actor_p_trajgoal: 1.0
 actor_p_curgoalshare: 1.0
 actor_geom_sample: false
+actor_loss: "awr"
 
 seed: 0
 training_steps: 1000000
