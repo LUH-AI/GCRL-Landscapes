@@ -27,7 +27,7 @@ def hpo_target(hydra_config: DictConfig) -> float:
         save_steps=[],
         eval_episodes=config["eval_episodes"],  # type: ignore
         configuration=config,
-        run_log_dir=Path("./run_log") / f"{str(hash(config))[:8]}",
+        run_log_dir=Path("./run_log") / f"hash_{str(hash(config))[:8]}",
         tasks_per_node_parallel=config["tasks_per_node_parallel"],  # type: ignore
         seed=config["seed"],  # type: ignore
     )
