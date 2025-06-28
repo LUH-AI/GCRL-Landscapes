@@ -1,6 +1,5 @@
 defaults:
   - hydra/sweeper/search_space/hiql
-  - hydra/sweeper/search_space/awr
   - smac
   - launcher
   - _self_
@@ -24,6 +23,8 @@ actor_p_trajgoal: 1.0
 actor_p_curgoalshare: 1.0
 actor_geom_sample: false
 actor_loss: "awr"
+# dummy alpha
+alpha: 0
 
 seed: 0
 training_steps: 200000
