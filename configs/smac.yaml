@@ -9,15 +9,11 @@ hydra:
   sweeper:
     n_trials: 128
     sweeper_kwargs:
+      seeds: [0, 1, 2, 3, 4]
       optimizer_kwargs:
         smac_facade:
           _target_: smac.facade.hyperparameter_optimization_facade.HyperparameterOptimizationFacade
           _partial_: true
-        intensifier:
-          _target_: smac.facade.hyperparameter_optimization_facade.HyperparameterOptimizationFacade.get_intensifier
-          _partial_: true
-          # [TODO: although SMAC receives this intensifier, no configuration is called with a seed!=0]
-          max_config_calls: 5
         scenario:
           n_trials: ${hydra.sweeper.n_trials}
           seed: ${seed}
