@@ -26,4 +26,4 @@ actor_geom_sample: false
 actor_loss: "awr"
 
 seed: 0
-training_steps: 1000000
+training_steps: 200000

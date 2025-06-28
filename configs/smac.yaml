@@ -8,22 +8,19 @@ hydra:
     dir: ./smac_log/${agent_name}/${env}
   sweeper:
     n_trials: 128
-    budget_variable: training_steps
     sweeper_kwargs:
       optimizer_kwargs:
         smac_facade:
-          _target_: smac.facade.multi_fidelity_facade.MultiFidelityFacade
+          _target_: smac.facade.hyperparameter_optimization_facade.HyperparameterOptimizationFacade
           _partial_: true
         intensifier:
-          _target_: smac.facade.multi_fidelity_facade.MultiFidelityFacade.get_intensifier
+          _target_: smac.facade.hyperparameter_optimization_facade.HyperparameterOptimizationFacade.get_intensifier
           _partial_: true
-          eta: 3
-          n_seeds: 3
+          # [TODO: although SMAC receives this intensifier, no configuration is called with a seed!=0]
+          max_config_calls: 5
         scenario:
           n_trials: ${hydra.sweeper.n_trials}
           seed: ${seed}
-          min_budget: 50000
-          max_budget: 200000
           deterministic: true
           use_default_config: true
           output_directory: ${hydra.sweep.dir}
