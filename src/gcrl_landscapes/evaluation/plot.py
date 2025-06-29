@@ -351,7 +351,13 @@ if __name__ == "__main__":
 
         folder = plots_folder / run_name
         folder.mkdir(exist_ok=True, parents=True)
-        plot(results_df, folder, run_info)
+        plot(
+            results_df,
+            folder,
+            run_info,
+            plot_return_distributions=args.plot_return_distributions,
+            plot_eval_curves=args.plot_eval_curves,
+        )
 
     # Build igpr grid of plots (across datasets)
     # first builds dataframe using plots inside subfolders
