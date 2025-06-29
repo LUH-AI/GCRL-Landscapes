@@ -26,6 +26,7 @@ from .common import (
 )
 import toml
 import zipfile
+import multiprocessing
 
 
 def plot_landscape(
@@ -342,8 +343,11 @@ if __name__ == "__main__":
         for identifier, (run_info, phase_results) in results.items()
     }
 
+    pool = multiprocessing.Pool(8)
+
     # Run plot function for every experiment inside zip/dataframe
-    for prefix, (run_info, results_df) in results_pandas.items():
+    def plot_result(arg: tuple[str, tuple[dict, pd.DataFrame]]):
+        prefix, (run_info, results_df) = arg
         run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
         if not run_match:
             raise ValueError("Naming inside of zipfile not as expected.")
@@ -351,6 +355,7 @@ if __name__ == "__main__":
 
         folder = plots_folder / run_name
         folder.mkdir(exist_ok=True, parents=True)
+        print(f"Plotting '{prefix}'")
         plot(
             results_df,
             folder,
@@ -358,6 +363,8 @@ if __name__ == "__main__":
             plot_return_distributions=args.plot_return_distributions,
             plot_eval_curves=args.plot_eval_curves,
         )
+
+    pool.map(plot_result, results_pandas.items())
 
     # Build igpr grid of plots (across datasets)
     # first builds dataframe using plots inside subfolders
