@@ -27,6 +27,7 @@ from .common import (
 import toml
 import zipfile
 import multiprocessing
+from functools import partial
 
 
 def plot_landscape(
@@ -326,6 +327,30 @@ def grid_plot(
     return
 
 
+def plot_parallel_wrapper(
+    plots_folder: Path,
+    arg: tuple[str, tuple[dict, pd.DataFrame]],
+    plot_return_distributions: bool = False,
+    plot_eval_curves: bool = False,
+):
+    prefix, (run_info, results_df) = arg
+    run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
+    if not run_match:
+        raise ValueError("Naming inside of zipfile not as expected.")
+    run_name = run_match.group(1)
+
+    folder = plots_folder / run_name
+    folder.mkdir(exist_ok=True, parents=True)
+    print(f"Plotting '{prefix}'")
+    plot(
+        results_df,
+        folder,
+        run_info,
+        plot_return_distributions=plot_return_distributions,
+        plot_eval_curves=plot_eval_curves,
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--zipfile", type=Path, required=True)
@@ -343,28 +368,16 @@ if __name__ == "__main__":
         for identifier, (run_info, phase_results) in results.items()
     }
 
-    pool = multiprocessing.Pool(8)
-
-    # Run plot function for every experiment inside zip/dataframe
-    def plot_result(arg: tuple[str, tuple[dict, pd.DataFrame]]):
-        prefix, (run_info, results_df) = arg
-        run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
-        if not run_match:
-            raise ValueError("Naming inside of zipfile not as expected.")
-        run_name = run_match.group(1)
-
-        folder = plots_folder / run_name
-        folder.mkdir(exist_ok=True, parents=True)
-        print(f"Plotting '{prefix}'")
-        plot(
-            results_df,
-            folder,
-            run_info,
-            plot_return_distributions=args.plot_return_distributions,
-            plot_eval_curves=args.plot_eval_curves,
+    with multiprocessing.get_context("spawn").Pool(8) as pool:
+        pool.map(
+            partial(
+                plot_parallel_wrapper,
+                plots_folder,
+                plot_return_distributions=args.plot_return_distributions,
+                plot_eval_curves=args.plot_eval_curves,
+            ),
+            results_pandas.items(),
         )
-
-    pool.map(plot_result, results_pandas.items())
 
     # Build igpr grid of plots (across datasets)
     # first builds dataframe using plots inside subfolders
