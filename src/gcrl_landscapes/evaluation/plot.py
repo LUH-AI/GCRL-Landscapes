@@ -258,7 +258,7 @@ def plot(
             plot_return_distribution(
                 phase,
                 phase_result_copy,
-                "normalized_goal_distance_returns",
+                "mean_normalized_goal_distance_return",
                 output_folder,
                 per_config_phase_folder,
                 "Normalized Goal Distance Return Distribution",
@@ -267,7 +267,7 @@ def plot(
             plot_eval_curve(
                 phase,
                 results_pandas[results_pandas["phase"] == phase],
-                "normalized_goal_distance_returns",
+                "mean_normalized_goal_distance_return",
                 output_folder,
                 per_config_phase_folder,
                 "Normalized Goal Distance Return",
