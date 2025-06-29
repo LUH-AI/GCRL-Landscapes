@@ -53,9 +53,10 @@ def get_all_phases(
     final_performance = performance_function(TARGET_EVAL_STEP)
     performance_target = final_performance * (final_performance_percentage / 100)
 
-    # Find first bracket which contains performance_target based on data
-    # -> find leftmost root
-    bracket_idx_right = np.min(np.where(performance_ys >= performance_target)[0])
+    # Find last bracket which contains performance_target based on data
+    # First bracket is not good, as goal distance can be quite good in beginning for a random network depending on the algorithm
+    # -> find rightmost root
+    bracket_idx_right = np.min(np.where(performance_ys >= performance_target)[-1])
     bracket = (performance_xs[bracket_idx_right - 1], performance_xs[bracket_idx_right])
 
     if mode == "target_ratio":
