@@ -78,6 +78,9 @@ class TripleGPModel(BaseEstimator):
         # all evaluations (y values) for a group (configuration):
         self.x_normalizing_offset = self.x_unscaled.min(axis=0)
         self.x_normalizing_factor = self.x_unscaled.max(axis=0) - self.x_unscaled.min(axis=0)
+        # max == min -> don't divide by zero
+        self.x_normalizing_factor[np.where(self.x_normalizing_factor == 0.0)] = 1.0
+
         self.x = self._scale_x(self.x_unscaled)
 
         y = np.concatenate(conf_groups[y_col].apply(list))
@@ -93,7 +96,7 @@ class TripleGPModel(BaseEstimator):
                 self.x[:, i] = (self.x[:, i] - configspace[hp_names[i]].lower) / (configspace[hp_names[i]].upper - configspace[hp_names[i]].lower)
         # scale y into [0, 1] interval:
         self.y_normalizing_offset = y.min()
-        self.y_normalizing_factor = y.max() - y.min()
+        self.y_normalizing_factor = y.max() - y.min() if y.max() != y.min() else 1.0
         self.y_unscaled = y
         self.y = (y - y.min()) / (y.max() - y.min())
         """(num_confs, samples_per_conf)"""

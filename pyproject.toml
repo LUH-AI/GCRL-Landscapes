@@ -53,7 +53,8 @@ dependencies = [
   "smac >= 2.3.1",
   "hypersweeper @ git+https://github.com/jmtoepperwien/hypersweeper",
   "swig",
-  "protobuf < 3.20.0",
+  "tensorflow > 2.15.0",
+  "tensorflow-probability >= 0.24.0",
 ]
 
 [project.urls]
