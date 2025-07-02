@@ -32,7 +32,9 @@ DDPGBC_BC_COEFF_UPPER = 0.5
 EPS_QRL_LOWER = 0.0
 EPS_QRL_UPPER = 1.0
 
-SUPPORTED_HPS = set(["lr", "discount", "actor_p_trajgoal", "alpha", "eps"])
+SUPPORTED_HPS = set(
+    ["lr", "discount", "actor_p_trajgoal", "alpha", "eps", "low_alpha", "high_alpha"]
+)
 
 
 def hydra_to_ogbench_config(hydra_config: DictConfig) -> FrozenConfigDict:
@@ -82,6 +84,20 @@ def get_config_space(agent: str) -> ConfigurationSpace:
             "actor_loss": Categorical("actor_loss", ("original", "ddpgbc", "awr")),
             "alpha": Float(
                 "alpha",
+                (
+                    min(AWR_TEMPERATURE_LOWER, DDPGBC_BC_COEFF_LOWER),
+                    max(AWR_TEMPERATURE_UPPER, DDPGBC_BC_COEFF_UPPER),
+                ),
+            ),
+            "low_alpha": Float(
+                "low_alpha",
+                (
+                    min(AWR_TEMPERATURE_LOWER, DDPGBC_BC_COEFF_LOWER),
+                    max(AWR_TEMPERATURE_UPPER, DDPGBC_BC_COEFF_UPPER),
+                ),
+            ),
+            "high_alpha": Float(
+                "high_alpha",
                 (
                     min(AWR_TEMPERATURE_LOWER, DDPGBC_BC_COEFF_LOWER),
                     max(AWR_TEMPERATURE_UPPER, DDPGBC_BC_COEFF_UPPER),
@@ -244,6 +260,21 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
             n, base_config["alpha"] if "alpha" in base_config else None
         )
     )
+    awr_temperatures_low_level_policy = (
+        _generate_awr_temperatures(n)
+        if "low_alpha" in hyperparameters
+        else _generate_dummy_list(
+            n, base_config["low_alpha"] if "low_alpha" in base_config else None
+        )
+    )
+    awr_temperatures_high_level_policy = (
+        _generate_awr_temperatures(n)
+        if "high_alpha" in hyperparameters
+        else _generate_dummy_list(
+            n, base_config["high_alpha"] if "high_alpha" in base_config else None
+        )
+    )
+
     ## may be unused if algorithm uses awr
     ddpgbc_bc_coeffs = (
         _generate_ddpgbc_bc_coeffs(n)
@@ -276,15 +307,25 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
                 "actor_p_randomgoal": actor_p_randomgoal,
                 "alpha": ddpgbc_bc_coeff if actor_loss == "ddpgbc" else awr_temperature,
                 **({"eps": eps} if "eps" in hyperparameters else {}),
+                **({"low_alpha": low_alpha if "low_alpha" in hyperparameters else {}}),
+                **(
+                    {
+                        "high_alpha": high_alpha
+                        if "high_alpha" in hyperparameters
+                        else {}
+                    }
+                ),
             }
         )
-        for lr, df, actor_p_curgoal, actor_p_trajgoal, actor_p_randomgoal, awr_temperature, ddpgbc_bc_coeff, eps in zip(
+        for lr, df, actor_p_curgoal, actor_p_trajgoal, actor_p_randomgoal, awr_temperature, low_alpha, high_alpha, ddpgbc_bc_coeff, eps in zip(
             learning_rates,
             discount_factors,
             actor_p_curgoals,
             actor_p_trajgoals,
             actor_p_randomgoals,
             awr_temperatures,
+            awr_temperatures_low_level_policy,
+            awr_temperatures_high_level_policy,
             ddpgbc_bc_coeffs,
             epss,
         )
