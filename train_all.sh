@@ -108,4 +108,4 @@ done
 # Automatically zip and plot after all runs done
 # Currently this waits for all jobs belonging to user and not only the ones submitted here
 dependencies=$(squeue --me -l -r | tail -n +3 | tr -s ' ' | cut -d ' ' -f2 | cut -d '_' -f1 | sort | uniq | paste -s -d':')
-sbatch --output "${logdir}/zip_and_plot_log.txt" -d "afterok:${dependencies}" ./zip_and_plot.sh "$logdir" $(which python)
+sbatch --output "${logdir}/zip_and_plot_log.txt" -d "afterany:${dependencies}" ./zip_and_plot.sh "$logdir" $(which python)
