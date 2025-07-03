@@ -14,6 +14,8 @@ from pandas import DataFrame
 from autorl_landscape.analyze.visualization import Visualization
 
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
 import numpy as np
 import seaborn as sns
 from pandas import DataFrame
@@ -253,9 +255,14 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
     Z = model.get_middle(points).reshape(X.shape)
 
     # Create contour plot
-    plt.figure(figsize=(8, 6))
-    contour = plt.contourf(X, Y, Z, levels=20, cmap="rocket", vmin=bounds[0], vmax=bounds[1])
-    plt.colorbar(contour)
+    fig, ax = plt.subplots()
+    contour = ax.contourf(X, Y, Z, levels=20, cmap="rocket", vmin=bounds[0], vmax=bounds[1])
+    if bounds[0] != None and bounds[1] != None:
+        norm = mcolors.Normalize(vmin=bounds[0], vmax=bounds[1])
+        mappable = cm.ScalarMappable(norm=norm, cmap="rocket")
+        cbar = plt.colorbar(mappable, ax=ax)
+    else:
+        cbar = plt.colorbar(contour, ax=ax)
 
     # Mark the peaks and valleys
     peaks = np.where(Z == Z.max())
