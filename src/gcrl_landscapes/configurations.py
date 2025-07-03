@@ -307,13 +307,11 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
                 "actor_p_randomgoal": actor_p_randomgoal,
                 "alpha": ddpgbc_bc_coeff if actor_loss == "ddpgbc" else awr_temperature,
                 **({"eps": eps} if "eps" in hyperparameters else {}),
-                **({"low_alpha": low_alpha if "low_alpha" in hyperparameters else {}}),
+                **({"low_alpha": low_alpha} if "low_alpha" in hyperparameters else {}),
                 **(
-                    {
-                        "high_alpha": high_alpha
-                        if "high_alpha" in hyperparameters
-                        else {}
-                    }
+                    {"high_alpha": high_alpha}
+                    if "high_alpha" in hyperparameters
+                    else {}
                 ),
             }
         )
