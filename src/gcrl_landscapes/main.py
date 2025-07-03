@@ -163,7 +163,7 @@ if __name__ == "__main__":
         "--basetime",
         type=int,
         required=False,
-        default=5,
+        default=10,
         help="Time allocation per task independent from training steps",
     )
     slurm_subparser.add_argument(
