@@ -56,8 +56,25 @@ def get_all_phases(
     # Find last bracket which contains performance_target based on data
     # First bracket is not good, as goal distance can be quite good in beginning for a random network depending on the algorithm
     # -> find rightmost root
-    bracket_idx_right = np.min(np.where(performance_ys >= performance_target)[-1])
-    bracket = (performance_xs[bracket_idx_right - 1], performance_xs[bracket_idx_right])
+    def in_interval(interval_left: float, interval_right: float, value: float):
+        return (
+            min(interval_left, interval_right)
+            <= value
+            <= max(interval_left, interval_right)
+        )
+
+    bracket_idx_left, bracket_idx_right = [
+        (bracket_idx_left, bracket_idx_right)
+        for bracket_idx_left, bracket_idx_right in reversed(
+            list(zip(range(len(performance_xs))[:-1], range(len(performance_xs))[1:]))
+        )
+        if in_interval(
+            performance_ys[bracket_idx_left],
+            performance_ys[bracket_idx_right],
+            float(performance_target),
+        )
+    ][0]
+    bracket = (performance_xs[bracket_idx_left], performance_xs[bracket_idx_right])
 
     if mode == "target_ratio":
         root_result: RootResults = root_scalar(
