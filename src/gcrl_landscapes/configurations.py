@@ -331,11 +331,11 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
 
 
 def _generate_learning_rates(n: int) -> list[float]:
-    return list(
-        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
-        * (LEARNING_RATE_UPPER - LEARNING_RATE_LOWER)
-        + LEARNING_RATE_LOWER
-    )
+    lr_unscaled = Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
+    log_lower = np.log10(LEARNING_RATE_LOWER)
+    log_upper = np.log10(LEARNING_RATE_UPPER)
+
+    return list(10 ** (log_lower + (log_upper - log_lower) * lr_unscaled))
 
 
 def _generate_discount_factors(n: int) -> list[float]:
