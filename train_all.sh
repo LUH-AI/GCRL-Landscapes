@@ -69,11 +69,12 @@ declare -a -r environments=(
 )
 
 # cache autotuning results to not having to recompile them on every run
-if [ -z ${BIGWORK+x} ]; then
-  export JAX_COMPILATION_CACHE_DIR="/tmp/jax_cache"
-else
-  export JAX_COMPILATION_CACHE_DIR="${BIGWORK}/jax_cache"
-fi
+# !DEACTIVATED for now due to strange caching bugs
+# if [ -z ${BIGWORK+x} ]; then
+#   export JAX_COMPILATION_CACHE_DIR="/tmp/jax_cache"
+# else
+#   export JAX_COMPILATION_CACHE_DIR="${BIGWORK}/jax_cache"
+# fi
 
 for environment in "${environments[@]}"; do
   echo "Starting jobs for ${environment}"
