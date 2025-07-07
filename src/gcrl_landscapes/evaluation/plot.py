@@ -48,8 +48,18 @@ def plot_landscape(
         output_folder: where to save plot to
         y_label: How y should be labeled
     """
+    result_copy = phase_result.copy()
+    if "hp.lr" in hp_names:
+        hp_names = ["lr-uniform"] + [
+            hp_name for hp_name in hp_names if hp_name != "hp.lr"
+        ]
+        result_copy["lr-uniform"] = (
+            np.log10(result_copy["hp.lr"]) - np.log10(result_copy["hp.lr"].min())
+        ) / (
+            np.log10(result_copy["hp.lr"].max()) - np.log10(result_copy["hp.lr"].min())
+        )
     model = TripleGPModel(
-        phase_result,
+        result_copy,
         np.float64,
         y_col=y_col,
         hp_names=hp_names,
@@ -357,6 +367,8 @@ if __name__ == "__main__":
     parser.add_argument("--plot_return_distributions", action="store_true")
     parser.add_argument("--plot_eval_curves", action="store_true")
     args = parser.parse_args()
+
+    plt.rcParams.update(sns.plotting_context("talk") | {"figure.figsize": [4, 3]})
 
     # Parse results
     plots_folder = Path("plots") / os.path.basename(args.zipfile)
