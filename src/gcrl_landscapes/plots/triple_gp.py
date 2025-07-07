@@ -94,7 +94,7 @@ class TripleGPModel(BaseEstimator):
 
         # scale ls dims into [0, 1] interval:
         for i in range(len(hp_names)):
-            if configspace[hp_names[i].split(".")[-1]].__class__ == Float:
+            if "-uniform" not in hp_names[i] and configspace[hp_names[i].split(".")[-1]].__class__ == Float:
                 self.x[:, i] = (self.x[:, i] - configspace[hp_names[i]].lower) / (configspace[hp_names[i]].upper - configspace[hp_names[i]].lower)
         # scale y into [0, 1] interval:
         self.y_normalizing_offset = y.min()
@@ -255,7 +255,19 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
     Z = model.get_middle(points).reshape(X.shape)
 
     # Create contour plot
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=[4, 3])
+
+    if model.hp_names[x_dim] == "lr-uniform":
+        X = 10 ** (np.log10(model.data["hp.lr"].min()) + (np.log10(model.data["hp.lr"].max()) - np.log10(model.data["hp.lr"].min())) * X)
+        ax.set_xscale('log', base=10)
+        ax.set_xticks(list(filter(lambda x: x > X.min(), [1e-6, 1e-5, 1e-4, 1e-3, 1e-2])))
+
+    if model.hp_names[y_dim] == "lr-uniform":
+        Y = 10 ** (np.log10(model.data["hp.lr"].min()) + (np.log10(model.data["hp.lr"].max()) - np.log10(model.data["hp.lr"].min())) * X)
+        ax.set_xscale('log', base=10)
+        ax.set_xticks(list(filter(lambda y: y > Y.min(), [1e-6, 1e-5, 1e-4, 1e-3, 1e-2])))
+
+
     contour = ax.contourf(X, Y, Z, levels=20, cmap="rocket", vmin=bounds[0], vmax=bounds[1])
     if bounds[0] != None and bounds[1] != None:
         norm = mcolors.Normalize(vmin=bounds[0], vmax=bounds[1])
