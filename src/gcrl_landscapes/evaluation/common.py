@@ -12,6 +12,9 @@ from gcrl_landscapes.util.data import (
 DIM_LABEL_MAPPING = {
     "actor_p_trajgoal": "$p_{trajgoal}$",
     "discount": "Discount Factor",
+    "alpha": "Alpha",
+    "lr": "Learning Rate",
+    "lr-uniform": "Learning Rate",
 }
 
 FTU_SIGNIFICANCE_THRESHOLD = 0.05
