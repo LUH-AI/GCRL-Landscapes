@@ -6,6 +6,7 @@ from .submission import train_wrapper
 import signal
 import sys
 import os
+import yaml
 
 
 @hydra.main(config_path="../../configs", config_name="hpo_crl", version_base="1.1")
@@ -17,6 +18,10 @@ def hpo_target(hydra_config: DictConfig) -> float:
 
     signal.signal(signal.SIGTERM, handler)
 
+    with open("hydra_config.yaml", "w") as f:
+        print(hydra_config)
+        yaml.dump(dict(hydra_config), f, default_flow_style=False)
+
     config = hydra_to_ogbench_config(hydra_config)
     eval_trajectory = train_wrapper(
         agent_name=config["agent_name"],  # type: ignore
@@ -27,7 +32,7 @@ def hpo_target(hydra_config: DictConfig) -> float:
         save_steps=[],
         eval_episodes=config["eval_episodes"],  # type: ignore
         configuration=config,
-        run_log_dir=Path("./run_log") / f"hash_{str(hash(config))[:8]}",
+        run_log_dir=Path("./"),
         tasks_per_node_parallel=config["tasks_per_node_parallel"],  # type: ignore
         seed=config["seed"],  # type: ignore
     )
