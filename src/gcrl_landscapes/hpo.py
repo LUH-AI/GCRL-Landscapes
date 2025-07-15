@@ -24,7 +24,18 @@ RUN_CONFIG_REMOVABLE_KEYS = [
 ]
 
 
-def find_best_agent(last_run: Path):
+def find_best_agent(last_run: Path) -> Path:
+    """Find best agent checkpoint based on Hypersweeper/SMAC HPO run
+
+    Args:
+        last_run: Directory of hypersweeper log
+
+    Returns:
+        Path to best checkpoint from best configuration of run
+
+    Raises:
+        ValueError: If there is a mismatch between directory configs and the logged best config
+    """
     with open(last_run / "incumbent.csv", "r") as f:
         *_, best_config_full = csv.DictReader(f)
         best_config = {
@@ -61,6 +72,24 @@ def find_best_agent(last_run: Path):
     seeds = [config["seed"] for config in matching_configs]
     if not len(seeds) == len(set(seeds)):
         raise ValueError("found more than one config matching the best config")
+
+    # Now we can look at which seed got us the best performance and find out its checkpoint-path
+    def get_final_performance(config: dict) -> dict:
+        with open(config["dir"] / "eval_log.csv", "r") as f:
+            *_, last_log = csv.DictReader(f)
+            return {
+                "success": float(last_log["success"]),
+                "step": int(last_log["step"]),
+            }
+
+    config_best_seed = max(
+        matching_configs, key=lambda config: get_final_performance(config)["success"]
+    )
+
+    return (
+        config_best_seed["dir"]
+        / f"params_{get_final_performance(config_best_seed)['step']}.pkl"
+    )
 
 
 @hydra.main(config_path="../../configs", config_name="hpo_crl", version_base="1.1")
