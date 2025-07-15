@@ -8,6 +8,7 @@ import sys
 import os
 import yaml
 import csv
+import re
 
 HYPERSWEEPER_REMOVABLE_KEYS = [
     "config_id",
@@ -18,15 +19,48 @@ HYPERSWEEPER_REMOVABLE_KEYS = [
     "total_optimization_time",
 ]
 
+RUN_CONFIG_REMOVABLE_KEYS = [
+    "tasks_per_node_parallel",
+]
+
 
 def find_best_agent(last_run: Path):
     with open(last_run / "incumbent.csv", "r") as f:
         *_, best_config_full = csv.DictReader(f)
         best_config = {
-            key: val
+            key.lower(): val.lower()
             for key, val in best_config_full.items()
             if key not in HYPERSWEEPER_REMOVABLE_KEYS
         }
+
+    # We will find all directories containing logs for the best configuration in the following steps
+    run_log_directories = filter(
+        lambda dir: dir.is_dir() and re.fullmatch(r"^\d+$", str(dir.name)),
+        [last_run / child for child in os.listdir(last_run)],
+    )
+
+    def read_config(dir: Path) -> dict:
+        with open(dir / "hydra_config.yaml", "r") as f:
+            loaded_config = yaml.load(f, yaml.BaseLoader)
+        return {
+            key.lower(): val.lower()
+            for key, val in loaded_config.items()
+            if key not in RUN_CONFIG_REMOVABLE_KEYS
+        } | {"log_dir": dir}
+
+    configs = map(read_config, run_log_directories)
+    matching_configs = list(  # These are all seeds for the best configuration/incumbent
+        filter(
+            lambda config: all(
+                [best_config[key] == config[key] for key in best_config.keys()]
+            ),
+            configs,
+        )
+    )
+
+    seeds = [config["seed"] for config in matching_configs]
+    if not len(seeds) == len(set(seeds)):
+        raise ValueError("found more than one config matching the best config")
 
 
 @hydra.main(config_path="../../configs", config_name="hpo_crl", version_base="1.1")
