@@ -7,6 +7,26 @@ import signal
 import sys
 import os
 import yaml
+import csv
+
+HYPERSWEEPER_REMOVABLE_KEYS = [
+    "config_id",
+    "performance",
+    "budget",
+    "budget_used",
+    "total_wallclock_time",
+    "total_optimization_time",
+]
+
+
+def find_best_agent(last_run: Path):
+    with open(last_run / "incumbent.csv", "r") as f:
+        *_, best_config_full = csv.DictReader(f)
+        best_config = {
+            key: val
+            for key, val in best_config_full.items()
+            if key not in HYPERSWEEPER_REMOVABLE_KEYS
+        }
 
 
 @hydra.main(config_path="../../configs", config_name="hpo_crl", version_base="1.1")
