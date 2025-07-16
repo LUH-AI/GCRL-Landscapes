@@ -6,9 +6,9 @@ from gcrl_landscapes.util.data import (
     read_results_from_zip,
 )
 from pathlib import Path
-from gcrl_landscapes.plots.triple_gp import TripleGPModel, create_contour_plot
+from gcrl_landscapes.plots.triple_gp import create_contour_plot
+from gcrl_landscapes.util.eval import fit_model
 import numpy as np
-from gcrl_landscapes.configurations import get_config_space
 import pandas as pd
 import matplotlib.pyplot as plt
 from scipy.interpolate import griddata
@@ -48,24 +48,7 @@ def plot_landscape(
         output_folder: where to save plot to
         y_label: How y should be labeled
     """
-    result_copy = phase_result.copy()
-    if "hp.lr" in hp_names:
-        hp_names = ["lr-uniform"] + [
-            hp_name for hp_name in hp_names if hp_name != "hp.lr"
-        ]
-        result_copy["lr-uniform"] = (
-            np.log10(result_copy["hp.lr"]) - np.log10(result_copy["hp.lr"].min())
-        ) / (
-            np.log10(result_copy["hp.lr"].max()) - np.log10(result_copy["hp.lr"].min())
-        )
-    model = TripleGPModel(
-        result_copy,
-        np.float64,
-        y_col=y_col,
-        hp_names=hp_names,
-        configspace=get_config_space(""),
-    )
-    model.fit()
+    model = fit_model(phase_result, y_col, hp_names)
     # One direct plot
     create_contour_plot(
         model,
