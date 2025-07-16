@@ -2,6 +2,7 @@ import argparse
 from gcrl_landscapes.util.data import (
     read_results_from_zip,
 )
+from gcrl_landscapes.util.eval import fit_model
 from pathlib import Path
 import pandas as pd
 import os
@@ -68,6 +69,41 @@ def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
         f.write(table.to_csv())
 
 
+def create_additional_tables(results_pandas: pd.DataFrame, output_folder: Path):
+    """Compute additional tabular data like IGPR fit
+
+    Args:
+        results_pandas: pandas dataframe containing all results (all phases) for one experiment
+        output_folder: folder to save plots in
+    """
+    # Compute k-fold cross validation fit per agent-dataset-phase combination for the IGPR model
+    results_pandas = compute_additional_information(results_pandas)
+
+    final_results_pandas = results_pandas[
+        results_pandas["eval_step"] == results_pandas["phase"]
+    ]
+    table = final_results_pandas.groupby(by=["agent", "dataset", "phase"]).apply(
+        lambda df: fit_model(
+            df.reset_index(drop=True),
+            "mean_normalized_goal_distance_return",
+            [f"hp.{hp_name}" for hp_name in df["hps"].iloc[0]],
+        )
+        .estimate_iqm_fit()
+        .drop(axis="columns", labels="fold")
+        .mean(axis=0),
+        include_groups=False,
+    )
+
+    with open(output_folder / "additional_table.md", "w") as f:
+        f.write(table.to_markdown())
+
+    with open(output_folder / "additional_table.tex", "w") as f:
+        f.write(table.to_latex())
+
+    with open(output_folder / "additional_table.csv", "w") as f:
+        f.write(table.to_csv())
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--zipfile", type=Path, required=True)
@@ -79,3 +115,4 @@ if __name__ == "__main__":
     merged_results_df = merge_experiments(read_results_from_zip(args.zipfile))
 
     create_tables(merged_results_df, output_folder)
+    create_additional_tables(merged_results_df, output_folder)
