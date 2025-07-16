@@ -1,4 +1,7 @@
 import numpy as np
+import pandas as pd
+from gcrl_landscapes.plots.triple_gp import TripleGPModel
+from gcrl_landscapes.configurations import get_config_space
 
 
 def cvar(values: np.ndarray, confidence_level: int = 5) -> np.floating:
@@ -51,3 +54,31 @@ def iqr(values: np.ndarray, confidence_levels: tuple[int, int]) -> np.floating:
         np.percentile(values, confidence_levels[0])
         - np.percentile(values, confidence_levels[1])
     )
+
+
+def fit_model(
+    phase_result: pd.DataFrame,
+    y_col: str,
+    hp_names: list[str],
+) -> TripleGPModel:
+    result_copy = phase_result.copy()
+    # Learning rate is scaled logarithmically
+    # -> Show model uniform distribution by appropriate scaling
+    if "hp.lr" in hp_names:
+        hp_names = ["lr-uniform"] + [
+            hp_name for hp_name in hp_names if hp_name != "hp.lr"
+        ]
+        result_copy["lr-uniform"] = (
+            np.log10(result_copy["hp.lr"]) - np.log10(result_copy["hp.lr"].min())
+        ) / (
+            np.log10(result_copy["hp.lr"].max()) - np.log10(result_copy["hp.lr"].min())
+        )
+    model = TripleGPModel(
+        result_copy,
+        np.float64,
+        y_col=y_col,
+        hp_names=hp_names,
+        configspace=get_config_space(""),
+    )
+    model.fit()
+    return model
