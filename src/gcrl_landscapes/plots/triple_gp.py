@@ -20,15 +20,13 @@ import numpy as np
 import seaborn as sns
 from pandas import DataFrame
 from sklearn.base import BaseEstimator
+from sklearn.metrics import mean_absolute_error, max_error, mean_squared_error
 
-
-import numpy as np
-from pandas import DataFrame
-from sklearn.base import BaseEstimator
-
+from autorl_landscape.ls_models.triple_gp import estimate_model_fit
 from autorl_landscape.analyze.visualization import Visualization
 from autorl_landscape.run.compare import iqm
 from typing import Callable
+
 
 def iqm(x, axis=None):
     """
@@ -143,10 +141,14 @@ class TripleGPModel(BaseEstimator):
         opt.minimize(self.upper_model.training_loss, self.upper_model.trainable_variables)
         opt.minimize(self.lower_model.training_loss, self.lower_model.trainable_variables)
 
-    def estimate_iqm_fit(self):
+    def estimate_iqm_fit(self, print: bool = False, metrics: list[Callable] = [mean_squared_error, mean_absolute_error, max_error]) -> DataFrame:
+        # unscale estimates to get interpretable results
+        data = estimate_model_fit(X=self.x, y=self.y_iqm, k=5, metrics=metrics) * self.y_normalizing_factor
+        if not print:
+            return data
+
         print("-"*50)
         print("Estimate IQM surface fit")
-        data = estimate_model_fit(X=self.x, y=self.y_iqm, k=5)
         for c in data.columns:
             if c != "fold":
                 print(c, data[c].mean(), data[c].std())
