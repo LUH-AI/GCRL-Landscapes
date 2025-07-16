@@ -227,10 +227,6 @@ def plot(
     for phase, phase_result in phase_results:
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
         per_config_phase_folder.mkdir(exist_ok=True)
-        phase_result_copy = phase_result.copy()
-        phase_result_copy.loc[:, "run_id"], _ = pd.factorize(
-            phase_result_copy["run_id"]
-        )  # TripleGPModel needs continuous run-ids starting at 0
 
         landscape_pairs = [
             ("success", "Success Rate"),
@@ -247,12 +243,12 @@ def plot(
             for confidence_level in CVAR_CONFIDENCE_LEVELS
         ]
         for col, title in landscape_pairs:
-            plot_landscape(phase, phase_result_copy, col, hp_list, output_folder, title)
+            plot_landscape(phase, phase_result, col, hp_list, output_folder, title)
 
         if plot_return_distributions:
             plot_return_distribution(
                 phase,
-                phase_result_copy,
+                phase_result,
                 "mean_normalized_goal_distance_return",
                 output_folder,
                 per_config_phase_folder,

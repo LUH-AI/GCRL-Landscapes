@@ -62,6 +62,10 @@ def fit_model(
     hp_names: list[str],
 ) -> TripleGPModel:
     result_copy = phase_result.copy()
+    result_copy.loc[:, "run_id"], _ = pd.factorize(
+        result_copy["run_id"]
+    )  # TripleGPModel needs continuous run-ids starting at 0
+
     # Learning rate is scaled logarithmically
     # -> Show model uniform distribution by appropriate scaling
     if "hp.lr" in hp_names:
