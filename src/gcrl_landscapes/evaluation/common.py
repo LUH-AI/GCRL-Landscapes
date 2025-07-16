@@ -90,6 +90,7 @@ def merge_experiments(
             phase_results_to_pandas(result).assign(
                 agent=run_info["arguments"]["agent"],
                 dataset=run_info["arguments"]["dataset"],
+                hps=lambda x: [run_info["arguments"]["hyperparameters"]] * len(x),
             )
             for run_info, result in results.values()
         ]
