@@ -5,6 +5,7 @@ from gcrl_landscapes.util.data import (
     phase_results_to_pandas,
     read_results_from_zip,
 )
+from gcrl_landscapes.plots.triple_gp import estimate_model_fit
 from pathlib import Path
 from gcrl_landscapes.plots.triple_gp import create_contour_plot
 from gcrl_landscapes.util.eval import fit_model
@@ -28,6 +29,8 @@ import toml
 import zipfile
 import multiprocessing
 from functools import partial
+from sklearn.metrics import mean_absolute_error, max_error, mean_squared_error
+from sklearn.model_selection import ShuffleSplit
 
 
 def plot_landscape(
@@ -189,12 +192,39 @@ def plot_return_distribution(
     plt.close()
 
 
+def plot_gp_fit(
+    phase: int,
+    phase_result: pd.DataFrame,
+    y_col: str,
+    hp_names: list[str],
+    output_folder: Path,
+    y_label: str | None,
+    n_samples: int = 10,
+):
+    gp_fit_dfs = []
+    # Sample n configurations from results and fit model
+    for n in range(2, len(phase_result.groupby(hp_names))):
+        print(n)
+        model = fit_model(phase_result, y_col, hp_names)
+        data = estimate_model_fit(
+            X=model.x,
+            y=model.y_iqm,
+            splitter=ShuffleSplit(n_splits=n_samples, random_state=0, train_size=n),
+            y_scale=model.y_normalizing_factor,
+            metrics=[mean_squared_error, mean_absolute_error, max_error],
+        )
+        data["n"] = n
+        gp_fit_dfs.append(data)
+    gp_fit_df = pd.concat(gp_fit_dfs).reset_index(drop=True)
+
+
 def plot(
     results_pandas: pd.DataFrame,
     output_folder: Path,
     run_info: dict[str, Any],
     plot_return_distributions: bool = False,
     plot_eval_curves: bool = False,
+    plot_gp_fits: bool = False,
 ):
     """Main plotting Code to generate the landscapes
 
@@ -263,6 +293,15 @@ def plot(
                 per_config_phase_folder,
                 "Normalized Goal Distance Return",
             )
+        if plot_gp_fits:
+            plot_gp_fit(
+                phase,
+                phase_result,
+                "mean_normalized_goal_distance_return",
+                hp_list,
+                output_folder,
+                "Normalized Goal Distance Return",
+            )
 
 
 def grid_plot(
@@ -321,6 +360,7 @@ def plot_parallel_wrapper(
     arg: tuple[str, tuple[dict, pd.DataFrame]],
     plot_return_distributions: bool = False,
     plot_eval_curves: bool = False,
+    plot_gp_fits: bool = False,
 ):
     prefix, (run_info, results_df) = arg
     run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
@@ -337,6 +377,7 @@ def plot_parallel_wrapper(
         run_info,
         plot_return_distributions=plot_return_distributions,
         plot_eval_curves=plot_eval_curves,
+        plot_gp_fits=plot_gp_fits,
     )
 
 
@@ -345,6 +386,7 @@ if __name__ == "__main__":
     parser.add_argument("--zipfile", type=Path, required=True)
     parser.add_argument("--plot_return_distributions", action="store_true")
     parser.add_argument("--plot_eval_curves", action="store_true")
+    parser.add_argument("--plot_gp_fits", action="store_true")
     args = parser.parse_args()
 
     plt.rcParams.update(sns.plotting_context("talk") | {"figure.figsize": [4, 3]})
@@ -366,6 +408,7 @@ if __name__ == "__main__":
                 plots_folder,
                 plot_return_distributions=args.plot_return_distributions,
                 plot_eval_curves=args.plot_eval_curves,
+                plot_gp_fits=args.plot_gp_fits,
             ),
             results_pandas.items(),
         )
