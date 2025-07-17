@@ -18,14 +18,38 @@ import matplotlib.cm as cm
 import matplotlib.colors as mcolors
 import numpy as np
 import seaborn as sns
+import pandas as pd
 from pandas import DataFrame
 from sklearn.base import BaseEstimator
 from sklearn.metrics import mean_absolute_error, max_error, mean_squared_error
+from sklearn.model_selection import KFold
 
-from autorl_landscape.ls_models.triple_gp import estimate_model_fit
 from autorl_landscape.analyze.visualization import Visualization
 from autorl_landscape.run.compare import iqm
-from typing import Callable
+from typing import Callable, Any
+
+
+def estimate_model_fit(X, y, y_scale, splitter: Any = KFold(n_splits=5, shuffle=True, random_state=0), metrics: list[Callable] | None = None) -> DataFrame:
+    if metrics is None:
+        metrics = [mean_squared_error, mean_absolute_error]
+
+    data = []
+    for i, (train_index, test_index) in enumerate(splitter.split(X=X, y=y)):
+        X_i = X[train_index]
+        Y_i = y[train_index]
+        model = gpflow.models.GPR((X_i, Y_i), kernel=gpflow.kernels.SquaredExponential())
+        opt = gpflow.optimizers.Scipy()
+        opt.minimize(model.training_loss, model.trainable_variables)
+        f_mean, _ = model.predict_f(X[test_index])
+        y_pred = f_mean.numpy()
+        results = {}
+        results["fold"] = i
+        for metric in metrics:
+            results[metric.__name__] = metric(y[test_index] * y_scale, y_pred * y_scale)
+        data.append(results)
+    data = pd.DataFrame(data)
+
+    return data
 
 
 def iqm(x, axis=None):
@@ -143,7 +167,7 @@ class TripleGPModel(BaseEstimator):
 
     def estimate_iqm_fit(self, print: bool = False, metrics: list[Callable] = [mean_squared_error, mean_absolute_error, max_error]) -> DataFrame:
         # unscale estimates to get interpretable results
-        data = estimate_model_fit(X=self.x, y=self.y_iqm, k=5, metrics=metrics) * self.y_normalizing_factor
+        data = estimate_model_fit(X=self.x, y=self.y_iqm, y_scale=self.y_normalizing_factor, metrics=metrics)
         if not print:
             return data
 
