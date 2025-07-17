@@ -29,6 +29,7 @@ import toml
 import zipfile
 import multiprocessing
 from functools import partial
+from itertools import combinations
 from sklearn.metrics import mean_absolute_error, max_error, mean_squared_error
 from sklearn.model_selection import ShuffleSplit
 
@@ -59,7 +60,7 @@ def plot_landscape(
         y_dim=1,
         z_dim=y_label if y_label else y_col,
         bounds=[0, 1],
-        filename=output_folder / f"igpr-{y_col}-{phase}.png",
+        filename=output_folder / f"igpr-({'_'.join(hp_names)})-{y_col}-{phase}.png",
         dim_label_mapping=map_labels,
     )
     # Scale results to [0, 1] to better see contours
@@ -69,7 +70,8 @@ def plot_landscape(
         y_dim=1,
         z_dim=y_label if y_label else y_col,
         bounds=[None, None],
-        filename=output_folder / f"igpr-{y_col}-{phase}-scaled.png",
+        filename=output_folder
+        / f"igpr-({'_'.join(hp_names)})-{y_col}-{phase}-scaled.png",
         dim_label_mapping=map_labels,
     )
 
@@ -231,7 +233,10 @@ def plot_gp_fit(
     ax.set_yscale("log")
     ax.set_xlabel("Number of Configurations")
     ax.set_ylabel("Error")
-    fig.savefig(output_folder / f"gp-fit-{y_col}-{phase}.png", bbox_inches="tight")
+    fig.savefig(
+        output_folder / f"gp-fit-({'_'.join(hp_names)})-{y_col}-{phase}.png",
+        bbox_inches="tight",
+    )
     plt.close()
 
 
@@ -289,8 +294,11 @@ def plot(
             )
             for confidence_level in CVAR_CONFIDENCE_LEVELS
         ]
-        for col, title in landscape_pairs:
-            plot_landscape(phase, phase_result, col, hp_list, output_folder, title)
+        for hp_pair in combinations(hp_list, 2):
+            for col, title in landscape_pairs:
+                plot_landscape(
+                    phase, phase_result, col, list(hp_pair), output_folder, title
+                )
 
         if plot_return_distributions:
             plot_return_distribution(
@@ -311,14 +319,15 @@ def plot(
                 "Normalized Goal Distance Return",
             )
         if plot_gp_fits:
-            plot_gp_fit(
-                phase,
-                phase_result,
-                "mean_normalized_goal_distance_return",
-                hp_list,
-                output_folder,
-                "Normalized Goal Distance Return",
-            )
+            for hp_pair in combinations(hp_list, 2):
+                plot_gp_fit(
+                    phase,
+                    phase_result,
+                    "mean_normalized_goal_distance_return",
+                    list(hp_pair),
+                    output_folder,
+                    "Normalized Goal Distance Return",
+                )
 
 
 def grid_plot(
