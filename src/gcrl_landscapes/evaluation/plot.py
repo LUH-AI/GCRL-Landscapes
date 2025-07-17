@@ -217,6 +217,18 @@ def plot_gp_fit(
         gp_fit_dfs.append(data)
     gp_fit_df = pd.concat(gp_fit_dfs).reset_index(drop=True)
 
+    fig, ax = plt.subplots()
+    sns.lineplot(
+        data=gp_fit_df, x="n", y="mean_absolute_error", ax=ax, label="Mean Error"
+    )
+    sns.lineplot(data=gp_fit_df, x="n", y="max_error", ax=ax, label="Max Error")
+    ax.set_ylim(0.01, 1)
+    ax.set_yscale("log")
+    ax.set_xlabel("Number of Configurations")
+    ax.set_ylabel("Error")
+    fig.savefig(output_folder / f"gp-fit-{y_col}-{phase}.png", bbox_inches="tight")
+    plt.close()
+
 
 def plot(
     results_pandas: pd.DataFrame,
