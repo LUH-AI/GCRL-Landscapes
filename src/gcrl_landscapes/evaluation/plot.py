@@ -418,7 +418,11 @@ if __name__ == "__main__":
         for identifier, (run_info, phase_results) in results.items()
     }
 
-    with multiprocessing.get_context("spawn").Pool(8) as pool:
+    try:
+        thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 2
+    except Exception as _:
+        thread_count = multiprocessing.cpu_count() // 2
+    with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
         pool.map(
             partial(
                 plot_parallel_wrapper,
