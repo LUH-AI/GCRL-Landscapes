@@ -199,17 +199,22 @@ def plot_gp_fit(
     hp_names: list[str],
     output_folder: Path,
     y_label: str | None,
-    n_samples: int = 10,
+    n_samples: int = 20,
+    n_splits: int = 10,
 ):
     gp_fit_dfs = []
     # Sample n configurations from results and fit model
-    for n in range(2, len(phase_result.groupby(hp_names))):
+    for n in np.unique(
+        np.rint(
+            np.linspace(2, len(phase_result.groupby(hp_names)) - 1, n_samples)
+        ).astype(int)
+    ):
         print(n)
         model = fit_model(phase_result, y_col, hp_names)
         data = estimate_model_fit(
             X=model.x,
             y=model.y_iqm,
-            splitter=ShuffleSplit(n_splits=n_samples, random_state=0, train_size=n),
+            splitter=ShuffleSplit(n_splits=n_splits, random_state=0, train_size=n),
             y_scale=model.y_normalizing_factor,
             metrics=[mean_squared_error, mean_absolute_error, max_error],
         )
