@@ -7,7 +7,7 @@ name = "gcrl-landscapes"
 dynamic = ["version"]
 description = ""
 readme = "README.md"
-requires-python = ">=3.9, <3.11"
+requires-python = ">=3.10, <3.11"
 license = "MIT"
 keywords = []
 authors = [
@@ -27,11 +27,11 @@ classifiers = [
 dependencies = [
   "gymnasium >= 1.1.1",
   "gymnasium[mujoco]",
-  "ogbench @ git+https://github.com/CrunchyFlakes/ogbench",
+  "ogbench; sys_platform == 'linux'",
   "tqdm >= 4.50.0",
-  "flax >= 0.10.6",
+  "flax >= 0.10.6; sys_platform == 'linux'",
   "numpy < 2.0.0",
-  "jax[cuda12] >= 0.6.2",
+  "jax[cuda12] >= 0.6.2; sys_platform == 'linux'",
   "wandb",
   "scipy >= 1.15.3",
   "GitPython",
@@ -61,6 +61,9 @@ dependencies = [
 Documentation = "https://github.com/LUH-AI/GCRL-Landscapes#readme"
 Issues = "https://github.com/LUH-AI/GCRL-Landscapes/issues"
 Source = "https://github.com/LUH-AI/GCRL-Landscapes"
+
+[tool.uv.sources]
+ogbench = { git = "https://github.com/CrunchyFlakes/ogbench", branch = "master" }
 
 [tool.hatch.metadata]
 allow-direct-references = true
