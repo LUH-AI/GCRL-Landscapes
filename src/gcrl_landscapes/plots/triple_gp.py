@@ -29,7 +29,7 @@ from autorl_landscape.run.compare import iqm
 from typing import Callable, Any
 
 
-def estimate_model_fit(X, y, y_scale, splitter: Any = KFold(n_splits=5, shuffle=True, random_state=0), metrics: list[Callable] | None = None) -> DataFrame:
+def estimate_model_fit(X, y, y_scale, splitter: Any = KFold(n_splits=5, shuffle=True), metrics: list[Callable] | None = None) -> DataFrame:
     if metrics is None:
         metrics = [mean_squared_error, mean_absolute_error]
 

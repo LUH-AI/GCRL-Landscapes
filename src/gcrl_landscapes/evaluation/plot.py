@@ -214,7 +214,7 @@ def plot_gp_fit(
         data = estimate_model_fit(
             X=model.x,
             y=model.y_iqm,
-            splitter=ShuffleSplit(n_splits=n_splits, random_state=0, train_size=n),
+            splitter=ShuffleSplit(n_splits=n_splits, train_size=n),
             y_scale=model.y_normalizing_factor,
             metrics=[mean_squared_error, mean_absolute_error, max_error],
         )
