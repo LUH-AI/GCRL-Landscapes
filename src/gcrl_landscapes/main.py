@@ -51,7 +51,11 @@ if __name__ == "__main__":
         help="At which percentages phases should be run",
     )
     setup_subparser.add_argument(
-        "--dataset", required=True, type=str, help="Which dataset/environment to run"
+        "--datasets",
+        required=True,
+        type=str,
+        nargs="+",
+        help="Which dataset/environment to run",
     )
     setup_subparser.add_argument(
         "--n_configurations",

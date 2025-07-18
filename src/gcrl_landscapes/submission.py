@@ -63,13 +63,21 @@ def run_setup(args: argparse.Namespace) -> None:
     logging.info("Set up for later running")
 
     adapted_default_config = get_adapted_default_config(
-        args.agent, args.dataset, args.actor_loss
+        args.agent,
+        args.datasets[0],  # Here we assume that all datasets are of the same kind
+        args.actor_loss,
     )
 
+    if len(args.datasets) == 1:
+        args.datasets = args.datasets * len(args.phase_percentages)
+    elif len(args.datasets) != len(args.phase_percentages):
+        raise ValueError(
+            f"Number of datasets ({len(args.datasets)}) does not match number of phase percentages ({len(args.phase_percentages)})"
+        )
     phases = (
         get_all_phases(
             args.agent,
-            args.dataset,
+            args.datasets,
             adapted_default_config["actor_loss"],  # type: ignore
             args.final_performance_percentage,
             args.convergence_zip,
@@ -112,7 +120,9 @@ def run_setup(args: argparse.Namespace) -> None:
             args.agent,
             set(args.hyperparameters),
             seed=args.seed,
-            env=args.dataset,
+            env=args.datasets[
+                0
+            ],  # Here we assume that all datasets are of the same kind
             actor_loss=args.actor_loss,
         )
     else:
@@ -417,11 +427,14 @@ def run_config(
 
     ## mix in explore and cache it if wanted
     explore_mix_match = re.fullmatch(
-        r"^.*explore(?P<explore_share>\d+)(?P<secondtype>[^-]*).*$", setup["dataset"]
+        r"^.*explore(?P<explore_share>\d+)(?P<secondtype>[^-]*).*$",
+        setup["dataset"][phase_idx],
     )
     if explore_mix_match:
-        base_dataset = re.sub(r"explore\d+", "", setup["dataset"])
-        explore_dataset = re.sub(r"explore\d+[^-]*", "explore", setup["dataset"])
+        base_dataset = re.sub(r"explore\d+", "", setup["dataset"][phase_idx])
+        explore_dataset = re.sub(
+            r"explore\d+[^-]*", "explore", setup["dataset"][phase_idx]
+        )
         explore_share = int(explore_mix_match.groupdict()["explore_share"])
         print(
             f"Found mixed dataset, mixing {explore_dataset} into {base_dataset} ({explore_share}%)"
@@ -440,7 +453,7 @@ def run_config(
         )
     else:
         env, train_dataset_raw, val_dataset_raw = make_env_and_datasets(
-            setup["dataset"]
+            setup["dataset"][phase_idx]
         )  # type: ignore
         train_dataset = dataset_constructor(train_dataset_raw)
         val_dataset = dataset_constructor(val_dataset_raw)
