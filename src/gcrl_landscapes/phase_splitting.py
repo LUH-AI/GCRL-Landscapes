@@ -5,17 +5,47 @@ import pandas as pd
 import numpy as np
 from scipy.stats import trim_mean
 from scipy.optimize import root_scalar, RootResults
+from collections.abc import Sequence
 
 TARGET_EVAL_STEP = 1_000_000
 
 
 def get_all_phases(
     agent: str,
-    dataset: str,
+    datasets: Sequence[str],
     actor_loss: str,
     final_performance_percentage: int,
     zippath: Path,
     phase_percentages: list[int],
+    mode: str = "target_ratio",
+    interpolation: str = "linear",
+) -> list[int]:
+    # For every dataset-phase-pair, calculate start and end of phase
+    dataset_phase_interval = [
+        calculate_phases(
+            agent,
+            dataset,
+            actor_loss,
+            final_performance_percentage,
+            zippath,
+            phase_percentage_interval,
+            mode,
+            interpolation,
+        )
+        for dataset, phase_percentage_interval in zip(
+            datasets, zip([0] + phase_percentages[:-1], phase_percentages)
+        )
+    ]
+    return [interval[1] - interval[0] for interval in dataset_phase_interval]
+
+
+def calculate_phases(
+    agent: str,
+    dataset: str,
+    actor_loss: str,
+    final_performance_percentage: int,
+    zippath: Path,
+    phase_percentages: Sequence[int],
     mode: str = "target_ratio",
     interpolation: str = "linear",
 ) -> list[int]:
