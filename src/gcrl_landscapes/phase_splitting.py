@@ -179,8 +179,9 @@ def get_data(agent: str, dataset: str, actor_loss: str, zippath: Path) -> pd.Dat
             if agent in prefix and dataset in prefix and actor_loss in prefix
         ]
         if len(matching_prefixes) != 1:
+            print(f"dataset: {dataset}\n, matching_prefixes: {matching_prefixes}")
             raise ValueError(
-                f"{zippath} has more than one agent-dataset-loss-combination."
+                f"{zippath} has != 1 {len(matching_prefixes)} agent-dataset-loss-combinations."
             )
         prefix = matching_prefixes[0]
     except StopIteration:
