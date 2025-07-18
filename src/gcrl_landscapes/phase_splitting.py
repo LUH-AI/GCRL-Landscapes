@@ -36,7 +36,10 @@ def get_all_phases(
             datasets, zip([0] + phase_percentages[:-1], phase_percentages)
         )
     ]
-    return [interval[1] - interval[0] for interval in dataset_phase_interval]
+    phase_training_steps = [
+        interval[1] - interval[0] for interval in dataset_phase_interval
+    ]
+    return np.cumsum(phase_training_steps).tolist()
 
 
 def calculate_phases(
