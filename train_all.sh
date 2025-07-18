@@ -15,8 +15,8 @@ hyperparameters="discount actor_p_trajgoal"
 actorloss="awr"
 numconfigurations="32"
 convergencezip="./convergence.zip"
-phasepercentages="25 50 100"
-finalperformancepercentage="90"
+phasepercentages="25 50 75 100"
+finalperformancepercentage="95"
 numevalepisodes="50"
 nseeds="5"
 taskspernodetotal="16"
@@ -42,6 +42,7 @@ declare -A -r agent_min_per_mill_steps=(
 )
 
 declare -a -r environments=(
+  "antmaze-medium-explore-v0 antmaze-medium-explore80navigate-v0 antmaze-medium-explore40navigate-v0 antmaze-medium-navigate-v0"
   "antmaze-medium-explore-v0"
   "antmaze-medium-navigate-v0"
   "antmaze-medium-explore10navigate-v0"
