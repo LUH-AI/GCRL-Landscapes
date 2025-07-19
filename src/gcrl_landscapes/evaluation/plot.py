@@ -464,7 +464,7 @@ if __name__ == "__main__":
             "arguments"
         ]
         agent = setup["agent"]
-        dataset = setup["dataset"]
+        dataset = setup["datasets"]
         if "actor_loss" in setup:
             actor_loss = setup["actor_loss"]
         else:
