@@ -428,12 +428,12 @@ def run_config(
     ## mix in explore and cache it if wanted
     explore_mix_match = re.fullmatch(
         r"^.*explore(?P<explore_share>\d+)(?P<secondtype>[^-]*).*$",
-        setup["dataset"][phase_idx],
+        setup["datasets"][phase_idx],
     )
     if explore_mix_match:
-        base_dataset = re.sub(r"explore\d+", "", setup["dataset"][phase_idx])
+        base_dataset = re.sub(r"explore\d+", "", setup["datasets"][phase_idx])
         explore_dataset = re.sub(
-            r"explore\d+[^-]*", "explore", setup["dataset"][phase_idx]
+            r"explore\d+[^-]*", "explore", setup["datasets"][phase_idx]
         )
         explore_share = int(explore_mix_match.groupdict()["explore_share"])
         print(
@@ -453,7 +453,7 @@ def run_config(
         )
     else:
         env, train_dataset_raw, val_dataset_raw = make_env_and_datasets(
-            setup["dataset"][phase_idx]
+            setup["datasets"][phase_idx]
         )  # type: ignore
         train_dataset = dataset_constructor(train_dataset_raw)
         val_dataset = dataset_constructor(val_dataset_raw)
