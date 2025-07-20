@@ -91,7 +91,6 @@ def create_additional_tables(results_pandas: pd.DataFrame, output_folder: Path):
         .estimate_iqm_fit()
         .drop(axis="columns", labels="fold")
         .mean(axis=0),
-        include_groups=False,
     )
 
     with open(output_folder / "additional_table.md", "w") as f:
