@@ -234,7 +234,7 @@ def plot_gp_fit(
     ax.set_xlabel("Number of Configurations")
     ax.set_ylabel("Error")
     fig.savefig(
-        output_folder / f"gp-fit-({'_'.join(hp_names)})-{y_col}-{phase}.png",
+        output_folder / f"gp_fit-({'_'.join(hp_names)})-{y_col}-{phase}.png",
         bbox_inches="tight",
     )
     plt.close()
@@ -428,9 +428,9 @@ if __name__ == "__main__":
     }
 
     try:
-        thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 2
+        thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 3
     except Exception as _:
-        thread_count = multiprocessing.cpu_count() // 2
+        thread_count = multiprocessing.cpu_count() // 3
     with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
         pool.map(
             partial(
@@ -454,6 +454,7 @@ if __name__ == "__main__":
             "dataset",
             "actor_loss",
             "y_col",
+            "hps",
         ]
     )  # type: ignore
     for experiment_name in os.listdir(plots_folder):
@@ -485,7 +486,7 @@ if __name__ == "__main__":
             if re.match(r"^.*-.*-\d+.png$", filename)
         ]:
             plot_name_matches = re.match(
-                r".*/(?P<plot_type>[^-/]*)-(?P<y_col>[^-/]*)-(?P<phase>\d+).png$",
+                r".*/(?P<plot_type>[^-/]*)-(?:\((?P<hps>[^\)]*)\)-)?(?P<y_col>[^-/]*)-(?P<phase>\d+).png$",
                 str(unscaled_plotpath),
             )
             if not plot_name_matches:
@@ -499,19 +500,29 @@ if __name__ == "__main__":
                 dataset,
                 actor_loss,
                 plot_name_matches["y_col"],
+                plot_name_matches["hps"],
             ]
 
     # Now actually plot all grid plots
-    for plot_type, agent, y_col, actor_loss in product(
+    for plot_type, agent, y_col, actor_loss, hps in product(
         imgpath_dataframe["plot_type"].unique(),
         imgpath_dataframe["agent"].unique(),
         imgpath_dataframe["y_col"].unique(),
         imgpath_dataframe["actor_loss"].unique(),
+        imgpath_dataframe["hps"].unique(),
     ):
         grid_df = imgpath_dataframe[
             (imgpath_dataframe["plot_type"] == plot_type)
             & (imgpath_dataframe["agent"] == agent)
             & (imgpath_dataframe["y_col"] == y_col)
+            & (
+                (imgpath_dataframe["hps"] == hps)
+                | (
+                    pd.isnull(imgpath_dataframe["hps"])
+                    if hps is None
+                    else ~pd.isnull(imgpath_dataframe["hps"])
+                )
+            )
             & (imgpath_dataframe["actor_loss"] == actor_loss)
         ]
         if len(grid_df) == 0:
@@ -519,6 +530,6 @@ if __name__ == "__main__":
         grid_plot(
             grid_df,
             plots_folder,
-            f"{plot_type}-{agent}-{y_col}-{actor_loss}",
+            f"{plot_type}-{agent}-{hps}-{y_col}-{actor_loss}",
             grid_columns=("dataset", "phase"),
         )  # type: ignore
