@@ -1,6 +1,6 @@
 from pathlib import Path
 import hydra
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 from .configurations import hydra_to_ogbench_config
 from .submission import train_wrapper
 import signal
@@ -54,7 +54,7 @@ def find_best_agent(last_run: Path) -> Path:
         with open(dir / "hydra_config.yaml", "r") as f:
             loaded_config = yaml.load(f, yaml.BaseLoader)
         return {
-            key.lower(): val.lower()
+            key.lower(): str(val).lower()
             for key, val in loaded_config.items()
             if key not in RUN_CONFIG_REMOVABLE_KEYS
         } | {"log_dir": dir}
@@ -75,7 +75,7 @@ def find_best_agent(last_run: Path) -> Path:
 
     # Now we can look at which seed got us the best performance and find out its checkpoint-path
     def get_final_performance(config: dict) -> dict:
-        with open(config["dir"] / "eval_log.csv", "r") as f:
+        with open(config["log_dir"] / "eval_log.csv", "r") as f:
             *_, last_log = csv.DictReader(f)
             return {
                 "success": float(last_log["success"]),
@@ -102,13 +102,22 @@ def hpo_target(hydra_config: DictConfig) -> float:
     signal.signal(signal.SIGTERM, handler)
 
     with open("hydra_config.yaml", "w") as f:
-        print(hydra_config)
-        yaml.dump(dict(hydra_config), f, default_flow_style=False)
+        f.write(OmegaConf.to_yaml(hydra_config, resolve=True))
+
+    if (
+        hydra_config["phases"].index(hydra_config["phase"]) > 0
+    ):  # There has been a run before
+        last_phase = hydra_config["phases"][
+            hydra_config["phases"].index(hydra_config["phase"]) - 1
+        ]
+        agent_path = find_best_agent(Path(os.getcwd()) / ".." / ".." / str(last_phase))
+    else:
+        agent_path = None
 
     config = hydra_to_ogbench_config(hydra_config)
     eval_trajectory = train_wrapper(
         agent_name=config["agent_name"],  # type: ignore
-        agent_path=None,
+        agent_path=agent_path,
         dataset_name=config["env"],  # type: ignore
         already_trained_steps=0,
         eval_steps=[config["training_steps"]],  # type: ignore
