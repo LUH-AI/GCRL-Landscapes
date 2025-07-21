@@ -3,9 +3,9 @@ tasks_per_node_parallel: 1
 
 hydra:
   run:
-    dir: ./smac_log/${agent_name}/${env}
+    dir: ./smac_log/${agent_name}/${env}/${phase}
   sweep:
-    dir: ./smac_log/${agent_name}/${env}
+    dir: ./smac_log/${agent_name}/${env}/${phase}
   sweeper:
     n_trials: 128
     sweeper_kwargs:
