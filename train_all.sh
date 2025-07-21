@@ -11,9 +11,9 @@
 #SBATCH --get-user-env
 
 logdir="./logs"
-hyperparameters="discount actor_p_trajgoal"
+hyperparameters="lr alpha"
 actorloss="awr"
-numconfigurations="32"
+numconfigurations="64"
 convergencezip="./convergence.zip"
 phasepercentages="25 50 75 100"
 finalperformancepercentage="95"
@@ -23,6 +23,9 @@ taskspernodetotal="16"
 taskspernodeparallel="4"
 partitions="ai,tnt"
 mempercpu="3G"
+
+module load Miniforge3
+conda activate gcrl
 
 declare -a -r agents=(
   "CRL"
@@ -85,7 +88,7 @@ for environment in "${environments[@]}"; do
 
     python -m gcrl_landscapes.main setup \
       --agent "$agent" \
-      --dataset "$environment" \
+      --datasets $environment \
       --n_configurations "$numconfigurations" \
       --convergence_zip "$convergencezip" \
       --phase_percentages $phasepercentages \
