@@ -25,6 +25,9 @@ taskspernodeparallel="5"
 partitions="ai,tnt"
 mempercpu="3G"
 
+module load Miniforge3
+conda activate gcrl
+
 declare -a -r agents=(
   "CRL"
   "GCBC"
@@ -70,11 +73,11 @@ declare -a -r environments=(
 )
 
 # cache autotuning results to not having to recompile them on every run
-if [ -z ${BIGWORK+x} ]; then
-  export JAX_COMPILATION_CACHE_DIR="/tmp/jax_cache"
-else
-  export JAX_COMPILATION_CACHE_DIR="${BIGWORK}/jax_cache"
-fi
+# if [ -z ${BIGWORK+x} ]; then
+#   export JAX_COMPILATION_CACHE_DIR="/tmp/jax_cache"
+# else
+#   export JAX_COMPILATION_CACHE_DIR="${BIGWORK}/jax_cache"
+# fi
 
 for environment in "${environments[@]}"; do
   echo "Starting jobs for ${environment}"
