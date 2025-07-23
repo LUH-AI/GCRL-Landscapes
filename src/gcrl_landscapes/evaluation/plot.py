@@ -474,7 +474,9 @@ if __name__ == "__main__":
             "arguments"
         ]
         agent = setup["agent"]
-        dataset = ",".join(setup["datasets"])
+        dataset = (
+            ",".join(setup["datasets"]) if "datasets" in setup else setup["dataset"]
+        )
         if "actor_loss" in setup:
             actor_loss = setup["actor_loss"]
         else:
