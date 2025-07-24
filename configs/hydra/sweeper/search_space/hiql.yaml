@@ -42,10 +42,11 @@ hyperparameters:
     lower: 1
     log: true
     default_value: 25
-  const_std:
-    type: categorical
-    choices: [ true, false ]
-    default_value: true
+  # Changes network architecture
+  # const_std:
+  #   type: categorical
+  #   choices: [ true, false ]
+  #   default_value: true
   value_p_trajgoal:
     type: uniform_float
     lower: 0.0
