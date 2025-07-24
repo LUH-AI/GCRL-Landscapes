@@ -75,7 +75,7 @@ def find_best_agent(last_run: Path) -> Path:
 
     # Now we can look at which seed got us the best performance and find out its checkpoint-path
     def get_final_performance(config: dict) -> dict:
-        with open(config["log_dir"] / "eval_log.csv", "r") as f:
+        with open(config["log_dir"] / "train_log" / "eval_log.csv", "r") as f:
             *_, last_log = csv.DictReader(f)
             return {
                 "success": float(last_log["success"]),
@@ -87,7 +87,8 @@ def find_best_agent(last_run: Path) -> Path:
     )
 
     return (
-        config_best_seed["dir"]
+        config_best_seed["log_dir"]
+        / "train_log"
         / f"params_{get_final_performance(config_best_seed)['step']}.pkl"
     )
 
@@ -111,7 +112,12 @@ def hpo_target(hydra_config: DictConfig) -> float:
             hydra_config["phases"].index(hydra_config["phase"]) - 1
         ]
         agent_path = find_best_agent(Path(os.getcwd()) / ".." / ".." / str(last_phase))
+        already_trained_steps = last_phase
+        print(
+            f"Already trained {already_trained_steps} steps. Resuming training from checkpoint {agent_path}"
+        )
     else:
+        already_trained_steps = 0
         agent_path = None
 
     config = hydra_to_ogbench_config(hydra_config)
@@ -119,12 +125,12 @@ def hpo_target(hydra_config: DictConfig) -> float:
         agent_name=config["agent_name"],  # type: ignore
         agent_path=agent_path,
         dataset_name=config["env"],  # type: ignore
-        already_trained_steps=0,
-        eval_steps=[config["training_steps"]],  # type: ignore
-        save_steps=[],
+        already_trained_steps=already_trained_steps,
+        eval_steps=[config["phase"]],  # type: ignore
+        save_steps=[config["phase"]],  # type: ignore
         eval_episodes=config["eval_episodes"],  # type: ignore
         configuration=config,
-        run_log_dir=Path("./"),
+        run_log_dir=Path("./train_log"),
         tasks_per_node_parallel=config["tasks_per_node_parallel"],  # type: ignore
         seed=config["seed"],  # type: ignore
     )
