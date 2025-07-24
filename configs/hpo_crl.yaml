@@ -21,4 +21,3 @@ alpha: 3.0
 actor_loss: "awr"
 
 seed: 0
-training_steps: 200000
