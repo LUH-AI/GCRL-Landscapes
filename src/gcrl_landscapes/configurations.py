@@ -37,9 +37,13 @@ SUPPORTED_HPS = set(
 )
 
 
-def hydra_to_ogbench_config(hydra_config: DictConfig) -> FrozenConfigDict:
+def hydra_to_ogbench_config(
+    hydra_config: DictConfig, phase_idx: int
+) -> FrozenConfigDict:
     get_adapted_default_config(
-        hydra_config["agent_name"], hydra_config["env"], hydra_config["actor_loss"]
+        hydra_config["agent_name"],
+        hydra_config["datasets"][phase_idx],
+        hydra_config["actor_loss"],
     )
 
     hydra_config_modified: dict = dict(hydra_config)
@@ -64,7 +68,7 @@ def hydra_to_ogbench_config(hydra_config: DictConfig) -> FrozenConfigDict:
         initial_dictionary=dict(
             get_adapted_default_config(
                 hydra_config["agent_name"],
-                hydra_config["env"],
+                hydra_config["datasets"][phase_idx],
                 hydra_config["actor_loss"],
             )
         )

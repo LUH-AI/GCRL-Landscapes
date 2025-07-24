@@ -3,6 +3,7 @@ import hydra
 from omegaconf import DictConfig, OmegaConf
 from .configurations import hydra_to_ogbench_config
 from .submission import train_wrapper
+from .phase_splitting import get_all_phases
 import signal
 import sys
 import os
@@ -102,17 +103,29 @@ def hpo_target(hydra_config: DictConfig) -> float:
 
     signal.signal(signal.SIGTERM, handler)
 
+    hydra_config["datasets"] = (
+        [hydra_config["datasets"][0]] * len(hydra_config["phases"])
+        if len(hydra_config["datasets"]) == 1
+        else hydra_config["datasets"]
+    )
     with open("hydra_config.yaml", "w") as f:
         f.write(OmegaConf.to_yaml(hydra_config, resolve=True))
 
-    if (
-        hydra_config["phases"].index(hydra_config["phase"]) > 0
-    ):  # There has been a run before
-        last_phase = hydra_config["phases"][
-            hydra_config["phases"].index(hydra_config["phase"]) - 1
-        ]
+    phase_idx = hydra_config["phases"].index(hydra_config["phase"])
+    config = hydra_to_ogbench_config(hydra_config, phase_idx)
+
+    phase_steps = get_all_phases(
+        config["agent_name"],
+        config["datasets"],
+        config["actor_loss"],
+        config["final_performance_percentage"],
+        hydra.utils.to_absolute_path(config["convergence_zip_path"]),
+        config["phases"],
+    )
+    if phase_idx > 0:  # There has been a run before
+        last_phase = hydra_config["phases"][phase_idx - 1]
         agent_path = find_best_agent(Path(os.getcwd()) / ".." / ".." / str(last_phase))
-        already_trained_steps = last_phase
+        already_trained_steps = phase_steps[phase_idx - 1]
         print(
             f"Already trained {already_trained_steps} steps. Resuming training from checkpoint {agent_path}"
         )
@@ -120,14 +133,16 @@ def hpo_target(hydra_config: DictConfig) -> float:
         already_trained_steps = 0
         agent_path = None
 
-    config = hydra_to_ogbench_config(hydra_config)
+    print(
+        f"Training on dataset {config['datasets'][phase_idx]} in phase {phase_steps[phase_idx]}"
+    )
     eval_trajectory = train_wrapper(
         agent_name=config["agent_name"],  # type: ignore
         agent_path=agent_path,
-        dataset_name=config["env"],  # type: ignore
+        dataset_name=config["datasets"][phase_idx],  # type: ignore
         already_trained_steps=already_trained_steps,
-        eval_steps=[config["phase"]],  # type: ignore
-        save_steps=[config["phase"]],  # type: ignore
+        eval_steps=[phase_steps[phase_idx]],  # type: ignore
+        save_steps=[phase_steps[phase_idx]],  # type: ignore
         eval_episodes=config["eval_episodes"],  # type: ignore
         configuration=config,
         run_log_dir=Path("./train_log"),

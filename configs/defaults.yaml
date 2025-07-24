@@ -1,0 +1,5 @@
+final_performance_percentage: 95
+convergence_zip_path: ./convergence.zip
+hydra:
+  job:
+    chdir: true
