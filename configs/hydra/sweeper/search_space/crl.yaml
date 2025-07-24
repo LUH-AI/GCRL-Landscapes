@@ -21,10 +21,11 @@ hyperparameters:
     lower: 0.8
     upper: 0.9999
     default_value: 0.99
-  const_std:
-    type: categorical
-    choices: [ true, false ]
-    default_value: true
+  # Changes network architecture
+  # const_std:
+  #   type: categorical
+  #   choices: [ true, false ]
+  #   default_value: true
   value_geom_sample:
     type: categorical
     choices: [ true, false ]
