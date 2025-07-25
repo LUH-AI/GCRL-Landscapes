@@ -45,6 +45,5 @@ fi
 module load Miniforge3
 conda activate gcrl
 
-for phase in "${phases[@]}"; do
-  python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5"
-done
+echo python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5"
+python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5"
