@@ -1,4 +1,5 @@
 defaults:
+  - defaults
   - hydra/sweeper/search_space/qrl
   - hydra/sweeper/search_space/awr
   - smac
