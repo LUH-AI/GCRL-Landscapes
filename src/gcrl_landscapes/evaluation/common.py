@@ -63,9 +63,7 @@ def compute_additional_information(
     # Calculate CVaR
     for confidence_level in CVAR_CONFIDENCE_LEVELS:
         results_copy[f"cvar{confidence_level}_normalized_goal_distance_return"] = (
-            results_copy[
-                "normalized_goal_distance_returns"
-            ].apply(
+            results_copy["normalized_goal_distance_returns"].apply(
                 lambda distances: cvar(distances, confidence_level=confidence_level)
             )
         )
