@@ -517,14 +517,7 @@ if __name__ == "__main__":
             (imgpath_dataframe["plot_type"] == plot_type)
             & (imgpath_dataframe["agent"] == agent)
             & (imgpath_dataframe["y_col"] == y_col)
-            & (
-                (imgpath_dataframe["hps"] == hps)
-                | (
-                    pd.isnull(imgpath_dataframe["hps"])
-                    if hps is None
-                    else ~pd.isnull(imgpath_dataframe["hps"])
-                )
-            )
+            & ((imgpath_dataframe["hps"] == hps) | pd.isnull(imgpath_dataframe["hps"]))
             & (imgpath_dataframe["actor_loss"] == actor_loss)
         ]
         if len(grid_df) == 0:
