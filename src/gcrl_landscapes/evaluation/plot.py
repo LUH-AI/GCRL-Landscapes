@@ -522,9 +522,11 @@ if __name__ == "__main__":
         ]
         if len(grid_df) == 0:
             continue
+        plots_subfolder = plots_folder / "grid_plots" / f"{plot_type}-{y_col}"
+        plots_subfolder.mkdir(exist_ok=True, parents=True)
         grid_plot(
             grid_df,
-            plots_folder,
+            plots_subfolder,
             f"{plot_type}-{agent}-{hps}-{y_col}-{actor_loss}",
             grid_columns=("dataset", "phase"),
         )  # type: ignore
