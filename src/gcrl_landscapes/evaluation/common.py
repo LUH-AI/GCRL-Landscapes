@@ -77,6 +77,35 @@ def compute_additional_information(
     )
     assert results_copy["disp_normalized_goal_distance_score"].max() <= 1
 
+    # Calculate regret
+    max_mean_normalized_goal_distance_return_per_phase = (
+        (
+            results_copy.groupby(by=["eval_step", "phase", "config_index"])[
+                "mean_normalized_goal_distance_return"
+            ]
+            .mean()
+            .reset_index()  # marginalize seed
+        )
+        .groupby(by="phase")["mean_normalized_goal_distance_return"]
+        .max()
+        .reset_index()
+        .rename(
+            columns={
+                "mean_normalized_goal_distance_return": "mean_normalized_goal_distance_return_max_per_phase"
+            }
+        )
+    )  # get best configuration per phase
+    results_copy = pd.merge(
+        results_copy,
+        max_mean_normalized_goal_distance_return_per_phase,
+        how="left",
+        on="phase",
+    )
+    results_copy["mean_normalized_goal_distance_return_regret"] = (
+        results_copy["mean_normalized_goal_distance_return_max_per_phase"]
+        - results_copy["mean_normalized_goal_distance_return"]
+    )
+
     return results_copy
 
 
