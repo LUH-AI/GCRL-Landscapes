@@ -269,7 +269,7 @@ class TripleGPModel(BaseEstimator):
         plt.legend()
         plt.show()
 
-def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str], grid_length=51):
+def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str], z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, grid_length=51):
     # Generate a finer grid for contour plot
     x = np.linspace(model.x_unscaled[:, x_dim].min(), model.x_unscaled[:, x_dim].max(), grid_length)
     y = np.linspace(model.x_unscaled[:, y_dim].min(), model.x_unscaled[:, y_dim].max(), grid_length)
@@ -278,7 +278,7 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
     Z = np.zeros_like(X)
 
     points = np.vstack([X.ravel(), Y.ravel()]).transpose()
-    Z = model.get_middle(points).reshape(X.shape)
+    Z = z_transform(model.get_middle(points).reshape(X.shape), model._unscale_y(model.y_iqm))
 
     # Create contour plot
     fig, ax = plt.subplots(figsize=[4, 3])

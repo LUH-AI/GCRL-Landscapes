@@ -5,7 +5,7 @@ from gcrl_landscapes.util.data import (
     phase_results_to_pandas,
     read_results_from_zip,
 )
-from gcrl_landscapes.plots.triple_gp import estimate_model_fit
+from gcrl_landscapes.plots.triple_gp import estimate_model_fit, TripleGPModel
 from pathlib import Path
 from gcrl_landscapes.plots.triple_gp import create_contour_plot
 from gcrl_landscapes.util.eval import fit_model
@@ -32,15 +32,18 @@ from functools import partial
 from itertools import combinations
 from sklearn.metrics import mean_absolute_error, max_error, mean_squared_error
 from sklearn.model_selection import ShuffleSplit
+from typing import Callable
 
 
+# fmt: off
 def plot_landscape(
     phase: int,
-    phase_result: pd.DataFrame,
+    model: TripleGPModel,
     y_col: str,
     hp_names: list[str],
     output_folder: Path,
     y_label: str | None,
+    y_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda y_pred, y: y_pred,
 ):
     """IGPR plot of given data. Fits gaussian process itself
 
@@ -52,7 +55,8 @@ def plot_landscape(
         output_folder: where to save plot to
         y_label: How y should be labeled
     """
-    model = fit_model(phase_result, y_col, hp_names)
+# fmt: on
+    plot_filename_base = f"({'_'.join(hp_names)})-{y_label.lower().replace(' ', '_').replace(')', '').replace('(', '') if y_label else y_col}-{phase}"
     # One direct plot
     create_contour_plot(
         model,
@@ -60,19 +64,9 @@ def plot_landscape(
         y_dim=1,
         z_dim=y_label if y_label else y_col,
         bounds=[0, 1],
-        filename=output_folder / f"igpr-({'_'.join(hp_names)})-{y_col}-{phase}.png",
+        filename=output_folder / f"igpr-{plot_filename_base}.png",
         dim_label_mapping=map_labels,
-    )
-    # Scale results to [0, 1] to better see contours
-    create_contour_plot(
-        model,
-        x_dim=0,
-        y_dim=1,
-        z_dim=y_label if y_label else y_col,
-        bounds=[None, None],
-        filename=output_folder
-        / f"igpr-({'_'.join(hp_names)})-{y_col}-{phase}-scaled.png",
-        dim_label_mapping=map_labels,
+        z_transform=y_transform,
     )
 
     # Create plot without using gaussian processes
@@ -94,9 +88,19 @@ def plot_landscape(
     x1i = x1i_scaled * model.x_normalizing_factor[1] + model.x_normalizing_offset[1]
     yi = model._unscale_y(yi_scaled).squeeze()
 
-    c = plt.contourf(x0i, x1i, yi, cmap="rocket", vmin=0, vmax=1)
+    c = plt.contourf(
+        x0i,
+        x1i,
+        y_transform(yi, model._unscale_y(model.y_iqm)),
+        cmap="rocket",
+        vmin=0,
+        vmax=1,
+    )
     plt.colorbar(c, label=y_label if y_label else y_col)
-    plt.savefig(output_folder / f"nearest_{y_label}-{phase}.png", bbox_inches="tight")
+    plt.savefig(
+        output_folder / f"nearest-{plot_filename_base}.png",
+        bbox_inches="tight",
+    )
     plt.close()
 
 
@@ -276,28 +280,62 @@ def plot(
         for phase in phases
     ]
 
-    for phase, phase_result in phase_results:
+    phase_result: pd.DataFrame
+    for phase, phase_result in phase_results:  # type: ignore
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
         per_config_phase_folder.mkdir(exist_ok=True)
 
         landscape_pairs = [
-            ("success", "Success Rate"),
-            ("mean_normalized_goal_distance_return", "Normalized Goal Distance Return"),
+            ("success", "Success Rate", lambda y_pred, y: y_pred),
+            (
+                "success",
+                "Success Epsilon Optimality",
+                lambda y_pred, y: y_pred / np.max(y),
+            ),
+            (
+                "success",
+                "Success Instantaneous Regret",
+                lambda y_pred, y: 1 - (np.max(y) - y_pred),
+            ),
+            (
+                "mean_normalized_goal_distance_return",
+                "Normalized Goal Distance Return",
+                lambda y_pred, y: y_pred,
+            ),
+            (
+                "mean_normalized_goal_distance_return",
+                "Normalized Goal Distance Return Epsilon Optimality",
+                lambda y_pred, y: y_pred / np.max(y),
+            ),
+            (
+                "mean_normalized_goal_distance_return",
+                "Normalized Goal Distance Return Instantaneous Regret",
+                lambda y_pred, y: 1 - (np.max(y) - y_pred),
+            ),
             (
                 "disp_normalized_goal_distance_score",
                 "Dispersion score of normalized goal distance return",
+                lambda y_pred, y: y_pred,
             ),
         ] + [  # Gather all CVaR confidence levels
             (
                 f"cvar{confidence_level}_normalized_goal_distance_return",
                 f"CVaR ({confidence_level}%)of normalized goal distance return",
+                lambda y_pred, y: y_pred,
             )
             for confidence_level in CVAR_CONFIDENCE_LEVELS
         ]
         for hp_pair in combinations(hp_list, 2):
-            for col, title in landscape_pairs:
+            for col, title, y_transform in landscape_pairs:
+                model = fit_model(phase_result, col, list(hp_pair))
                 plot_landscape(
-                    phase, phase_result, col, list(hp_pair), output_folder, title
+                    phase,
+                    model,
+                    col,
+                    list(hp_pair),
+                    output_folder,
+                    title,
+                    y_transform=y_transform,
                 )
 
         if plot_return_distributions:
@@ -492,7 +530,9 @@ if __name__ == "__main__":
                 str(unscaled_plotpath),
             )
             if not plot_name_matches:
-                raise ValueError("Naming inside of plots folder not as expected.")
+                raise ValueError(
+                    f"Naming inside of plots folder not as expected for {unscaled_plotpath}."
+                )
 
             imgpath_dataframe.loc[len(imgpath_dataframe)] = [
                 plot_name_matches["plot_type"],
