@@ -95,7 +95,7 @@ def compute_additional_information(
             .mean()
             .reset_index()  # marginalize seed
         )
-        .groupby(by="phase")["mean_normalized_goal_distance_return"]
+        .groupby(by=["eval_step", "phase"])["mean_normalized_goal_distance_return"]
         .max()
         .reset_index()
         .rename(
@@ -108,11 +108,28 @@ def compute_additional_information(
         results_copy,
         max_mean_normalized_goal_distance_return_per_phase,
         how="left",
-        on="phase",
+        on=["eval_step", "phase"],
     )
     results_copy["mean_normalized_goal_distance_return_regret"] = (
         results_copy["mean_normalized_goal_distance_return_max_per_phase"]
         - results_copy["mean_normalized_goal_distance_return"]
+    )
+    ## Calculate cumulative regret
+    cum_regret_result: pd.DataFrame = results_copy[  # type: ignore
+        (results_copy["eval_step"] == results_copy["phase"])
+    ].sort_values(by="phase")
+    mean_normalized_goal_distance_cumsum = (
+        cum_regret_result.groupby(by=["config_index", "seed"])[
+            "mean_normalized_goal_distance_return_regret"
+        ]
+        .cumsum()
+        .rename("mean_normalized_goal_distance_return_regret_cumsum")
+    )  # type: ignore
+    results_copy = pd.merge(
+        results_copy,
+        mean_normalized_goal_distance_cumsum,
+        left_index=True,
+        right_index=True,
     )
 
     return results_copy
