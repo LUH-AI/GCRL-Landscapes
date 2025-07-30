@@ -77,7 +77,16 @@ def compute_additional_information(
     )
     assert results_copy["disp_normalized_goal_distance_score"].max() <= 1
 
-    # Calculate regret
+    # Regret
+    ## Check how many hyperparameters are varied.
+    ## This only supports 2 HPs at the same time.
+    ## Otherwise we'll have to also look at the different combinations and apply some kind of aggregation
+    temp_df = results_copy.loc[:, results_copy.columns.str.startswith("hp")]
+    if sum(temp_df.nunique() > 1) > 2:
+        raise NotImplementedError(
+            "More than 2 hyperparameters are varied. This is not supported yet for regret calculations as these are done upfront."
+        )
+    ## Now calculate regret
     max_mean_normalized_goal_distance_return_per_phase = (
         (
             results_copy.groupby(by=["eval_step", "phase", "config_index"])[
