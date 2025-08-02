@@ -293,11 +293,6 @@ def plot(
                 lambda y_pred, y: y_pred / np.max(y),
             ),
             (
-                "success",
-                "Success Instantaneous Regret",
-                lambda y_pred, y: 1 - (np.max(y) - y_pred),
-            ),
-            (
                 "mean_normalized_goal_distance_return",
                 "Normalized Goal Distance Return",
                 lambda y_pred, y: y_pred,
@@ -308,13 +303,18 @@ def plot(
                 lambda y_pred, y: y_pred / np.max(y),
             ),
             (
-                "mean_normalized_goal_distance_return",
-                "Normalized Goal Distance Return Instantaneous Regret",
-                lambda y_pred, y: 1 - (np.max(y) - y_pred),
-            ),
-            (
                 "disp_normalized_goal_distance_score",
                 "Dispersion score of normalized goal distance return",
+                lambda y_pred, y: y_pred,
+            ),
+            (
+                "mean_normalized_goal_distance_return_regret",
+                "Normalized Goal Distance Return Regret",
+                lambda y_pred, y: y_pred,
+            ),
+            (
+                "mean_normalized_goal_distance_return_regret_cummean",
+                "Normalized Goal Distance Return Regret Cumulative",
                 lambda y_pred, y: y_pred,
             ),
         ] + [  # Gather all CVaR confidence levels

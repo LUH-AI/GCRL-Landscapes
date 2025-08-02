@@ -118,16 +118,18 @@ def compute_additional_information(
     cum_regret_result: pd.DataFrame = results_copy[  # type: ignore
         (results_copy["eval_step"] == results_copy["phase"])
     ].sort_values(by="phase")
-    mean_normalized_goal_distance_cumsum = (
+    mean_normalized_goal_distance_cummean = (
         cum_regret_result.groupby(by=["config_index", "seed"])[
             "mean_normalized_goal_distance_return_regret"
         ]
-        .cumsum()
-        .rename("mean_normalized_goal_distance_return_regret_cumsum")
+        .expanding()
+        .mean()
+        .reset_index(level=[0, 1], drop=True)
+        .rename("mean_normalized_goal_distance_return_regret_cummean")
     )  # type: ignore
     results_copy = pd.merge(
         results_copy,
-        mean_normalized_goal_distance_cumsum,
+        mean_normalized_goal_distance_cummean,
         left_index=True,
         right_index=True,
     )
