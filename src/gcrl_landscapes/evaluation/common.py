@@ -87,52 +87,47 @@ def compute_additional_information(
             "More than 2 hyperparameters are varied. This is not supported yet for regret calculations as these are done upfront."
         )
     ## Now calculate regret
-    max_mean_normalized_goal_distance_return_per_phase = (
-        (
-            results_copy.groupby(by=["eval_step", "phase", "config_index"])[
-                "mean_normalized_goal_distance_return"
-            ]
+    for column in (
+        "mean_normalized_goal_distance_return",
+        "success",
+    ):
+        column_max_per_phase = (
+            (
+                results_copy.groupby(by=["eval_step", "phase", "config_index"])[column]
+                .mean()
+                .reset_index()  # marginalize seed
+            )
+            .groupby(by=["eval_step", "phase"])[column]
+            .max()
+            .reset_index()
+            .rename(columns={column: f"{column}_max_per_phase"})
+        )  # get best configuration per phase
+        results_copy = pd.merge(
+            results_copy,
+            column_max_per_phase,
+            how="left",
+            on=["eval_step", "phase"],
+        )
+        results_copy[f"{column}_regret"] = (
+            results_copy[f"{column}_max_per_phase"] - results_copy[column]
+        )
+        ## Calculate cumulative regret
+        cum_regret_result: pd.DataFrame = results_copy[  # type: ignore
+            (results_copy["eval_step"] == results_copy["phase"])
+        ].sort_values(by="phase")
+        col_cummean = (
+            cum_regret_result.groupby(by=["config_index", "seed"])[f"{column}_regret"]
+            .expanding()
             .mean()
-            .reset_index()  # marginalize seed
+            .reset_index(level=[0, 1], drop=True)
+            .rename(f"{column}_regret_cummean")  # type: ignore
+        )  # type: ignore
+        results_copy = pd.merge(
+            results_copy,
+            col_cummean,
+            left_index=True,
+            right_index=True,
         )
-        .groupby(by=["eval_step", "phase"])["mean_normalized_goal_distance_return"]
-        .max()
-        .reset_index()
-        .rename(
-            columns={
-                "mean_normalized_goal_distance_return": "mean_normalized_goal_distance_return_max_per_phase"
-            }
-        )
-    )  # get best configuration per phase
-    results_copy = pd.merge(
-        results_copy,
-        max_mean_normalized_goal_distance_return_per_phase,
-        how="left",
-        on=["eval_step", "phase"],
-    )
-    results_copy["mean_normalized_goal_distance_return_regret"] = (
-        results_copy["mean_normalized_goal_distance_return_max_per_phase"]
-        - results_copy["mean_normalized_goal_distance_return"]
-    )
-    ## Calculate cumulative regret
-    cum_regret_result: pd.DataFrame = results_copy[  # type: ignore
-        (results_copy["eval_step"] == results_copy["phase"])
-    ].sort_values(by="phase")
-    mean_normalized_goal_distance_cummean = (
-        cum_regret_result.groupby(by=["config_index", "seed"])[
-            "mean_normalized_goal_distance_return_regret"
-        ]
-        .expanding()
-        .mean()
-        .reset_index(level=[0, 1], drop=True)
-        .rename("mean_normalized_goal_distance_return_regret_cummean")
-    )  # type: ignore
-    results_copy = pd.merge(
-        results_copy,
-        mean_normalized_goal_distance_cummean,
-        left_index=True,
-        right_index=True,
-    )
 
     return results_copy
 
