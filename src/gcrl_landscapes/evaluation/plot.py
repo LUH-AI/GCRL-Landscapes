@@ -317,6 +317,16 @@ def plot(
                 "Normalized Goal Distance Return Regret Cumulative",
                 lambda y_pred, y: y_pred,
             ),
+            (
+                "success_regret",
+                "Normalized Goal Distance Return Regret",
+                lambda y_pred, y: y_pred,
+            ),
+            (
+                "success_regret_cummean",
+                "Normalized Goal Distance Return Regret Cumulative",
+                lambda y_pred, y: y_pred,
+            ),
         ] + [  # Gather all CVaR confidence levels
             (
                 f"cvar{confidence_level}_normalized_goal_distance_return",
