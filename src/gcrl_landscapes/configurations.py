@@ -232,64 +232,8 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
         raise NotImplementedError(
             f"hyperparameters {hyperparameters - SUPPORTED_HPS} not supported"
         )
-    learning_rates = (
-        _generate_learning_rates(n)
-        if "lr" in hyperparameters
-        else _generate_dummy_list(n, base_config["lr"])
-    )
-    discount_factors = (
-        _generate_discount_factors(n)
-        if "discount" in hyperparameters
-        else _generate_dummy_list(n, base_config["discount"])
-    )
-    # trajectory goals for dataset sampling
-    actor_p_curgoals = _generate_dummy_list(
-        n, 0
-    )  # always on 0 as it shouldn't be that relevant
-    actor_p_trajgoals = (
-        _generate_actor_p_trajgoals(n)
-        if "actor_p_trajgoal" in hyperparameters
-        else _generate_dummy_list(n, base_config["actor_p_trajgoal"])
-    )
-    actor_p_randomgoals = list(
-        np.ones(len(actor_p_trajgoals)) - np.array(actor_p_trajgoals)
-    )
-    # Set alpha hyperparameter (AWR temperature or ddpgbc bc coefficient)
-    ## may be unused if algorithm uses ddpgbc
-    awr_temperatures = (
-        _generate_awr_temperatures(n)
-        if "alpha" in hyperparameters
-        else _generate_dummy_list(
-            n, base_config["alpha"] if "alpha" in base_config else None
-        )
-    )
-    awr_temperatures_low_level_policy = (
-        _generate_awr_temperatures(n)
-        if "low_alpha" in hyperparameters
-        else _generate_dummy_list(
-            n, base_config["low_alpha"] if "low_alpha" in base_config else None
-        )
-    )
-    awr_temperatures_high_level_policy = (
-        _generate_awr_temperatures(n)
-        if "high_alpha" in hyperparameters
-        else _generate_dummy_list(
-            n, base_config["high_alpha"] if "high_alpha" in base_config else None
-        )
-    )
-
-    ## may be unused if algorithm uses awr
-    ddpgbc_bc_coeffs = (
-        _generate_ddpgbc_bc_coeffs(n)
-        if "alpha" in hyperparameters
-        else _generate_dummy_list(
-            n, base_config["alpha"] if "alpha" in base_config else None
-        )
-    )
-
-    # Set epsilon for QRL
-    ## unused for other algorithms
-    epss = _generate_epss(n)
+    if not len(hyperparameters) == 2:
+        raise NotImplementedError("Only supports two hyperparameters at the moment")
 
     # choose between awr temperature and ddpgbc bc coefficient
     # use given actor loss as information, otherwise look at size of default alpha
@@ -299,6 +243,102 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
         actor_loss = "ddpgbc" if base_config["alpha"] < 1.0 else "awr"
     else:
         actor_loss = None
+
+    random_values = Sobol(d=len(hyperparameters)).random_base2(round(log(n, 2)))
+    random_values_per_hp = [random_values[:, i] for i in range(len(hyperparameters))]
+
+    learning_rates = (
+        _scale_to_range(
+            random_values_per_hp.pop(), LEARNING_RATE_LOWER, LEARNING_RATE_UPPER, True
+        )
+        if "lr" in hyperparameters
+        else _generate_dummy_list(n, base_config["lr"])
+    )
+    discount_factors = (
+        _scale_to_range(
+            random_values_per_hp.pop(),
+            DISCOUNT_FACTOR_LOWER,
+            DISCOUNT_FACTOR_UPPER,
+            False,
+        )
+        if "discount" in hyperparameters
+        else _generate_dummy_list(n, base_config["discount"])
+    )
+    # trajectory goals for dataset sampling
+    actor_p_curgoals = _generate_dummy_list(
+        n, 0
+    )  # always on 0 as it shouldn't be that relevant
+    actor_p_trajgoals = (
+        _scale_to_range(random_values_per_hp.pop(), 0, 1, False)
+        if "actor_p_trajgoal" in hyperparameters
+        else _generate_dummy_list(n, base_config["actor_p_trajgoal"])
+    )
+    actor_p_randomgoals = list(
+        np.ones(len(actor_p_trajgoals)) - np.array(actor_p_trajgoals)
+    )
+    # Set alpha hyperparameter (AWR temperature or ddpgbc bc coefficient)
+    ## may be unused if algorithm uses ddpgbc
+    awr_temperatures = (
+        _scale_to_range(
+            random_values_per_hp.pop(),
+            AWR_TEMPERATURE_LOWER,
+            AWR_TEMPERATURE_UPPER,
+            False,
+        )
+        if "alpha" in hyperparameters and actor_loss != "ddpgbc"
+        else _generate_dummy_list(
+            n, base_config["alpha"] if "alpha" in base_config else None
+        )
+    )
+    awr_temperatures_low_level_policy = (
+        _scale_to_range(
+            random_values_per_hp.pop(),
+            AWR_TEMPERATURE_LOWER,
+            AWR_TEMPERATURE_UPPER,
+            False,
+        )
+        if "low_alpha" in hyperparameters and actor_loss != "ddpgbc"
+        else _generate_dummy_list(
+            n, base_config["low_alpha"] if "low_alpha" in base_config else None
+        )
+    )
+    awr_temperatures_high_level_policy = (
+        _scale_to_range(
+            random_values_per_hp.pop(),
+            AWR_TEMPERATURE_LOWER,
+            AWR_TEMPERATURE_UPPER,
+            False,
+        )
+        if "high_alpha" in hyperparameters and actor_loss != "ddpgbc"
+        else _generate_dummy_list(
+            n, base_config["high_alpha"] if "high_alpha" in base_config else None
+        )
+    )
+
+    ## may be unused if algorithm uses awr
+    ddpgbc_bc_coeffs = (
+        _scale_to_range(
+            random_values_per_hp.pop(),
+            DDPGBC_BC_COEFF_LOWER,
+            DDPGBC_BC_COEFF_UPPER,
+            False,
+        )
+        if "alpha" in hyperparameters and actor_loss == "ddpgbc"
+        else _generate_dummy_list(
+            n, base_config["alpha"] if "alpha" in base_config else None
+        )
+    )
+
+    # Set epsilon for QRL
+    ## unused for other algorithms
+    epss = (
+        _scale_to_range(random_values_per_hp.pop(), 0, 1, False)
+        if "eps" in hyperparameters
+        else _generate_dummy_list(
+            n, base_config["eps"] if "eps" in base_config else None
+        )
+    )
+
     return [
         FrozenConfigDict(
             initial_dictionary=base_config
@@ -333,49 +373,15 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
     ]
 
 
-def _generate_learning_rates(n: int) -> list[float]:
-    lr_unscaled = Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
-    log_lower = np.log10(LEARNING_RATE_LOWER)
-    log_upper = np.log10(LEARNING_RATE_UPPER)
-
-    return list(10 ** (log_lower + (log_upper - log_lower) * lr_unscaled))
-
-
-def _generate_discount_factors(n: int) -> list[float]:
-    return list(
-        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
-        * (DISCOUNT_FACTOR_UPPER - DISCOUNT_FACTOR_LOWER)
-        + DISCOUNT_FACTOR_LOWER
-    )
-
-
-def _generate_awr_temperatures(n: int) -> list[float]:
-    return list(
-        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
-        * (AWR_TEMPERATURE_UPPER - AWR_TEMPERATURE_LOWER)
-        + AWR_TEMPERATURE_LOWER
-    )
-
-
-def _generate_ddpgbc_bc_coeffs(n: int) -> list[float]:
-    return list(
-        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
-        * (DDPGBC_BC_COEFF_UPPER - DDPGBC_BC_COEFF_LOWER)
-        + DDPGBC_BC_COEFF_LOWER
-    )
-
-
-def _generate_actor_p_trajgoals(n: int) -> list[float]:
-    # Already in [0, 1], no need for scaling
-    return list(Sobol(1).random_base2(round(log(n, 2))).reshape(-1))
-
-
-def _generate_epss(n: int) -> list[float]:
-    return list(
-        Sobol(1).random_base2(round(log(n, 2))).reshape(-1)
-        * (EPS_QRL_UPPER - EPS_QRL_LOWER)
-        + EPS_QRL_LOWER
-    )
+def _scale_to_range(
+    values: np.ndarray, lower: float, upper: float, log: bool
+) -> list[float]:
+    if log:
+        return list(
+            10 ** (np.log10(lower) + (np.log10(upper) - np.log10(lower)) * values)
+        )
+    else:
+        return list(lower + (upper - lower) * values)
 
 
 def _generate_dummy_list(n: int, val: object) -> list[object]:
