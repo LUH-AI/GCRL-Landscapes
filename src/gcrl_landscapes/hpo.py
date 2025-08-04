@@ -10,6 +10,7 @@ import os
 import yaml
 import csv
 import re
+from scipy.stats import trim_mean
 
 HYPERSWEEPER_REMOVABLE_KEYS = [
     "config_id",
@@ -83,8 +84,13 @@ def find_best_agent(last_run: Path) -> Path:
                 "step": int(last_log["step"]),
             }
 
-    config_best_seed = max(
-        matching_configs, key=lambda config: get_final_performance(config)["success"]
+    iqm = trim_mean(
+        [get_final_performance(config)["success"] for config in matching_configs],
+        proportiontocut=0.25,
+    )
+    config_best_seed = min(
+        matching_configs,
+        key=lambda config: abs(get_final_performance(config)["success"] - iqm),
     )
 
     return (
