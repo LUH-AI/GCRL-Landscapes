@@ -10,6 +10,8 @@ import re
 import toml
 from tempfile import NamedTemporaryFile
 from glob import glob
+from scipy.stats import trim_mean
+import numpy as np
 
 
 T = TypeVar("T")
@@ -102,7 +104,7 @@ class PhaseResult(dict[FrozenConfigDict, dict[int, EvalTrajectory]]):
 
 
 def get_best_agent_path(
-    result_pandas: pd.DataFrame, eval_step: int | None = None
+    result_pandas: pd.DataFrame, seed_mode: str = "iqm", eval_step: int | None = None
 ) -> Path:
     """Find the best agent for the given results for a phase.
     Currently uses success as metric for gauging "best"
@@ -110,6 +112,7 @@ def get_best_agent_path(
 
     Args:
         result_pandas: phase results as parsed by `get_phase_results`
+        seed_mode: Which trained model (different seeds) to pick. Currently supports only "iqm", meaning picking the one closest to interquartile mean evaluation
         eval_step: For which evaluation step to get best agent. Will use highest available if not specified
 
     Returns:
@@ -117,10 +120,26 @@ def get_best_agent_path(
     """
     final_eval_step = eval_step if eval_step else result_pandas["eval_step"].max()
     final_eval_result = result_pandas[result_pandas["eval_step"] == final_eval_step]
-    best_config, phase, seed = final_eval_result[
-        final_eval_result["success"] == final_eval_result["success"].max()
-    ].iloc[0][["config_index", "phase", "seed"]]
-    # now get entry at phase steps
+
+    if seed_mode == "iqm":
+        iqms = final_eval_result.groupby("config_index")["success"].apply(
+            lambda df: trim_mean(df, proportiontocut=0.25)
+        )
+
+        best_config_index = iqms.idxmax()
+        best_config_iqm = iqms.max()
+
+        subset = final_eval_result[
+            final_eval_result["config_index"] == best_config_index
+        ]
+
+        idx_closest = np.abs(subset["success"] - best_config_iqm).idxmin()
+        best_config, phase, seed = subset.loc[
+            idx_closest, ["config_index", "phase", "seed"]
+        ]
+    else:
+        raise NotImplementedError(f"no seed mode {seed_mode}")
+
     best_df = result_pandas[
         (result_pandas["eval_step"] == phase)
         & (result_pandas["config_index"] == best_config)
