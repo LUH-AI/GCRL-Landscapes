@@ -461,6 +461,7 @@ if __name__ == "__main__":
     parser.add_argument("--plot_return_distributions", action="store_true")
     parser.add_argument("--plot_eval_curves", action="store_true")
     parser.add_argument("--plot_gp_fits", action="store_true")
+    parser.add_argument("--no_multiprocessing", action="store_true")
     args = parser.parse_args()
 
     plt.rcParams.update(sns.plotting_context("talk") | {"figure.figsize": [4, 3]})
@@ -475,21 +476,27 @@ if __name__ == "__main__":
         for identifier, (run_info, phase_results) in results.items()
     }
 
-    try:
-        thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 3
-    except Exception as _:
-        thread_count = multiprocessing.cpu_count() // 3
-    with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
-        pool.map(
-            partial(
-                plot_parallel_wrapper,
-                plots_folder,
-                plot_return_distributions=args.plot_return_distributions,
-                plot_eval_curves=args.plot_eval_curves,
-                plot_gp_fits=args.plot_gp_fits,
-            ),
-            results_pandas.items(),
-        )
+    plot_results = partial(
+                    plot_parallel_wrapper,
+                    plots_folder,
+                    plot_return_distributions=args.plot_return_distributions,
+                    plot_eval_curves=args.plot_eval_curves,
+                    plot_gp_fits=args.plot_gp_fits,
+                )
+
+    if not args.no_multiprocessing:
+        try:
+            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 3
+        except Exception as _:
+            thread_count = multiprocessing.cpu_count() // 3
+        with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
+            pool.map(
+                plot_results,
+                results_pandas.items(),
+            )
+    else:
+        for item in results_pandas.items():
+            plot_results(item)
 
     # Build igpr grid of plots (across datasets)
     # first builds dataframe using plots inside subfolders
