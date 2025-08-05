@@ -81,7 +81,7 @@ def compute_additional_information(
     ## Check how many hyperparameters are varied.
     ## This only supports 2 HPs at the same time.
     ## Otherwise we'll have to also look at the different combinations and apply some kind of aggregation
-    temp_df = results_copy.loc[:, results_copy.columns.str.startswith("hp")]
+    temp_df = results_copy.loc[:, results_copy.columns.str.startswith("hp.")]
     if sum(temp_df.nunique() > 1) > 2:
         raise NotImplementedError(
             "More than 2 hyperparameters are varied. This is not supported yet for regret calculations as these are done upfront."
