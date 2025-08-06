@@ -16,6 +16,7 @@ from autorl_landscape.analyze.visualization import Visualization
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.colors as mcolors
+from matplotlib.patches import Patch
 import numpy as np
 import seaborn as sns
 import pandas as pd
@@ -269,7 +270,7 @@ class TripleGPModel(BaseEstimator):
         plt.legend()
         plt.show()
 
-def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str], z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, grid_length=51):
+def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str], z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, discrete_levels: np.ndarray | None = None, grid_length=100):
     # Generate a finer grid for contour plot
     x = np.linspace(model.x_unscaled[:, x_dim].min(), model.x_unscaled[:, x_dim].max(), grid_length)
     y = np.linspace(model.x_unscaled[:, y_dim].min(), model.x_unscaled[:, y_dim].max(), grid_length)
@@ -278,7 +279,9 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
     Z = np.zeros_like(X)
 
     points = np.vstack([X.ravel(), Y.ravel()]).transpose()
-    Z = z_transform(model.get_middle(points).reshape(X.shape), model._unscale_y(model.y_iqm))
+    Z = z_transform(model.get_middle(points).reshape(-1), model._unscale_y(model.y_iqm)).reshape(X.shape)
+    if bounds[0] != None and bounds[1] != None:
+        Z = np.clip(Z, bounds[0], bounds[1])
 
     # Create contour plot
     fig, ax = plt.subplots(figsize=[4, 3])
@@ -294,20 +297,46 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
         ax.set_xticks(list(filter(lambda y: y > Y.min(), [1e-6, 1e-5, 1e-4, 1e-3, 1e-2])))
 
 
-    contour = ax.contourf(X, Y, Z, levels=20, cmap="rocket", vmin=bounds[0], vmax=bounds[1])
-    if bounds[0] != None and bounds[1] != None:
-        norm = mcolors.Normalize(vmin=bounds[0], vmax=bounds[1])
-        mappable = cm.ScalarMappable(norm=norm, cmap="rocket")
-        cbar = plt.colorbar(mappable, ax=ax)
+    if discrete_levels is None:
+        if bounds[0] != None and bounds[1] != None:
+            levels = np.linspace(bounds[0], bounds[1], 21)
+            cmap = plt.get_cmap("rocket", len(levels) - 1)
+            norm = mcolors.BoundaryNorm(levels, cmap.N, clip=True)
+
+            cbarnorm = mcolors.Normalize(vmin=bounds[0], vmax=bounds[1])
+            cbarmappable = cm.ScalarMappable(norm=cbarnorm, cmap="rocket")
+            cbar = plt.colorbar(cbarmappable, ax=ax)
+            contour = ax.contourf(X, Y, Z, levels=levels, cmap=cmap, norm=norm)
+        else:
+
+            levels = np.linspace(Z.min(), Z.max(), 21)
+            cmap = plt.get_cmap("rocket", len(levels) - 1)
+            norm = mcolors.BoundaryNorm(levels, cmap.N, clip=True)
+
+            contour = ax.contourf(X, Y, Z, levels=levels, cmap=cmap, norm=norm)
+            cbar = plt.colorbar(contour, ax=ax)
+
     else:
-        cbar = plt.colorbar(contour, ax=ax)
+        Z = discrete_levels[np.clip(np.searchsorted(discrete_levels, Z.reshape(-1), side="right") - 1, 0, len(discrete_levels) - 1)].reshape(Z.shape)
+        levels = discrete_levels
+
+        labels = [f">={level:.1f}" for level in levels[:-1]]
+
+        cmap = plt.get_cmap("viridis", len(levels) - 1)
+        norm = mcolors.BoundaryNorm(levels, ncolors=cmap.N, clip=True)
+
+        handles = [
+            Patch(color=cmap(i), label=labels[i]) for i in range(len(labels))
+        ]
+        ax.legend(handles=handles, title="Value Range")
+        contour = ax.contourf(X, Y, Z, levels=levels, cmap=cmap, norm=norm)
 
     # Mark the peaks and valleys
-    peaks = np.where(Z == Z.max())
-    valleys = np.where(Z == Z.min())
-    plt.scatter(X[peaks], Y[peaks], color='white', marker='^', s=100, edgecolor='black')  # Peaks
-    plt.scatter(X[valleys], Y[valleys], color='white', marker='v', s=100, edgecolor='black')  # Valleys
-
+    # peaks = np.where(Z == Z.max())
+    # valleys = np.where(Z == Z.min())
+    # plt.scatter(X[peaks], Y[peaks], color='white', marker='^', s=100, edgecolor='black')  # Peaks
+    # plt.scatter(X[valleys], Y[valleys], color='white', marker='v', s=100, edgecolor='black')  # Valleys
+    #
     plt.xlabel(dim_label_mapping(model.hp_names[x_dim].split('.')[-1]), fontsize=18)
     plt.ylabel(dim_label_mapping(model.hp_names[y_dim].split('.')[-1]), fontsize=18)
     plt.title(f'{z_dim}', fontsize=18)

@@ -44,6 +44,7 @@ def plot_landscape(
     output_folder: Path,
     y_label: str | None,
     y_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda y_pred, y: y_pred,
+    discrete_levels: np.ndarray | None = None,
 ):
     """IGPR plot of given data. Fits gaussian process itself
 
@@ -67,6 +68,7 @@ def plot_landscape(
         filename=output_folder / f"igpr-{plot_filename_base}.png",
         dim_label_mapping=map_labels,
         z_transform=y_transform,
+        discrete_levels=discrete_levels,
     )
 
     # Create plot without using gaussian processes
@@ -285,58 +287,66 @@ def plot(
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
         per_config_phase_folder.mkdir(exist_ok=True)
 
+        e_optimal_bins = np.array([0.0, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
         landscape_pairs = [
-            ("success", "Success Rate", lambda y_pred, y: y_pred),
+            ("success", "Success Rate", {}),
             (
                 "success",
                 "Success Epsilon Optimality",
-                lambda y_pred, y: y_pred / np.max(y),
+                # Make this stepped, so that it is easier to interpret
+                {
+                    "y_transform": lambda y_pred, y: y_pred / np.max(y),
+                    "discrete_levels": e_optimal_bins,
+                }
             ),
             (
                 "mean_normalized_goal_distance_return",
                 "Normalized Goal Distance Return",
-                lambda y_pred, y: y_pred,
+                {}
             ),
             (
                 "mean_normalized_goal_distance_return",
                 "Normalized Goal Distance Return Epsilon Optimality",
-                lambda y_pred, y: y_pred / np.max(y),
+                {
+                    "y_transform": lambda y_pred, y: y_pred / np.max(y),
+                    "discrete_levels": e_optimal_bins,
+                }
             ),
             (
                 "disp_normalized_goal_distance_score",
                 "Dispersion score of normalized goal distance return",
-                lambda y_pred, y: y_pred,
+                {}
             ),
             (
                 "mean_normalized_goal_distance_return_regret",
                 "Normalized Goal Distance Return Regret",
-                lambda y_pred, y: y_pred,
+                {}
             ),
             (
                 "mean_normalized_goal_distance_return_regret_cummean",
                 "Normalized Goal Distance Return Regret Cumulative",
-                lambda y_pred, y: y_pred,
+                {}
             ),
             (
                 "success_regret",
                 "Normalized Goal Distance Return Regret",
-                lambda y_pred, y: y_pred,
+                {}
             ),
             (
                 "success_regret_cummean",
                 "Normalized Goal Distance Return Regret Cumulative",
-                lambda y_pred, y: y_pred,
+                {}
             ),
         ] + [  # Gather all CVaR confidence levels
             (
                 f"cvar{confidence_level}_normalized_goal_distance_return",
                 f"CVaR ({confidence_level}%)of normalized goal distance return",
-                lambda y_pred, y: y_pred,
+                {}
             )
             for confidence_level in CVAR_CONFIDENCE_LEVELS
         ]
         for hp_pair in combinations(hp_list, 2):
-            for col, title, y_transform in landscape_pairs:
+            for col, title, kwargs in landscape_pairs:
                 model = fit_model(phase_result, col, list(hp_pair))
                 plot_landscape(
                     phase,
@@ -345,7 +355,7 @@ def plot(
                     list(hp_pair),
                     output_folder,
                     title,
-                    y_transform=y_transform,
+                    **kwargs
                 )
 
         if plot_return_distributions:
