@@ -279,7 +279,8 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
     Z = np.zeros_like(X)
 
     points = np.vstack([X.ravel(), Y.ravel()]).transpose()
-    Z = z_transform(model.get_middle(points).reshape(-1), model._unscale_y(model.y_iqm)).reshape(X.shape)
+    Z_untransformed = model.get_middle(points)
+    Z = z_transform(Z_untransformed.reshape(-1), model._unscale_y(model.y_iqm)).reshape(X.shape)
     if bounds[0] != None and bounds[1] != None:
         Z = np.clip(Z, bounds[0], bounds[1])
 
@@ -317,7 +318,6 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
             cbar = plt.colorbar(contour, ax=ax)
 
     else:
-        Z = discrete_levels[np.clip(np.searchsorted(discrete_levels, Z.reshape(-1), side="right") - 1, 0, len(discrete_levels) - 1)].reshape(Z.shape)
         levels = discrete_levels
 
         labels = [f">={level:.1f}" for level in levels[:-1]]
