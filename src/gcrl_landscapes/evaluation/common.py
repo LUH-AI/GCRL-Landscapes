@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from scipy.stats import trim_mean
 from copy import deepcopy
 from gcrl_landscapes.util.eval import cvar, iqr
 from gcrl_landscapes.util.data import (
@@ -94,13 +95,16 @@ def compute_additional_information(
         column_max_per_phase = (
             (
                 results_copy.groupby(by=["eval_step", "phase", "config_index"])[column]
-                .mean()
+                .apply(
+                    lambda column_values: trim_mean(column_values, proportiontocut=0.25)
+                )
+                .rename(f"{column}_iqm")  # type: ignore
                 .reset_index()  # marginalize seed
             )
-            .groupby(by=["eval_step", "phase"])[column]
+            .groupby(by=["eval_step", "phase"])[f"{column}_iqm"]
             .max()
             .reset_index()
-            .rename(columns={column: f"{column}_max_per_phase"})
+            .rename(columns={f"{column}_iqm": f"{column}_iqm_max_per_phase"})
         )  # get best configuration per phase
         results_copy = pd.merge(
             results_copy,
@@ -109,7 +113,7 @@ def compute_additional_information(
             on=["eval_step", "phase"],
         )
         results_copy[f"{column}_regret"] = (
-            results_copy[f"{column}_max_per_phase"] - results_copy[column]
+            results_copy[f"{column}_iqm_max_per_phase"] - results_copy[column]
         )
         ## Calculate cumulative regret
         cum_regret_result: pd.DataFrame = results_copy[  # type: ignore
