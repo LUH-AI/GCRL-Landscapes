@@ -513,6 +513,8 @@ if __name__ == "__main__":
         ]
     )  # type: ignore
     for experiment_name in os.listdir(plots_folder):
+        if experiment_name == "grid_plots":
+            continue
         if not Path(plots_folder / experiment_name).is_dir():
             continue
 
