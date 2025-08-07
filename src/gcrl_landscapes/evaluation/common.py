@@ -125,6 +125,7 @@ def compute_additional_information(
         results_copy = pd.merge(
             results_copy,
             col_cummean,
+            how="outer",
             left_index=True,
             right_index=True,
         )
