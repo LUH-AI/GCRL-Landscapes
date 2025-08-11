@@ -24,6 +24,7 @@ from .common import (
     CVAR_CONFIDENCE_LEVELS,
     map_labels,
     compute_additional_information,
+    calculate_regret_for_experiment,
 )
 import toml
 import zipfile
@@ -246,6 +247,28 @@ def plot_gp_fit(
     plt.close()
 
 
+def plot_regret_curve(
+    experiment_result: pd.DataFrame,
+    output_folder: Path,
+                ) -> None:
+    regret_df = calculate_regret_for_experiment(experiment_result)
+    regret_df = regret_df[regret_df.columns[regret_df.columns.str.startswith("regret_phase_")]].reset_index().rename(columns={"phase": "pick_phase"})
+
+    regret_df_long = regret_df.melt(id_vars="pick_phase", var_name="phase", value_name="regret")
+    ordered_pick_phases = np.sort(regret_df_long["pick_phase"].unique())  # type: ignore
+    regret_df_long["pick_phase"] = regret_df_long["pick_phase"].map(
+        dict(zip(ordered_pick_phases, range(1, len(ordered_pick_phases) + 1)))  # type: ignore
+    )
+    regret_df_long["phase"] = regret_df_long["phase"].str.replace("regret_phase_", "")
+
+    fig, ax = plt.subplots()
+    sns.lineplot(data=regret_df_long, x="phase", y="regret", hue="pick_phase", ax=ax)
+    ax.set_ylim(0, 0.5)
+    plt.tight_layout()
+    fig.savefig(output_folder / "regret_test.png")
+    plt.close()
+
+
 def plot(
     results_pandas: pd.DataFrame,
     output_folder: Path,
@@ -253,6 +276,7 @@ def plot(
     plot_return_distributions: bool = False,
     plot_eval_curves: bool = False,
     plot_gp_fits: bool = False,
+    plot_regret: bool = False,
 ):
     """Main plotting Code to generate the landscapes
 
@@ -270,6 +294,12 @@ def plot(
     hp_list = [f"hp.{hp_name}" for hp_name in run_info["arguments"]["hyperparameters"]]
     assert all(hp in hp_full_list for hp in hp_list)
 
+    # Plots using full experiment results
+    if plot_regret:
+        plot_regret_curve(results_pandas, output_folder)
+
+
+    # Plots that are local to a phase
     phases = sorted(results_pandas["phase"].unique().tolist())
     phase_results = [
         (
@@ -445,6 +475,7 @@ def plot_parallel_wrapper(
     plot_return_distributions: bool = False,
     plot_eval_curves: bool = False,
     plot_gp_fits: bool = False,
+    plot_regret: bool = False,
 ):
     prefix, (run_info, results_df) = arg
     run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
@@ -462,6 +493,7 @@ def plot_parallel_wrapper(
         plot_return_distributions=plot_return_distributions,
         plot_eval_curves=plot_eval_curves,
         plot_gp_fits=plot_gp_fits,
+        plot_regret=plot_regret,
     )
 
 
@@ -471,6 +503,7 @@ if __name__ == "__main__":
     parser.add_argument("--plot_return_distributions", action="store_true")
     parser.add_argument("--plot_eval_curves", action="store_true")
     parser.add_argument("--plot_gp_fits", action="store_true")
+    parser.add_argument("--plot_regret", action="store_true")
     parser.add_argument("--no_multiprocessing", action="store_true")
     args = parser.parse_args()
 
@@ -492,6 +525,7 @@ if __name__ == "__main__":
                     plot_return_distributions=args.plot_return_distributions,
                     plot_eval_curves=args.plot_eval_curves,
                     plot_gp_fits=args.plot_gp_fits,
+                    plot_regret=args.plot_regret,
                 )
 
     if not args.no_multiprocessing:
