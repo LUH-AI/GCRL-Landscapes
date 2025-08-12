@@ -3,11 +3,6 @@ import numpy as np
 from scipy.stats import trim_mean
 from copy import deepcopy
 from gcrl_landscapes.util.eval import cvar, iqr
-from gcrl_landscapes.util.data import (
-    PhaseResult,
-    ResultsPerStep,
-    phase_results_to_pandas,
-)
 
 
 DIM_LABEL_MAPPING = {
@@ -138,11 +133,12 @@ def compute_additional_information(
 
 
 def merge_experiments(
-    results: dict[str, tuple[dict, ResultsPerStep[PhaseResult]]],
+    results: dict[str, tuple[dict, pd.DataFrame]],
+    # results: dict[str, tuple[dict, ResultsPerStep[PhaseResult]]],
 ) -> pd.DataFrame:
     return pd.concat(
         [
-            phase_results_to_pandas(result).assign(
+            result.assign(
                 agent=run_info["arguments"]["agent"],
                 dataset=",".join(run_info["arguments"]["datasets"])
                 if "datasets" in run_info["arguments"]

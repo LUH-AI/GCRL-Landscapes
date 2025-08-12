@@ -9,6 +9,7 @@ import os
 from .common import (
     compute_additional_information,
     merge_experiments,
+    phase_results_to_pandas,
     calculate_regret_for_experiment,
     CVAR_CONFIDENCE_LEVELS,
 )
@@ -21,8 +22,6 @@ def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
         results_pandas: pandas dataframe containing all results (all phases) for one experiment
         output_folder: folder to save plots in
     """
-    results_pandas = compute_additional_information(results_pandas)  # type: ignore
-
     per_config_folder = output_folder / "per_config"
     per_config_folder.mkdir(exist_ok=True)
 
@@ -78,8 +77,6 @@ def create_additional_tables(results_pandas: pd.DataFrame, output_folder: Path):
         output_folder: folder to save plots in
     """
     # Compute k-fold cross validation fit per agent-dataset-phase combination for the IGPR model
-    results_pandas = compute_additional_information(results_pandas)
-
     final_results_pandas = results_pandas[
         results_pandas["eval_step"] == results_pandas["phase"]
     ]
@@ -105,8 +102,6 @@ def create_additional_tables(results_pandas: pd.DataFrame, output_folder: Path):
 
 
 def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
-    results_pandas = compute_additional_information(results_pandas)
-
     final_results_pandas = results_pandas[
         results_pandas["eval_step"] == results_pandas["phase"]
     ]
@@ -155,7 +150,17 @@ if __name__ == "__main__":
     # Parse results
     output_folder = Path("tables") / os.path.basename(args.zipfile)
     output_folder.mkdir(exist_ok=True, parents=True)
-    merged_results_df = merge_experiments(read_results_from_zip(args.zipfile))
+    merged_results_df = merge_experiments(
+        {
+            prefix: (
+                run_info,
+                compute_additional_information(phase_results_to_pandas(phase_results)),
+            )
+            for prefix, (run_info, phase_results) in read_results_from_zip(
+                args.zipfile
+            ).items()
+        }
+    )
 
     create_tables(merged_results_df, output_folder)
     create_additional_tables(merged_results_df, output_folder)
