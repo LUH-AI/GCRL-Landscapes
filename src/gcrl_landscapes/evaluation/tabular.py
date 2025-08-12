@@ -3,13 +3,13 @@ from gcrl_landscapes.util.data import (
     read_results_from_zip,
 )
 from gcrl_landscapes.util.eval import fit_model
+from gcrl_landscapes.util.data import phase_results_to_pandas
 from pathlib import Path
 import pandas as pd
 import os
 from .common import (
     compute_additional_information,
     merge_experiments,
-    phase_results_to_pandas,
     calculate_regret_for_experiment,
     CVAR_CONFIDENCE_LEVELS,
 )

@@ -88,13 +88,13 @@ def compute_additional_information(
         "success",
     ):
         column_max_per_phase = (
-            (
+            (  # marginalize seed
                 results_copy.groupby(by=["eval_step", "phase", "config_index"])[column]
                 .apply(
                     lambda column_values: trim_mean(column_values, proportiontocut=0.25)
                 )
                 .rename(f"{column}_iqm")  # type: ignore
-                .reset_index()  # marginalize seed
+                .reset_index()
             )
             .groupby(by=["eval_step", "phase"])[f"{column}_iqm"]
             .max()
@@ -110,6 +110,10 @@ def compute_additional_information(
         results_copy[f"{column}_regret"] = (
             results_copy[f"{column}_iqm_max_per_phase"] - results_copy[column]
         )
+        results_copy[f"{column}_normalized_regret"] = (
+            results_copy[f"{column}_regret"]
+            / results_copy[f"{column}_iqm_max_per_phase"]
+        )
         ## Calculate cumulative regret
         cum_regret_result: pd.DataFrame = results_copy[  # type: ignore
             (results_copy["eval_step"] == results_copy["phase"])
@@ -121,10 +125,25 @@ def compute_additional_information(
             .reset_index(level=[0, 1], drop=True)
             .rename(f"{column}_regret_cummean")  # type: ignore
         )  # type: ignore
+        col_normalized_cummean = (
+            cum_regret_result.groupby(by=["config_index", "seed"])[
+                f"{column}_normalized_regret"
+            ]
+            .expanding()
+            .mean()
+            .reset_index(level=[0, 1], drop=True)
+            .rename(f"{column}_normalized_regret_cummean")  # type: ignore
+        )
         results_copy = pd.merge(
             results_copy,
             col_cummean,
             how="outer",
+            left_index=True,
+            right_index=True,
+        )
+        results_copy = pd.merge(
+            results_copy,
+            col_normalized_cummean,
             left_index=True,
             right_index=True,
         )
