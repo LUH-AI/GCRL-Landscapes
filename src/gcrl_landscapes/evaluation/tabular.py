@@ -106,40 +106,56 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
         results_pandas["eval_step"] == results_pandas["phase"]
     ]
 
-    regret_df = (
-        final_results_pandas.groupby(by=["agent", "dataset"])
-        .apply(calculate_regret_for_experiment)
-        .reset_index(level="phase")
-    )
+    for regret_col, base_col in [
+        (
+            "mean_normalized_goal_distance_return_normalized_regret",
+            "mean_normalized_goal_distance_return",
+        ),
+        (
+            "mean_normalized_goal_distance_return_normalized_regret",
+            "mean_normalized_goal_distance_return",
+        ),
+        ("success_regret", "success"),
+        ("success_normalized_regret", "success"),
+    ]:
 
-    table_pick_first_phase = (
-        regret_df.sort_values(["phase"], ascending=True)
-        .groupby(by=regret_df.index.names)
-        .nth(0)
-    )
-    table_pick_second_phase = (
-        regret_df.sort_values(["phase"], ascending=True)
-        .groupby(by=regret_df.index.names)
-        .nth(1)
-    )
+        def calculate_regret(df: pd.DataFrame) -> pd.DataFrame:
+            return calculate_regret_for_experiment(df, regret_col, base_col)
 
-    with open(output_folder / "regret_table_first_phase.md", "w") as f:
-        f.write(table_pick_first_phase.to_markdown())
+        regret_df = (
+            final_results_pandas.groupby(by=["agent", "dataset"])
+            .apply(calculate_regret)
+            .reset_index(level="phase")
+        )
 
-    with open(output_folder / "regret_table_first_phase.tex", "w") as f:
-        f.write(table_pick_first_phase.to_latex())
+        table_pick_first_phase = (
+            regret_df.sort_values(["phase"], ascending=True)
+            .groupby(by=regret_df.index.names)
+            .nth(0)
+        )
+        table_pick_second_phase = (
+            regret_df.sort_values(["phase"], ascending=True)
+            .groupby(by=regret_df.index.names)
+            .nth(1)
+        )
 
-    with open(output_folder / "regret_table_first_phase.csv", "w") as f:
-        f.write(table_pick_first_phase.to_csv())
+        with open(output_folder / f"{regret_col}_table_first_phase.md", "w") as f:
+            f.write(table_pick_first_phase.to_markdown())
 
-    with open(output_folder / "regret_table_second_phase.md", "w") as f:
-        f.write(table_pick_second_phase.to_markdown())
+        with open(output_folder / f"{regret_col}_table_first_phase.tex", "w") as f:
+            f.write(table_pick_first_phase.to_latex())
 
-    with open(output_folder / "regret_table_second_phase.tex", "w") as f:
-        f.write(table_pick_second_phase.to_latex())
+        with open(output_folder / f"{regret_col}_table_first_phase.csv", "w") as f:
+            f.write(table_pick_first_phase.to_csv())
 
-    with open(output_folder / "regret_table_second_phase.csv", "w") as f:
-        f.write(table_pick_second_phase.to_csv())
+        with open(output_folder / f"{regret_col}_table_second_phase.md", "w") as f:
+            f.write(table_pick_second_phase.to_markdown())
+
+        with open(output_folder / f"{regret_col}_table_second_phase.tex", "w") as f:
+            f.write(table_pick_second_phase.to_latex())
+
+        with open(output_folder / f"{regret_col}_table_second_phase.csv", "w") as f:
+            f.write(table_pick_second_phase.to_csv())
 
 
 if __name__ == "__main__":
