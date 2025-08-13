@@ -249,9 +249,13 @@ def plot_gp_fit(
 
 def plot_regret_curve(
     experiment_result: pd.DataFrame,
+    regret_col: str,
+    base_col: str,
+    hp_names: list[str],
     output_folder: Path,
+    regret_label: str | None,
                 ) -> None:
-    regret_df = calculate_regret_for_experiment(experiment_result)
+    regret_df = calculate_regret_for_experiment(experiment_result, regret_col, base_col)
     regret_df = regret_df[regret_df.columns[regret_df.columns.str.startswith("regret_phase_")]].reset_index().rename(columns={"phase": "pick_phase"})
 
     regret_df_long = regret_df.melt(id_vars="pick_phase", var_name="phase", value_name="regret")
@@ -263,9 +267,9 @@ def plot_regret_curve(
 
     fig, ax = plt.subplots()
     sns.lineplot(data=regret_df_long, x="phase", y="regret", hue="pick_phase", ax=ax)
-    ax.set_ylim(0, 0.5)
+    ax.set_ylim(0, 1)
     plt.tight_layout()
-    fig.savefig(output_folder / "regret_test.png")
+    fig.savefig(output_folder / f"regret_({'_'.join(hp_names)})-{regret_label.lower().replace(' ', '_').replace(')', '').replace('(', '') if regret_label else regret_col}.png")
     plt.close()
 
 
@@ -295,8 +299,15 @@ def plot(
     assert all(hp in hp_full_list for hp in hp_list)
 
     # Plots using full experiment results
+    regret_targets = [
+        ("mean_normalized_goal_distance_return_regret", "mean_normalized_goal_distance_return", "Goal Distance Regret"),
+        ("mean_normalized_goal_distance_return_normalized_regret", "mean_normalized_goal_distance_return", "Normalized Goal Distance Regret"),
+        ("success_regret", "success", "Success Regret"),
+        ("success_normalized_regret", "success", "Normalized Success Regret"),
+    ]
     if plot_regret:
-        plot_regret_curve(results_pandas, output_folder)
+        for regret_column, base_column, regret_label in regret_targets:
+            plot_regret_curve(results_pandas, regret_column, base_column, hp_list, output_folder, regret_label)
 
 
     # Plots that are local to a phase

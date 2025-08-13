@@ -169,7 +169,9 @@ def merge_experiments(
     )
 
 
-def calculate_regret_for_experiment(df: pd.DataFrame) -> pd.DataFrame:
+def calculate_regret_for_experiment(
+    df: pd.DataFrame, regret_column: str, base_column: str
+) -> pd.DataFrame:
     """Calculate the different regret metrics for one experiment.
     Calculates metrics for best configuration per phase.
 
@@ -180,9 +182,6 @@ def calculate_regret_for_experiment(df: pd.DataFrame) -> pd.DataFrame:
         A dataframe with regret metrics. It will have a row for each phase and columns for the regret in future phases. The row will only reflect the best configuration for that phase. Additionally there is a column with the cumulation of future regrets.
     """
     # Marginalize Seed
-    regret_columns = [column for column in df.columns if "regret" in column] + [
-        "success"
-    ]
     df = (
         df.groupby(by=["phase", "config_index"])
         .agg(
@@ -190,7 +189,7 @@ def calculate_regret_for_experiment(df: pd.DataFrame) -> pd.DataFrame:
                 column: lambda column_values: trim_mean(
                     column_values, proportiontocut=0.25
                 )
-                for column in regret_columns
+                for column in [regret_column, base_column]
             }
         )
         .reset_index()
@@ -206,7 +205,7 @@ def calculate_regret_for_experiment(df: pd.DataFrame) -> pd.DataFrame:
     for phase_idx, phase in enumerate(df["phase"].unique()):
         best_config_index = (
             df[df["phase"] == phase]  # type: ignore
-            .sort_values("success", ascending=False)
+            .sort_values(base_column, ascending=False)
             .iloc[0]["config_index"]
         )
         best_config_df = df[df["config_index"] == best_config_index]
@@ -216,14 +215,14 @@ def calculate_regret_for_experiment(df: pd.DataFrame) -> pd.DataFrame:
         for other_phase_idx, other_phase in enumerate(df["phase"].unique()):
             regret_df.loc[phase + 1, f"regret_phase_{other_phase_idx + 1}"] = (
                 best_config_df[best_config_df["phase"] == other_phase].iloc[0][  # type: ignore
-                    "success_regret"
+                    regret_column
                 ]
             )
         regret_df.loc[phase + 1, "mean_regret_over_phases"] = best_config_df[
-            "success_regret"
+            regret_column
         ].mean()
         regret_df.loc[phase + 1, "mean_future_regret_over_phases"] = best_config_df[
             best_config_df["phase"] > phase
-        ]["success_regret"].mean()
+        ][regret_column].mean()
 
     return regret_df
