@@ -29,7 +29,7 @@ for phase in "${phases[@]}"; do
     then
       output=$(sbatch --parsable --output "${logdir}/hpo_log_${phase}.txt" hpo_single.sh "$1" "$logdir" "$datasets_str" "$phases_str" "$phase")
     else
-      output=$(sbatch --parsable --output "${logdir}/hpo_log_${phase}.txt" --dependency="afterok:${job_id}" hpo_single.sh "$1" "$logdir" "$datasets_str" "$phases_str" "$phase")
+      output=$(sbatch --parsable --output "${logdir}/hpo_log_${agent}_${phase}.txt" --dependency="afterok:${job_id}" hpo_single.sh "$1" "$logdir" "$datasets_str" "$phases_str" "$phase")
   fi
   if [[ "$output" == *";"* ]]; then
     IFS=';' read -r job_id cluster_name <<< "$output"
