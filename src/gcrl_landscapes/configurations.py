@@ -32,8 +32,20 @@ DDPGBC_BC_COEFF_UPPER = 0.5
 EPS_QRL_LOWER = 0.0
 EPS_QRL_UPPER = 1.0
 
+TAU_HIQL_LOWER = 1e-4
+TAU_HIQL_UPPER = 1.0
+
 SUPPORTED_HPS = set(
-    ["lr", "discount", "actor_p_trajgoal", "alpha", "eps", "low_alpha", "high_alpha"]
+    [
+        "lr",
+        "discount",
+        "actor_p_trajgoal",
+        "alpha",
+        "eps",
+        "low_alpha",
+        "high_alpha",
+        "tau",
+    ]
 )
 
 
@@ -111,6 +123,7 @@ def get_config_space(agent: str) -> ConfigurationSpace:
             "actor_p_curgoal": Float("actor_p_curgoal", (0, 1)),
             "actor_geom_sample": Categorical("actor_geom_sample", (True, False)),
             "eps": Float("eps", (0, 1)),
+            "tau": Float("tau", (TAU_HIQL_LOWER, TAU_HIQL_UPPER)),
         }
     )
 
@@ -332,10 +345,21 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
     # Set epsilon for QRL
     ## unused for other algorithms
     epss = (
-        _scale_to_range(random_values_per_hp.pop(), 0, 1, False)
+        _scale_to_range(random_values_per_hp.pop(), EPS_QRL_LOWER, EPS_QRL_UPPER, True)
         if "eps" in hyperparameters
         else _generate_dummy_list(
             n, base_config["eps"] if "eps" in base_config else None
+        )
+    )
+
+    # Set tau for HIQL (and maybe other non-regarded algorithms)
+    taus = (
+        _scale_to_range(
+            random_values_per_hp.pop(), TAU_HIQL_LOWER, TAU_HIQL_UPPER, True
+        )
+        if "tau" in hyperparameters
+        else _generate_dummy_list(
+            n, base_config["tau"] if "tau" in base_config else None
         )
     )
 
@@ -350,6 +374,7 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
                 "actor_p_randomgoal": actor_p_randomgoal,
                 "alpha": ddpgbc_bc_coeff if actor_loss == "ddpgbc" else awr_temperature,
                 **({"eps": eps} if "eps" in hyperparameters else {}),
+                **({"tau": tau} if "tau" in hyperparameters else {}),
                 **({"low_alpha": low_alpha} if "low_alpha" in hyperparameters else {}),
                 **(
                     {"high_alpha": high_alpha}
@@ -358,7 +383,7 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
                 ),
             }
         )
-        for lr, df, actor_p_curgoal, actor_p_trajgoal, actor_p_randomgoal, awr_temperature, low_alpha, high_alpha, ddpgbc_bc_coeff, eps in zip(
+        for lr, df, actor_p_curgoal, actor_p_trajgoal, actor_p_randomgoal, awr_temperature, low_alpha, high_alpha, ddpgbc_bc_coeff, eps, tau in zip(
             learning_rates,
             discount_factors,
             actor_p_curgoals,
@@ -369,6 +394,7 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
             awr_temperatures_high_level_policy,
             ddpgbc_bc_coeffs,
             epss,
+            taus,
         )
     ]
 
