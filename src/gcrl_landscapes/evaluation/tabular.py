@@ -15,12 +15,12 @@ from .common import (
 )
 
 
-def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
-    """Main code to generate the tabular data
+def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
+    """Main code to generate the tabular data for data grouped by phases
 
     Args:
-        results_pandas: pandas dataframe containing all results (all phases) for one experiment
-        output_folder: folder to save plots in
+        results_pandas: pandas dataframe containing all results (all phases)
+        output_folder: folder to save tables in
     """
     per_config_folder = output_folder / "per_config"
     per_config_folder.mkdir(exist_ok=True)
@@ -69,12 +69,12 @@ def create_tables(results_pandas: pd.DataFrame, output_folder: Path):
         f.write(table.to_csv())
 
 
-def create_additional_tables(results_pandas: pd.DataFrame, output_folder: Path):
+def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
     """Compute additional tabular data like IGPR fit
 
     Args:
-        results_pandas: pandas dataframe containing all results (all phases) for one experiment
-        output_folder: folder to save plots in
+        results_pandas: pandas dataframe containing all results (all phases)
+        output_folder: folder to save tables in
     """
     # Compute k-fold cross validation fit per agent-dataset-phase combination for the IGPR model
     final_results_pandas = results_pandas[
@@ -102,6 +102,12 @@ def create_additional_tables(results_pandas: pd.DataFrame, output_folder: Path):
 
 
 def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
+    """Create regret tables
+
+    Args:
+        results_pandas: pandas dataframe containing all results (all phases)
+        output_folder: folder to save tables in
+    """
     final_results_pandas = results_pandas[
         results_pandas["eval_step"] == results_pandas["phase"]
     ]
@@ -178,6 +184,6 @@ if __name__ == "__main__":
         }
     )
 
-    create_tables(merged_results_df, output_folder)
-    create_additional_tables(merged_results_df, output_folder)
+    create_phased_tables(merged_results_df, output_folder)
+    create_igprfit_tables(merged_results_df, output_folder)
     create_regret_table(merged_results_df, output_folder)
