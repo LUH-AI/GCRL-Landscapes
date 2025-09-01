@@ -42,6 +42,7 @@ def plot_landscape(
     model: TripleGPModel,
     y_col: str,
     hp_names: list[str],
+    agent_name: str,
     output_folder: Path,
     y_label: str | None,
     y_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda y_pred, y: y_pred,
@@ -68,6 +69,7 @@ def plot_landscape(
         bounds=[0, 1],
         filename=output_folder / f"igpr-{plot_filename_base}.png",
         dim_label_mapping=map_labels,
+        agent_name=agent_name,
         z_transform=y_transform,
         discrete_levels=discrete_levels,
     )
@@ -394,6 +396,7 @@ def plot(
                     model,
                     col,
                     list(hp_pair),
+                    phase_result["hp.agent_name"].iloc[0],
                     output_folder,
                     title,
                     **kwargs
