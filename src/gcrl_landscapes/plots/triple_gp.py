@@ -1,5 +1,5 @@
 # +-----------------------------------------------------------------------------------------------------------------------------------------------------+
-# | The following code is mostly taken from https://colab.research.google.com/drive/1VjWng8KeGiW1RnsU6FYriaxAOxkBooXc?usp=sharing#scrollTo=81Mam8kV7ksN |
+# | The following code is adapted from https://colab.research.google.com/drive/1VjWng8KeGiW1RnsU6FYriaxAOxkBooXc?usp=sharing#scrollTo=81Mam8kV7ksN |
 # | and was created by Aditya Mohan (https://amsks.github.io/)                                                                                          |
 # +-----------------------------------------------------------------------------------------------------------------------------------------------------+
 
@@ -28,6 +28,8 @@ from sklearn.model_selection import KFold
 from autorl_landscape.analyze.visualization import Visualization
 from autorl_landscape.run.compare import iqm
 from typing import Callable, Any
+
+from gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
 
 
 def estimate_model_fit(X, y, y_scale, splitter: Any = KFold(n_splits=5, shuffle=True), metrics: list[Callable] | None = None) -> DataFrame:
@@ -270,10 +272,12 @@ class TripleGPModel(BaseEstimator):
         plt.legend()
         plt.show()
 
-def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str], z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, discrete_levels: np.ndarray | None = None, grid_length=100):
+def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str],  agent_name:str, z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, discrete_levels: np.ndarray | None = None, grid_length=100):
+    x_lower, x_upper, x_log = get_bounds(model.hp_names[x_dim].removeprefix("hp."), agent_name)
+    y_lower, y_upper, y_log = get_bounds(model.hp_names[y_dim].removeprefix("hp."), agent_name)
     # Generate a finer grid for contour plot
-    x = np.linspace(model.x_unscaled[:, x_dim].min(), model.x_unscaled[:, x_dim].max(), grid_length)
-    y = np.linspace(model.x_unscaled[:, y_dim].min(), model.x_unscaled[:, y_dim].max(), grid_length)
+    x = np.linspace(0, 1, grid_length)
+    y = np.linspace(0, 1, grid_length)
 
     X, Y = np.meshgrid(x, y)
     Z = np.zeros_like(X)
@@ -287,15 +291,13 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
     # Create contour plot
     fig, ax = plt.subplots(figsize=[4, 3])
 
-    if model.hp_names[x_dim] == "lr-uniform":
-        X = 10 ** (np.log10(model.data["hp.lr"].min()) + (np.log10(model.data["hp.lr"].max()) - np.log10(model.data["hp.lr"].min())) * X)
+    X = sobol_codomain_to_hp(X, x_lower, x_upper, x_log)
+    Y = sobol_codomain_to_hp(Y, y_lower, y_upper, y_log)
+    if x_log:
         ax.set_xscale('log', base=10)
-        ax.set_xticks(list(filter(lambda x: x > X.min(), [1e-6, 1e-5, 1e-4, 1e-3, 1e-2])))
 
-    if model.hp_names[y_dim] == "lr-uniform":
-        Y = 10 ** (np.log10(model.data["hp.lr"].min()) + (np.log10(model.data["hp.lr"].max()) - np.log10(model.data["hp.lr"].min())) * X)
+    if y_log:
         ax.set_xscale('log', base=10)
-        ax.set_xticks(list(filter(lambda y: y > Y.min(), [1e-6, 1e-5, 1e-4, 1e-3, 1e-2])))
 
 
     if discrete_levels is None:

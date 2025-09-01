@@ -14,6 +14,7 @@ import warnings
 import numpy as np
 import logging
 from omegaconf import DictConfig
+from typing_extensions import deprecated
 
 logger = logging.getLogger(__name__)
 
@@ -434,15 +435,11 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
     ]
 
 
+@deprecated("_scale_to_range is deprecated. Use sobol_codomain_to_hp instead.")
 def _scale_to_range(
     values: np.ndarray, lower: float, upper: float, log: bool
 ) -> list[float]:
-    if log:
-        return list(
-            10 ** (np.log10(lower) + (np.log10(upper) - np.log10(lower)) * values)
-        )
-    else:
-        return list(lower + (upper - lower) * values)
+    return list(sobol_codomain_to_hp(values, lower, upper, log))
 
 
 def hp_to_sobol_codomain(values, lower: float, upper: float, log: bool):
@@ -452,6 +449,13 @@ def hp_to_sobol_codomain(values, lower: float, upper: float, log: bool):
         )
     else:
         return (values - lower) / (upper - lower)
+
+
+def sobol_codomain_to_hp(values, lower: float, upper: float, log: bool):
+    if log:
+        return 10 ** (np.log10(lower) + (np.log10(upper) - np.log10(lower)) * values)
+    else:
+        return lower + (upper - lower) * values
 
 
 def _generate_dummy_list(n: int, val: object) -> list[object]:
