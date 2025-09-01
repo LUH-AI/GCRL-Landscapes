@@ -49,6 +49,41 @@ SUPPORTED_HPS = set(
 )
 
 
+def get_bounds(hp_name: str, agent: str) -> tuple[float, float, bool]:
+    """Get boundaries for hyperparameter-name and agent
+
+    Args:
+        hp_name: hyperparameter name as in ogbench
+        agent: agent name
+
+    Returns:
+        tuple[float, float, bool]: lower bound, upper bound, boolean if logarithmic
+
+    Raises:
+        NotImplementedError: hyperparameter not supported
+    """
+    if hp_name.lower() == "lr":
+        return LEARNING_RATE_LOWER, LEARNING_RATE_UPPER, True
+    elif hp_name.lower() == "discount":
+        return DISCOUNT_FACTOR_LOWER, DISCOUNT_FACTOR_UPPER, False
+    elif hp_name.lower() == "actor_p_trajgoal":
+        return 0.0, 1.0, False
+    elif hp_name.lower() == "alpha":
+        return AWR_TEMPERATURE_LOWER, AWR_TEMPERATURE_UPPER, False
+    elif hp_name.lower() == "low_alpha":
+        return AWR_TEMPERATURE_LOWER, AWR_TEMPERATURE_UPPER, False
+    elif hp_name.lower() == "high_alpha":
+        return AWR_TEMPERATURE_LOWER, AWR_TEMPERATURE_UPPER, False
+    elif hp_name.lower() == "eps":
+        return EPS_QRL_LOWER, EPS_QRL_UPPER, True
+    elif hp_name.lower() == "tau":
+        return TAU_HIQL_LOWER, TAU_HIQL_UPPER, True
+    else:
+        raise NotImplementedError(
+            f"no bounds for hyperparameter {hp_name} for agent {agent}"
+        )
+
+
 def hydra_to_ogbench_config(
     hydra_config: DictConfig, phase_idx: int
 ) -> FrozenConfigDict:
@@ -408,6 +443,15 @@ def _scale_to_range(
         )
     else:
         return list(lower + (upper - lower) * values)
+
+
+def hp_to_sobol_codomain(values, lower: float, upper: float, log: bool):
+    if log:
+        return (np.log10(values) - np.log10(lower)) / (
+            np.log10(upper) - np.log10(lower)
+        )
+    else:
+        return (values - lower) / (upper - lower)
 
 
 def _generate_dummy_list(n: int, val: object) -> list[object]:
