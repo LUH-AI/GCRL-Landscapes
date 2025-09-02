@@ -7,7 +7,6 @@ from gcrl_landscapes.util.data import phase_results_to_pandas
 from pathlib import Path
 import pandas as pd
 import numpy as np
-import os
 from .common import (
     compute_additional_information,
     merge_experiments,
@@ -259,11 +258,12 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--zipfile", type=Path, required=True)
+    parser.add_argument("--zipfiles", nargs="+", type=Path, required=True)
+    parser.add_argument("--output_folder", type=Path, required=True)
     args = parser.parse_args()
 
     # Parse results
-    output_folder = Path("tables") / os.path.basename(args.zipfile)
+    output_folder = args.output_folder
     output_folder.mkdir(exist_ok=True, parents=True)
     merged_results_df = merge_experiments(
         {
@@ -271,8 +271,9 @@ if __name__ == "__main__":
                 run_info,
                 compute_additional_information(phase_results_to_pandas(phase_results)),
             )
+            for zipfile in args.zipfiles
             for prefix, (run_info, phase_results) in read_results_from_zip(
-                args.zipfile
+                zipfile
             ).items()
         }
     )
