@@ -17,4 +17,4 @@ ZIPNAME="${DATE}-${1/\.\//}.zip"
 module load GCC/12.2.0 OpenMPI/4.1.4 Armadillo
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${BIGWORK}/usr/lib"
 $2 -m gcrl_landscapes.evaluation.plot --plot_eval_curves --plot_return_distributions --plot_gp_fits --zipfile "$ZIPNAME"
-$2 -m gcrl_landscapes.evaluation.tabular --zipfile "$ZIPNAME"
+$2 -m gcrl_landscapes.evaluation.tabular --zipfiles "$ZIPNAME" --output_folder "tables/${ZIPNAME}"
