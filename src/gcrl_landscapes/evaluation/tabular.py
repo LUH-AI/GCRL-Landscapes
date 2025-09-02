@@ -6,6 +6,7 @@ from gcrl_landscapes.util.eval import fit_model
 from gcrl_landscapes.util.data import phase_results_to_pandas
 from pathlib import Path
 import pandas as pd
+import numpy as np
 import os
 from .common import (
     compute_additional_information,
@@ -13,6 +14,10 @@ from .common import (
     calculate_regret_for_experiment,
     CVAR_CONFIDENCE_LEVELS,
 )
+from gcrl_landscapes.configurations import hp_to_sobol_codomain, get_bounds
+from scipy.stats import trim_mean
+from scipy.optimize import shgo
+from typing import Any
 
 
 def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
@@ -164,6 +169,94 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
             f.write(table_pick_second_phase.to_csv())
 
 
+def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
+    """Create table to compute optimum-shift over phases
+
+    Args:
+        results_pandas: pandas dataframe containing all results (all phases)
+        out: folder to save tables in
+    """
+    final_results_pandas = results_pandas[
+        results_pandas["eval_step"] == results_pandas["phase"]
+    ]
+
+    def calculate_optimum_shift(df: pd.DataFrame) -> pd.DataFrame:
+        def retain_hp(values: pd.Series) -> Any:
+            if not all([v == values.iloc[0] for v in values]):
+                raise ValueError("all hps must be the same for simple retaining")
+            return values.iloc[0]
+
+        # Marginalize seed
+        temp_df = (
+            df.groupby(by=["phase", "config_index"])
+            .agg(
+                {
+                    "success": lambda column_values: trim_mean(
+                        column_values, proportiontocut=0.25
+                    ),
+                    "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
+                        column_values, proportiontocut=0.25
+                    ),
+                }
+                | {f"hp.{hp_name}": retain_hp for hp_name in df["hps"].iloc[0]}
+            )
+            .reset_index()
+        )
+        optimum_per_phase_df = temp_df.groupby(by=["phase"]).apply(
+            lambda df: df.sort_values(["success"]).iloc[-1],
+        )
+        for hp_name in [hp_name for hp_name in df["hps"].iloc[0]]:
+            optimum_per_phase_df[f"hp.{hp_name}_sobol_codomain"] = hp_to_sobol_codomain(
+                optimum_per_phase_df[f"hp.{hp_name}"],
+                *get_bounds(hp_name, df["hp.agent_name"].iloc[0]),
+            )
+
+        # Train IGPR model
+        models_per_phase = [
+            (
+                fit_model(
+                    final_results_pandas[final_results_pandas["phase"] == phase],
+                    "success",
+                    [f"hp.{hp_name}" for hp_name in df["hps"].iloc[0]],
+                ),
+                phase,
+            )
+            for phase in sorted(temp_df["phase"].unique())
+        ]
+        optimum_per_phase = {
+            phase: shgo(
+                func=lambda x: -model.get_middle([x]),
+                bounds=[(0, 1), (0, 1)],
+            )
+            for model, phase in models_per_phase
+        }
+
+        optimum_per_phase_df = pd.DataFrame(
+            [value.x for value in optimum_per_phase.values()],
+            columns=["hp0_opt", "hp1_opt"],
+        )
+        optimum_per_phase_df["phase"] = optimum_per_phase.keys()
+        optimum_per_phase_df = optimum_per_phase_df.set_index("phase")
+        optimum_per_phase_diff_df = optimum_per_phase_df.diff()
+        optimum_per_phase_diff_df["optimum_shift"] = optimum_per_phase_diff_df.apply(
+            lambda row: np.sqrt(row["hp0_opt"] ** 2 + row["hp1_opt"] ** 2), axis=1
+        )
+        return optimum_per_phase_diff_df
+
+    table = final_results_pandas.groupby(by=["agent", "dataset"]).apply(
+        calculate_optimum_shift
+    )
+
+    with open(out / "optimum_shift_table.md", "w") as f:
+        f.write(table.to_markdown())
+
+    with open(out / "optimum_shift_table.tex", "w") as f:
+        f.write(table.to_latex())
+
+    with open(out / "optimum_shift_table.csv", "w") as f:
+        f.write(table.to_csv())
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--zipfile", type=Path, required=True)
@@ -187,3 +280,4 @@ if __name__ == "__main__":
     create_phased_tables(merged_results_df, output_folder)
     create_igprfit_tables(merged_results_df, output_folder)
     create_regret_table(merged_results_df, output_folder)
+    create_optimum_shift_table(merged_results_df, output_folder)
