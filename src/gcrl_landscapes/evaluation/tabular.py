@@ -17,6 +17,9 @@ from gcrl_landscapes.configurations import hp_to_sobol_codomain, get_bounds
 from scipy.stats import trim_mean
 from scipy.optimize import shgo
 from typing import Any
+import zipfile
+import re
+import json
 
 
 def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
@@ -254,6 +257,78 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
 
     with open(out / "optimum_shift_table.csv", "w") as f:
         f.write(table.to_csv())
+
+
+def parse_hp_importance(zip_path: Path) -> pd.DataFrame:
+    """Parse the importances from the zip file
+
+    Args:
+        zip_path: Path to importance zip file
+
+    Returns:
+        pd.DataFrame with multiindex ("setting", "agent", "trainingprogress", "hp") and columns ("mean", "std")
+    """
+
+    def parse_filename(filename: str) -> None | re.Match:
+        return re.fullmatch(
+            r"(?P<setting>[^/]*)/(?P<agent>[a-zA-Z]+)(?P<trainingprogress>\d+)\.json",
+            filename,
+        )
+
+    def parse_importances(
+        filename: str, zip_file: zipfile.ZipFile
+    ) -> dict[str, dict[str, float]]:
+        with zip_file.open(filename) as f:
+            raw_importance_data = json.loads(
+                f.read().decode(encoding="utf-8").replace("'", '"')
+            )
+
+        assert len(raw_importance_data.keys()) == 1
+        run_hash = list(raw_importance_data.keys())[0]
+        assert len(raw_importance_data[run_hash]) == 1
+        run_number = list(raw_importance_data[run_hash].keys())[0]
+
+        return {
+            key: {
+                "mean": raw_importance_data[run_hash][run_number][key][0],
+                "std": raw_importance_data[run_hash][run_number][key][1],
+            }
+            for key in raw_importance_data[run_hash][run_number].keys()
+        }
+
+    with zipfile.ZipFile(zip_path) as zip_file:
+        filenames = zip_file.namelist()
+        parsed_filenames: list[re.Match] = filter(
+            lambda match: match is not None,
+            [parse_filename(filename) for filename in filenames],
+        )  # type: ignore
+        data = [
+            {
+                "setting": match.groupdict()["setting"],
+                "agent": match.groupdict()["agent"],
+                "trainingprogress": int(match.groupdict()["trainingprogress"]),
+                "hp": parse_importances(match.group(0), zip_file),
+            }
+            for match in parsed_filenames
+        ]
+
+    df_wide = pd.json_normalize(data)
+    df_long = df_wide.melt(
+        id_vars=["setting", "agent", "trainingprogress"],
+        value_vars=[c for c in df_wide.columns if c.startswith("hp.")],
+        var_name="hp",
+        value_name="importance",
+    )
+    df_long["hp"] = df_long["hp"].str.replace("hp.", "")
+    # We now have hp_name.mean and hp_name.std as values in hp-column
+    # Move this into own columns
+    df_long[["hp", "stat"]] = df_long["hp"].str.split(".", expand=True)
+    df = df_long.pivot(
+        index=["setting", "agent", "trainingprogress", "hp"],
+        columns="stat",
+        values="importance",
+    ).dropna()
+    return df
 
 
 if __name__ == "__main__":
