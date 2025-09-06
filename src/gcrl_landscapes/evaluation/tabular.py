@@ -16,6 +16,7 @@ from .common import (
 from gcrl_landscapes.configurations import hp_to_sobol_codomain, get_bounds
 from scipy.stats import trim_mean
 from scipy.optimize import shgo
+from scipy.spatial import distance
 from typing import Any
 import zipfile
 import re
@@ -259,6 +260,54 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
         f.write(table.to_csv())
 
 
+def create_importance_divergence_table(
+    results_pandas: pd.DataFrame, output_folder: Path
+):
+    """Create a table showing divergence per dataset-setting and algorithm.
+    Uses cosine similarity for measuring the difference.
+
+    Args:
+        results_pandas: pandas dataframe containing all results (all phases)
+        output_folder: folder to save tables in
+    """
+
+    def compute_importance_divergence(df: pd.DataFrame) -> pd.Series:
+        # Create probability arrays
+        df_prob_arrays = (
+            df.reset_index(level=["hp", "trainingprogress"])
+            .groupby(by="trainingprogress")
+            .apply(lambda df: np.array(df.sort_values("hp")["mean"]))
+            .sort_index()
+        )
+
+        cosine_df = pd.Series(
+            {
+                f"{df_prob_arrays.index[i - 1]}->{df_prob_arrays.index[i]}": distance.cosine(
+                    df_prob_arrays.iloc[i - 1], df_prob_arrays.iloc[i]
+                )
+                for i in range(len(df_prob_arrays))
+            }
+        )
+        cosine_df["->".join(map(str, df_prob_arrays.index))] = cosine_df.loc[
+            ~cosine_df.index.str.startswith("100->")
+        ].sum()
+
+        return cosine_df
+
+    table = results_pandas.groupby(by=["agent", "setting"]).apply(
+        lambda df: compute_importance_divergence(df)
+    )
+
+    with open(output_folder / "importance_divergence_table.md", "w") as f:
+        f.write(table.to_markdown())
+
+    with open(output_folder / "importance_divergence_table.tex", "w") as f:
+        f.write(table.to_latex())
+
+    with open(output_folder / "importance_divergence_table.csv", "w") as f:
+        f.write(table.to_csv())
+
+
 def parse_hp_importance(zip_path: Path) -> pd.DataFrame:
     """Parse the importances from the zip file
 
@@ -334,8 +383,20 @@ def parse_hp_importance(zip_path: Path) -> pd.DataFrame:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--zipfiles", nargs="+", type=Path, required=True)
+    parser.add_argument(
+        "--hp_importance_data",
+        action="store_true",
+        help="Zip contains hp importance data. Only create tables based on hp importance.",
+    )
     parser.add_argument("--output_folder", type=Path, required=True)
     args = parser.parse_args()
+
+    if args.hp_importance_data:
+        importance_df = pd.concat(
+            [parse_hp_importance(zipfile) for zipfile in args.zipfiles]
+        )
+        create_importance_divergence_table(importance_df, args.output_folder)
+        exit(0)
 
     # Parse results
     output_folder = args.output_folder
