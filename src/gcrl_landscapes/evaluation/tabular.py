@@ -391,6 +391,10 @@ if __name__ == "__main__":
     parser.add_argument("--output_folder", type=Path, required=True)
     args = parser.parse_args()
 
+    # Parse results
+    output_folder = args.output_folder
+    output_folder.mkdir(exist_ok=True, parents=True)
+
     if args.hp_importance_data:
         importance_df = pd.concat(
             [parse_hp_importance(zipfile) for zipfile in args.zipfiles]
@@ -398,9 +402,6 @@ if __name__ == "__main__":
         create_importance_divergence_table(importance_df, args.output_folder)
         exit(0)
 
-    # Parse results
-    output_folder = args.output_folder
-    output_folder.mkdir(exist_ok=True, parents=True)
     merged_results_df = merge_experiments(
         {
             prefix: (
