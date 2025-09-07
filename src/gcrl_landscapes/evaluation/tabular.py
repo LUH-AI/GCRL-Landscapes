@@ -285,7 +285,7 @@ def create_importance_divergence_table(
                 f"{df_prob_arrays.index[i - 1]}->{df_prob_arrays.index[i]}": distance.cosine(
                     df_prob_arrays.iloc[i - 1], df_prob_arrays.iloc[i]
                 )
-                for i in range(len(df_prob_arrays))
+                for i in range(1, len(df_prob_arrays))
             }
         )
         cosine_df["->".join(map(str, df_prob_arrays.index))] = cosine_df.loc[
@@ -294,7 +294,7 @@ def create_importance_divergence_table(
 
         return cosine_df
 
-    table = results_pandas.groupby(by=["agent", "setting"]).apply(
+    table = results_pandas.groupby(by=["setting", "agent"]).apply(
         lambda df: compute_importance_divergence(df)
     )
 
