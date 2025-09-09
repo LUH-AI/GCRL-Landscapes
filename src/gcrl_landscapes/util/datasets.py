@@ -1,3 +1,4 @@
+from ogbench import make_env_and_datasets
 from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
 from ogbench.impls.agents import (
     CRLAgent,
