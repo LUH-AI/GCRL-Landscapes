@@ -5,6 +5,7 @@ from .maze import xy_to_ij
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import cmocean
 from PIL import Image, ImageOps
 import io
 from pathlib import Path
@@ -82,9 +83,9 @@ def plot_dataset_heatmap(dataset: str, output_folder: Path) -> None:
         x=coordinates[:, 0],
         y=coordinates[:, 1],
         levels=100,
-        bw_adjust=0.2,
+        bw_adjust=0.3,
         fill=True,
-        cmap="plasma",
+        cmap=cmocean.cm.ice_r,
     )
 
     # Overlay to pillow image
@@ -112,9 +113,9 @@ if __name__ == "__main__":
 
     if not args.no_multiprocessing:
         try:
-            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 3
+            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 2
         except Exception as _:
-            thread_count = multiprocessing.cpu_count() // 3
+            thread_count = multiprocessing.cpu_count() // 2
         with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
             pool.map(
                 partial(plot_dataset_heatmap, output_folder=output_folder),

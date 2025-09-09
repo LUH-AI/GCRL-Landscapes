@@ -55,6 +55,7 @@ dependencies = [
   "swig",
   "tensorflow > 2.15.0",
   "tensorflow-probability >= 0.24.0",
+  "cmocean",
 ]
 
 [project.urls]
