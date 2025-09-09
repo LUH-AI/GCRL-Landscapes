@@ -50,7 +50,7 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
     )
 
     table = results_only_final_eval_df.groupby(
-        by=["agent", "dataset", "hps", "phase"]
+        by=["agent", "dataset", "hps", "phase_num"]
     ).agg(
         **{
             "Goal Distance Score": pd.NamedAgg(
@@ -90,7 +90,9 @@ def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
     final_results_pandas = results_pandas[
         results_pandas["eval_step"] == results_pandas["phase"]
     ]
-    table = final_results_pandas.groupby(by=["agent", "dataset", "hps", "phase"]).apply(
+    table = final_results_pandas.groupby(
+        by=["agent", "dataset", "hps", "phase_num"]
+    ).apply(
         lambda df: fit_model(
             df.reset_index(drop=True),
             "mean_normalized_goal_distance_return",
@@ -193,7 +195,7 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
 
         # Marginalize seed
         temp_df = (
-            df.groupby(by=["phase", "config_index"])
+            df.groupby(by=["phase_num", "config_index"])
             .agg(
                 {
                     "success": lambda column_values: trim_mean(
@@ -207,7 +209,7 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
             )
             .reset_index()
         )
-        optimum_per_phase_df = temp_df.groupby(by=["phase"]).apply(
+        optimum_per_phase_df = temp_df.groupby(by=["phase_num"]).apply(
             lambda df: df.sort_values(["success"]).iloc[-1],
         )
         for hp_name in [hp_name for hp_name in df["hps"].iloc[0]]:
@@ -220,13 +222,13 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
         models_per_phase = [
             (
                 fit_model(
-                    final_results_pandas[final_results_pandas["phase"] == phase],
+                    df[df["phase_num"] == phase],
                     "success",
                     [f"hp.{hp_name}" for hp_name in df["hps"].iloc[0]],
                 ),
                 phase,
             )
-            for phase in sorted(temp_df["phase"].unique())
+            for phase in sorted(temp_df["phase_num"].unique())
         ]
         optimum_per_phase = {
             phase: shgo(
@@ -240,26 +242,95 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
             [value.x for value in optimum_per_phase.values()],
             columns=["hp0_opt", "hp1_opt"],
         )
-        optimum_per_phase_df["phase"] = optimum_per_phase.keys()
-        optimum_per_phase_df = optimum_per_phase_df.set_index("phase")
+        optimum_per_phase_df["phase_num"] = optimum_per_phase.keys()
+        optimum_per_phase_df = optimum_per_phase_df.set_index("phase_num")
         optimum_per_phase_diff_df = optimum_per_phase_df.diff()
         optimum_per_phase_diff_df["optimum_shift"] = optimum_per_phase_diff_df.apply(
             lambda row: np.sqrt(row["hp0_opt"] ** 2 + row["hp1_opt"] ** 2), axis=1
         )
         return optimum_per_phase_diff_df
 
-    table = final_results_pandas.groupby(by=["agent", "dataset", "hps"]).apply(
-        calculate_optimum_shift
-    )
+    full_table = final_results_pandas.groupby(
+        by=["agent", "dataset", "constant_dataset", "hps"]
+    ).apply(calculate_optimum_shift)
 
-    with open(out / "optimum_shift_table.md", "w") as f:
-        f.write(table.to_markdown())
+    with open(out / "optimum_shift_table_full.md", "w") as f:
+        f.write(full_table.to_markdown())
 
-    with open(out / "optimum_shift_table.tex", "w") as f:
-        f.write(table.to_latex())
+    with open(out / "optimum_shift_table_full.tex", "w") as f:
+        f.write(full_table.to_latex())
 
-    with open(out / "optimum_shift_table.csv", "w") as f:
-        f.write(table.to_csv())
+    with open(out / "optimum_shift_table_full.csv", "w") as f:
+        f.write(full_table.to_csv())
+
+    agent_scheduled_vs_non_scheduled = full_table.groupby(
+        by=["agent", "constant_dataset"]
+    )["optimum_shift"].mean()
+
+    with open(
+        out / "optimum_shift_table_agent_scheduled_vs_non_scheduled.md", "w"
+    ) as f:
+        f.write(agent_scheduled_vs_non_scheduled.to_markdown())
+
+    with open(
+        out / "optimum_shift_table_agent_scheduled_vs_non_scheduled.tex", "w"
+    ) as f:
+        f.write(agent_scheduled_vs_non_scheduled.to_latex())
+
+    with open(
+        out / "optimum_shift_table_agent_scheduled_vs_non_scheduled.csv", "w"
+    ) as f:
+        f.write(agent_scheduled_vs_non_scheduled.to_csv())
+
+    dataset_table = full_table.groupby(by=["dataset"])["optimum_shift"].mean()
+
+    with open(out / "optimum_shift_table_dataset.md", "w") as f:
+        f.write(dataset_table.to_markdown())
+
+    with open(out / "optimum_shift_table_dataset.tex", "w") as f:
+        f.write(dataset_table.to_latex())
+
+    with open(out / "optimum_shift_table_dataset.csv", "w") as f:
+        f.write(dataset_table.to_csv())
+
+    agent_dataset_table = full_table.groupby(by=["agent", "dataset"])[
+        "optimum_shift"
+    ].mean()
+
+    with open(out / "optimum_shift_table_agent_dataset.md", "w") as f:
+        f.write(agent_dataset_table.to_markdown())
+
+    with open(out / "optimum_shift_table_agent_dataset.tex", "w") as f:
+        f.write(agent_dataset_table.to_latex())
+
+    with open(out / "optimum_shift_table_agent_dataset.csv", "w") as f:
+        f.write(agent_dataset_table.to_csv())
+
+    agent_phase_table = full_table.groupby(by=["agent", "phase_num"])[
+        "optimum_shift"
+    ].mean()
+
+    with open(out / "optimum_shift_table_agent_phase.md", "w") as f:
+        f.write(agent_phase_table.to_markdown())
+
+    with open(out / "optimum_shift_table_agent_phase.tex", "w") as f:
+        f.write(agent_phase_table.to_latex())
+
+    with open(out / "optimum_shift_table_agent_phase.csv", "w") as f:
+        f.write(agent_phase_table.to_csv())
+
+    dataset_phase_table = full_table.groupby(by=["dataset", "phase_num"])[
+        "optimum_shift"
+    ].mean()
+
+    with open(out / "optimum_shift_table_dataset_phase.md", "w") as f:
+        f.write(dataset_phase_table.to_markdown())
+
+    with open(out / "optimum_shift_table_dataset_phase.tex", "w") as f:
+        f.write(dataset_phase_table.to_latex())
+
+    with open(out / "optimum_shift_table_dataset_phase.csv", "w") as f:
+        f.write(dataset_phase_table.to_csv())
 
 
 def create_importance_divergence_table(

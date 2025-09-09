@@ -35,6 +35,8 @@ def compute_additional_information(
         new object with additional information with same layout as original one
     """
     results_copy = deepcopy(results)
+    # enumerate phases
+    results_copy["phase_num"] = results_copy["phase"].rank(method="dense").astype(int)
     # Normalize goal end distances by start distance to get a distance in [1, inf)
     results_copy["normalized_goal_distances"] = results_copy["eval_result"].apply(
         lambda results_per_seed: np.array(
@@ -162,6 +164,7 @@ def merge_experiments(
                 dataset=",".join(run_info["arguments"]["datasets"])
                 if "datasets" in run_info["arguments"]
                 else run_info["arguments"]["dataset"],
+                constant_dataset=len(set(run_info["arguments"]["datasets"])) == 1,
                 hps=lambda x: [frozenset(run_info["arguments"]["hyperparameters"])]
                 * len(x),
             )
