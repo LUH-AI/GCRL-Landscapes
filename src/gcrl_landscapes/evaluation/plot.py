@@ -330,7 +330,7 @@ def plot(
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
         per_config_phase_folder.mkdir(exist_ok=True)
 
-        e_optimal_bins = np.array([0.0, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0])
+        e_optimal_bins = np.array([0.0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0])
         landscape_pairs = [
             ("success", "Success Rate", {}),
             (
