@@ -338,7 +338,7 @@ def plot(
                 "Success Epsilon Optimality",
                 # Make this stepped, so that it is easier to interpret
                 {
-                    "y_transform": lambda y_pred, y: y_pred / np.max(y),
+                    "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
                     "discrete_levels": e_optimal_bins,
                 }
             ),
@@ -351,7 +351,7 @@ def plot(
                 "mean_normalized_goal_distance_return",
                 "Normalized Goal Distance Return Epsilon Optimality",
                 {
-                    "y_transform": lambda y_pred, y: y_pred / np.max(y),
+                    "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
                     "discrete_levels": e_optimal_bins,
                 }
             ),
