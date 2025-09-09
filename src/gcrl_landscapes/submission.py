@@ -179,81 +179,20 @@ def train_wrapper(
 
     from .training import train
     from .evaluate import evaluate_wrapper
-    from ogbench import make_env_and_datasets
-    from ogbench.impls.utils.datasets import HGCDataset, GCDataset, Dataset
-    from ogbench.impls.agents import (
-        CRLAgent,
-        CMDAgent,
-        GCBCAgent,
-        QRLAgent,
-        HIQLAgent,
-        GCIQLAgent,
-        GCIVLAgent,
-        SACAgent,
-    )
     import jax
     from .util.misc import jax_has_gpu
+    from .util.datasets import AGENT_CLASSES, create_env_and_dataset
 
     jax.config.update("jax_persistent_cache_min_entry_size_bytes", -1)
     jax.config.update("jax_persistent_cache_min_compile_time_secs", 0)
     jax.config.update("jax_persistent_cache_enable_xla_caches", "all")
     print(f"Default backend: {jax.default_backend()}, running on gpu?: {jax_has_gpu()}")
 
-    AGENT_CLASSES = {
-        "CRL": CRLAgent,
-        "CMD": CMDAgent,
-        "GCBC": GCBCAgent,
-        "GCIQL": GCIQLAgent,
-        "GCIVL": GCIVLAgent,
-        "QRL": QRLAgent,
-        "HIQL": HIQLAgent,
-        "SAC": SACAgent,
-    }
-    DATASET_CLASSES = {
-        "CRL": GCDataset,
-        "CMD": GCDataset,
-        "GCBC": GCDataset,
-        "GCIQL": GCDataset,
-        "GCIVL": GCDataset,
-        "QRL": GCDataset,
-        "HIQL": HGCDataset,
-        "SAC": GCDataset,
-    }
-
     run_log_dir.mkdir(parents=True, exist_ok=False)
 
-    def dataset_constructor(dataset_raw):
-        return DATASET_CLASSES[agent_name.upper()](
-            Dataset.create(**dataset_raw), configuration
-        )
-
-    ## mix in explore and cache it if wanted
-    explore_mix_match = re.fullmatch(
-        r"^.*explore(?P<explore_share>\d+)(?P<secondtype>[^-]*).*$", dataset_name
+    env, train_dataset, val_dataset = create_env_and_dataset(
+        dataset_name, agent_name, configuration
     )
-    if explore_mix_match:
-        base_dataset = re.sub(r"explore\d+", "", dataset_name)
-        explore_dataset = re.sub(r"explore\d+[^-]*", "explore", dataset_name)
-        explore_share = int(explore_mix_match.groupdict()["explore_share"])
-        print(
-            f"Found mixed dataset, mixing {explore_dataset} into {base_dataset} ({explore_share}%)"
-        )
-        env, train_dataset1_raw, val_dataset1_raw = make_env_and_datasets(base_dataset)  # type: ignore
-        _, train_dataset2_raw, val_dataset2_raw = make_env_and_datasets(explore_dataset)  # type: ignore
-        train_dataset = MixedDataset(
-            dataset_constructor(train_dataset1_raw),
-            dataset_constructor(train_dataset2_raw),
-            explore_share,
-        )
-        val_dataset = MixedDataset(
-            dataset_constructor(val_dataset1_raw),
-            dataset_constructor(val_dataset2_raw),
-            explore_share,
-        )
-    else:
-        env, train_dataset_raw, val_dataset_raw = make_env_and_datasets(dataset_name)  # type: ignore
-        train_dataset = dataset_constructor(train_dataset_raw)
-        val_dataset = dataset_constructor(val_dataset_raw)
 
     eval_trajectory = train(
         agent_class=AGENT_CLASSES[agent_name.upper()],

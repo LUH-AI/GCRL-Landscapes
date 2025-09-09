@@ -63,8 +63,8 @@ def xy_to_ij(
     env,  # no type hint, as ogbench creates dynamic types during runtime
 ) -> np.ndarray:
     # See ogbench MazeEnv
-    i = (xy[:, 0] + env._offset_x) / env._maze_unit
-    j = (xy[:, 1] + env._offset_y) / env._maze_unit
+    i = (xy[:, 0] + env._offset_x + 0.5 * env._maze_unit) / env._maze_unit
+    j = (xy[:, 1] + env._offset_y + 0.5 * env._maze_unit) / env._maze_unit
     return np.column_stack((i, j))
 
 
@@ -110,9 +110,7 @@ def visualize_trajs(
         for traj, color in zip(trajs, colors):
             ij = xy_to_ij(traj["observations"][:, :2], env)
             draw.line(
-                (
-                    (ij + 0.5) / env.maze_map.transpose().shape * background.size
-                ).tolist(),
+                (ij / env.maze_map.transpose().shape * background.size).tolist(),
                 width=2 * SUPERSAMPLING_FACTOR,
                 fill=tuple(
                     [round(channel * 255) for channel in matplotlib_color_to_rgb(color)]
