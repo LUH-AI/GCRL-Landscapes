@@ -7,9 +7,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from PIL import Image, ImageOps
 import io
+from pathlib import Path
+import os
+import multiprocessing
+from functools import partial
 
 
-DATASET_SAMPLE_SIZE = 10_000  # TODO: bigger
+DATASET_SAMPLE_SIZE = 100_000
 MAX_IMAGE_SIZE = 1000
 SUPERSAMPLING_FACTOR = 10
 
@@ -35,66 +39,87 @@ def fig_on_maze(density_plot: Image.Image, background: Image.Image) -> Image.Ima
     return Image.alpha_composite(white_bg, density_maze_w_alpha)
 
 
+def plot_dataset_heatmap(dataset: str, output_folder: Path) -> None:
+    # agent class and actor loss do not matter much here, as they influence parts of the dataset we do not use anyways
+    env, train_dataset, val_dataset = create_env_and_dataset(
+        dataset, "CRL", get_adapted_default_config("CRL", dataset, "awr")
+    )
+
+    # Create maze image
+    # move goal and ant out of picture
+    env.unwrapped.set_goal(goal_xy=(-10, -10))  # type: ignore
+    env.unwrapped.set_xy((-10, -10))  # type: ignore
+    env.unwrapped.render()
+    maze = ImageOps.contain(
+        ImageOps.invert(
+            Image.fromarray(env.unwrapped.maze_map.astype(np.uint8) * 255)  # type: ignore
+        ),
+        (
+            MAX_IMAGE_SIZE * SUPERSAMPLING_FACTOR,
+            MAX_IMAGE_SIZE * SUPERSAMPLING_FACTOR,
+        ),
+        method=Image.Resampling.BOX,
+    ).convert("RGBA")
+
+    coordinates = (
+        xy_to_ij(
+            sample_to_coordinates(train_dataset.sample(DATASET_SAMPLE_SIZE)),
+            env.unwrapped,
+        )
+        / env.unwrapped.maze_map.transpose().shape
+    )
+    fig = plt.figure(figsize=(10, 10))
+
+    # Make plot work as an overlay
+    plt.axis("off")
+    plt.margins(0, 0)
+    plt.xlim(0, 1)
+    plt.ylim(0, 1)
+    plt.gca().set_position([0, 0, 1, 1])
+    plt.gca().invert_yaxis()
+
+    sns.kdeplot(
+        x=coordinates[:, 0],
+        y=coordinates[:, 1],
+        levels=100,
+        bw_adjust=0.2,
+        fill=True,
+        cmap="plasma",
+    )
+
+    # Overlay to pillow image
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True, pad_inches=0)
+    plt.close(fig)
+    buf.seek(0)
+    overlay = Image.open(buf).convert("RGBA").resize(maze.size)
+
+    ImageOps.contain(
+        fig_on_maze(overlay, maze),
+        (MAX_IMAGE_SIZE, MAX_IMAGE_SIZE),
+        method=Image.Resampling.LANCZOS,
+    ).save(output_folder / f"heatmap_{dataset}.png")
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="+", type=str, required=True)
+    parser.add_argument("--no_multiprocessing", action="store_true")
     args = parser.parse_args()
 
-    for dataset in args.datasets:
-        print(f"Creating heatmap for {dataset}")
-        # agent class and actor loss do not matter much here, as they influence parts of the dataset we do not use anyways
-        env, train_dataset, val_dataset = create_env_and_dataset(
-            dataset, "CRL", get_adapted_default_config("CRL", dataset, "awr")
-        )
+    output_folder = Path("plots") / "visualizations" / "datasets"
+    output_folder.mkdir(exist_ok=True, parents=True)
 
-        # Create maze image
-        # move goal and ant out of picture
-        env.unwrapped.set_goal(goal_xy=(-10, -10))  # type: ignore
-        env.unwrapped.set_xy((-10, -10))  # type: ignore
-        visualized_env = env.unwrapped.render()  # type: ignore
-        maze = ImageOps.contain(
-            ImageOps.invert(
-                Image.fromarray(env.unwrapped.maze_map.astype(np.uint8) * 255)  # type: ignore
-            ),
-            (
-                MAX_IMAGE_SIZE * SUPERSAMPLING_FACTOR,
-                MAX_IMAGE_SIZE * SUPERSAMPLING_FACTOR,
-            ),
-            method=Image.Resampling.BOX,
-        ).convert("RGBA")
-
-        coordinates = (
-            xy_to_ij(
-                sample_to_coordinates(train_dataset.sample(DATASET_SAMPLE_SIZE)),
-                env.unwrapped,
+    if not args.no_multiprocessing:
+        try:
+            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 3
+        except Exception as _:
+            thread_count = multiprocessing.cpu_count() // 3
+        with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
+            pool.map(
+                partial(plot_dataset_heatmap, output_folder=output_folder),
+                args.datasets,
             )
-            / env.unwrapped.maze_map.transpose().shape
-        )
-        fig = plt.figure(figsize=(10, 10))
-
-        # Make plot work as an overlay
-        plt.axis("off")
-        plt.margins(0, 0)
-        plt.xlim(0, 1)
-        plt.ylim(0, 1)
-        plt.gca().set_position([0, 0, 1, 1])
-        plt.gca().invert_yaxis()
-
-        sns.kdeplot(
-            x=coordinates[:, 0],
-            y=coordinates[:, 1],
-            bw_adjust=0.3,
-            fill=True,
-            cmap="plasma",
-        )
-
-        # Overlay to pillow image
-        buf = io.BytesIO()
-        fig.savefig(
-            buf, format="png", bbox_inches="tight", transparent=True, pad_inches=0
-        )
-        plt.close(fig)
-        buf.seek(0)
-        overlay = Image.open(buf).convert("RGBA").resize(maze.size)
-
-        fig_on_maze(overlay, maze).save(f"{dataset}.png")
+    else:
+        for dataset in args.datasets:
+            plot_dataset_heatmap(dataset, output_folder)
