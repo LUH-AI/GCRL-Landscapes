@@ -49,7 +49,9 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
         (results_df for _, results_df in phase_results)
     )
 
-    table = results_only_final_eval_df.groupby(by=["agent", "dataset", "phase"]).agg(
+    table = results_only_final_eval_df.groupby(
+        by=["agent", "dataset", "hps", "phase"]
+    ).agg(
         **{
             "Goal Distance Score": pd.NamedAgg(
                 column="mean_normalized_goal_distance_return", aggfunc="mean"
@@ -88,7 +90,7 @@ def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
     final_results_pandas = results_pandas[
         results_pandas["eval_step"] == results_pandas["phase"]
     ]
-    table = final_results_pandas.groupby(by=["agent", "dataset", "phase"]).apply(
+    table = final_results_pandas.groupby(by=["agent", "dataset", "hps", "phase"]).apply(
         lambda df: fit_model(
             df.reset_index(drop=True),
             "mean_normalized_goal_distance_return",
@@ -137,7 +139,7 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
             return calculate_regret_for_experiment(df, regret_col, base_col)
 
         regret_df = (
-            final_results_pandas.groupby(by=["agent", "dataset"])
+            final_results_pandas.groupby(by=["agent", "dataset", "hps"])
             .apply(calculate_regret)
             .reset_index(level="phase")
         )
@@ -246,7 +248,7 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
         )
         return optimum_per_phase_diff_df
 
-    table = final_results_pandas.groupby(by=["agent", "dataset"]).apply(
+    table = final_results_pandas.groupby(by=["agent", "dataset", "hps"]).apply(
         calculate_optimum_shift
     )
 

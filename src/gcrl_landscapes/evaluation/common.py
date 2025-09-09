@@ -162,7 +162,8 @@ def merge_experiments(
                 dataset=",".join(run_info["arguments"]["datasets"])
                 if "datasets" in run_info["arguments"]
                 else run_info["arguments"]["dataset"],
-                hps=lambda x: [run_info["arguments"]["hyperparameters"]] * len(x),
+                hps=lambda x: [frozenset(run_info["arguments"]["hyperparameters"])]
+                * len(x),
             )
             for run_info, result in results.values()
         ]
