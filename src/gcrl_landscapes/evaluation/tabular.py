@@ -253,9 +253,9 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
         )
         return optimum_per_phase_diff_df
 
-    full_table = final_results_pandas.groupby(
+    full_table: pd.DataFrame = final_results_pandas.groupby(
         by=["agent", "dataset", "constant_dataset", "hps"]
-    ).apply(calculate_optimum_shift)
+    ).apply(calculate_optimum_shift)  # type: ignore
 
     with open(out / "optimum_shift_table_full.md", "w") as f:
         f.write(full_table.to_markdown())
@@ -266,74 +266,14 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
     with open(out / "optimum_shift_table_full.csv", "w") as f:
         f.write(full_table.to_csv())
 
-    agent_scheduled_vs_non_scheduled = full_table.groupby(
-        by=["agent", "constant_dataset"]
-    )["optimum_shift"].mean()
-
-    with open(
-        out / "optimum_shift_table_agent_scheduled_vs_non_scheduled.md", "w"
-    ) as f:
-        f.write(agent_scheduled_vs_non_scheduled.to_markdown())
-
-    with open(
-        out / "optimum_shift_table_agent_scheduled_vs_non_scheduled.tex", "w"
-    ) as f:
-        f.write(agent_scheduled_vs_non_scheduled.to_latex())
-
-    with open(
-        out / "optimum_shift_table_agent_scheduled_vs_non_scheduled.csv", "w"
-    ) as f:
-        f.write(agent_scheduled_vs_non_scheduled.to_csv())
-
-    dataset_table = full_table.groupby(by=["dataset"])["optimum_shift"].mean()
-
-    with open(out / "optimum_shift_table_dataset.md", "w") as f:
-        f.write(dataset_table.to_markdown())
-
-    with open(out / "optimum_shift_table_dataset.tex", "w") as f:
-        f.write(dataset_table.to_latex())
-
-    with open(out / "optimum_shift_table_dataset.csv", "w") as f:
-        f.write(dataset_table.to_csv())
-
-    agent_dataset_table = full_table.groupby(by=["agent", "dataset"])[
-        "optimum_shift"
-    ].mean()
-
-    with open(out / "optimum_shift_table_agent_dataset.md", "w") as f:
-        f.write(agent_dataset_table.to_markdown())
-
-    with open(out / "optimum_shift_table_agent_dataset.tex", "w") as f:
-        f.write(agent_dataset_table.to_latex())
-
-    with open(out / "optimum_shift_table_agent_dataset.csv", "w") as f:
-        f.write(agent_dataset_table.to_csv())
-
-    agent_phase_table = full_table.groupby(by=["agent", "phase_num"])[
-        "optimum_shift"
-    ].mean()
-
-    with open(out / "optimum_shift_table_agent_phase.md", "w") as f:
-        f.write(agent_phase_table.to_markdown())
-
-    with open(out / "optimum_shift_table_agent_phase.tex", "w") as f:
-        f.write(agent_phase_table.to_latex())
-
-    with open(out / "optimum_shift_table_agent_phase.csv", "w") as f:
-        f.write(agent_phase_table.to_csv())
-
-    dataset_phase_table = full_table.groupby(by=["dataset", "phase_num"])[
-        "optimum_shift"
-    ].mean()
-
-    with open(out / "optimum_shift_table_dataset_phase.md", "w") as f:
-        f.write(dataset_phase_table.to_markdown())
-
-    with open(out / "optimum_shift_table_dataset_phase.tex", "w") as f:
-        f.write(dataset_phase_table.to_latex())
-
-    with open(out / "optimum_shift_table_dataset_phase.csv", "w") as f:
-        f.write(dataset_phase_table.to_csv())
+    base_path = out / "optimum_shift_table"
+    aggregate_and_save_results(full_table, ["agent", "constant_dataset"], base_path)
+    aggregate_and_save_results(full_table, ["dataset"], base_path)
+    aggregate_and_save_results(full_table, ["agent", "dataset"], base_path)
+    aggregate_and_save_results(full_table, ["agent", "phase_num"], base_path)
+    aggregate_and_save_results(full_table, ["dataset", "phase_num"], base_path)
+    aggregate_and_save_results(full_table, ["agent"], base_path)
+    aggregate_and_save_results(full_table, ["phase_num"], base_path)
 
 
 def create_importance_divergence_table(
@@ -454,6 +394,37 @@ def parse_hp_importance(zip_path: Path) -> pd.DataFrame:
         values="importance",
     ).dropna()
     return df
+
+
+def aggregate_and_save_results(
+    table: pd.DataFrame, grouping_keys: list[str], output_base_path: Path
+) -> None:
+    unformatted_aggregated_table = table.groupby(by=grouping_keys).agg(["mean", "std"])
+
+    aggregated_table = pd.DataFrame(
+        {
+            col: [
+                f"{m:.2f} ± {s:.2f}"
+                for m, s in zip(
+                    unformatted_aggregated_table[(col, "mean")],
+                    unformatted_aggregated_table[(col, "std")],
+                )
+            ]
+            for col in unformatted_aggregated_table.columns.get_level_values(0)
+        },
+        index=unformatted_aggregated_table.index,
+    )
+
+    with open(f"{str(output_base_path)}_{'-'.join(grouping_keys)}.md", "w") as f:
+        f.write(aggregated_table.to_markdown())
+
+    with open(f"{str(output_base_path)}_{'-'.join(grouping_keys)}.tex", "w") as f:
+        f.write(aggregated_table.to_latex())
+
+    with open(f"{str(output_base_path)}_{'-'.join(grouping_keys)}.csv", "w") as f:
+        f.write(aggregated_table.to_csv())
+
+    return
 
 
 def compute_merged_df(zipfiles: list[Path]) -> pd.DataFrame:
