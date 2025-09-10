@@ -187,7 +187,7 @@ def calculate_regret_for_experiment(
     """
     # Marginalize Seed
     df = (
-        df.groupby(by=["phase", "config_index"])
+        df.groupby(by=["phase_num", "config_index"])
         .agg(
             {  # type: ignore
                 column: lambda column_values: trim_mean(
@@ -200,33 +200,33 @@ def calculate_regret_for_experiment(
     )
 
     regret_df = pd.DataFrame(
-        columns=[f"regret_phase_{i + 1}" for i in range(len(df["phase"].unique()))]
+        columns=[f"regret_phase_{i + 1}" for i in range(len(df["phase_num"].unique()))]
         + ["mean_regret_over_phases", "mean_future_regret_over_phases"]
     )
     regret_df.index = regret_df.index.rename("phase")  # type: ignore
-    all_phases = np.sort(df["phase"].unique())  # type: ignore
+    all_phases = np.sort(df["phase_num"].unique())  # type: ignore
 
-    for phase_idx, phase in enumerate(df["phase"].unique()):
+    for phase_idx, phase_num in enumerate(df["phase_num"].unique()):
         best_config_index = (
-            df[df["phase"] == phase]  # type: ignore
+            df[df["phase_num"] == phase_num]  # type: ignore
             .sort_values(base_column, ascending=False)
             .iloc[0]["config_index"]
         )
         best_config_df = df[df["config_index"] == best_config_index]
-        assert best_config_df["phase"].nunique() == len(all_phases)  # type: ignore
-        assert len(best_config_df["phase"]) == len(all_phases)
-        regret_df.loc[phase + 1] = [np.nan] * (len(all_phases) + 2)
-        for other_phase_idx, other_phase in enumerate(df["phase"].unique()):
-            regret_df.loc[phase + 1, f"regret_phase_{other_phase_idx + 1}"] = (
-                best_config_df[best_config_df["phase"] == other_phase].iloc[0][  # type: ignore
+        assert best_config_df["phase_num"].nunique() == len(all_phases)  # type: ignore
+        assert len(best_config_df["phase_num"]) == len(all_phases)
+        regret_df.loc[phase_num] = [np.nan] * (len(all_phases) + 2)
+        for other_phase_idx, other_phase_num in enumerate(df["phase_num"].unique()):
+            regret_df.loc[phase_num, f"regret_phase_{other_phase_num}"] = (
+                best_config_df[best_config_df["phase_num"] == other_phase_num].iloc[0][  # type: ignore
                     regret_column
                 ]
             )
-        regret_df.loc[phase + 1, "mean_regret_over_phases"] = best_config_df[
+        regret_df.loc[phase_num, "mean_regret_over_phases"] = best_config_df[
             regret_column
         ].mean()
-        regret_df.loc[phase + 1, "mean_future_regret_over_phases"] = best_config_df[
-            best_config_df["phase"] > phase
+        regret_df.loc[phase_num, "mean_future_regret_over_phases"] = best_config_df[
+            best_config_df["phase_num"] > phase_num
         ][regret_column].mean()
 
     return regret_df
