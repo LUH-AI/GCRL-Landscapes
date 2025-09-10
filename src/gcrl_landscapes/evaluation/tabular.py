@@ -144,21 +144,23 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
             return calculate_regret_for_experiment(df, regret_col, base_col)
 
         regret_df = (
-            final_results_pandas.groupby(by=["agent", "dataset", "hps"])
+            final_results_pandas.groupby(
+                by=["agent", "dataset", "constant_dataset", "hps"]
+            )
             .apply(calculate_regret)
             .reset_index(level="phase")
         )
 
-        table_pick_first_phase = (
+        table_pick_first_phase: pd.DataFrame = (
             regret_df.sort_values(["phase"], ascending=True)
             .groupby(by=regret_df.index.names)
             .nth(0)
-        )
-        table_pick_second_phase = (
+        )  # type: ignore
+        table_pick_second_phase: pd.DataFrame = (
             regret_df.sort_values(["phase"], ascending=True)
             .groupby(by=regret_df.index.names)
             .nth(1)
-        )
+        )  # type: ignore
 
         with open(output_folder / f"{regret_col}_table_first_phase.md", "w") as f:
             f.write(table_pick_first_phase.to_markdown())
@@ -177,6 +179,26 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
 
         with open(output_folder / f"{regret_col}_table_second_phase.csv", "w") as f:
             f.write(table_pick_second_phase.to_csv())
+
+        base_path = output_folder / f"{regret_col}_table_first_phase"
+        aggregate_and_save_results(
+            table_pick_first_phase, ["agent", "constant_dataset"], base_path
+        )
+        aggregate_and_save_results(table_pick_first_phase, ["dataset"], base_path)
+        aggregate_and_save_results(
+            table_pick_first_phase, ["agent", "dataset"], base_path
+        )
+        aggregate_and_save_results(table_pick_first_phase, ["agent"], base_path)
+
+        base_path = output_folder / f"{regret_col}_table_second_phase"
+        aggregate_and_save_results(
+            table_pick_second_phase, ["agent", "constant_dataset"], base_path
+        )
+        aggregate_and_save_results(table_pick_second_phase, ["dataset"], base_path)
+        aggregate_and_save_results(
+            table_pick_second_phase, ["agent", "dataset"], base_path
+        )
+        aggregate_and_save_results(table_pick_second_phase, ["agent"], base_path)
 
 
 def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
