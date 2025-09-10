@@ -2,7 +2,7 @@ import flax
 from pathlib import Path
 import pickle
 from ml_collections import FrozenConfigDict
-from typing import Generic, TypeVar, Any
+from typing import Generic, TypeVar, Any, Callable
 import json
 import pandas as pd
 import zipfile
@@ -12,6 +12,7 @@ from tempfile import NamedTemporaryFile
 from glob import glob
 from scipy.stats import trim_mean
 import numpy as np
+import hashlib
 
 
 T = TypeVar("T")
@@ -354,3 +355,42 @@ def read_results_from_zip(
         prefix: (prefix_run_mapping[prefix], prefix_phase_results_mapping[prefix])
         for prefix in prefix_run_mapping.keys()
     }
+
+
+def filehash(filepaths: list[Path], algorithm: str = "sha256") -> str:
+    """Get hash for combination of all files.
+    Is sensitive to metadata (filename, size, mtime) and zipfile content.
+
+    Args:
+        filepaths: path of files to hash
+        algorithm: hash algorithm
+
+    Returns:
+        hash of all files
+    """
+    h = hashlib.new(algorithm)
+    for path in sorted(filepaths):
+        h.update(str(path).encode())
+        h.update(str(path.stat().st_size).encode())
+        h.update(str(path.stat().st_mtime).encode())
+        with open(path, "rb") as f:
+            h.update(f.read())
+
+    return h.hexdigest()
+
+
+def load_or_compute(
+    filepaths: list[Path],
+    compute: Callable,
+    cache_dir: Path = Path.home() / ".cache" / "gcrl_landscapes",
+) -> Any | None:
+    cache_path = cache_dir / filehash(filepaths)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    if cache_path.exists():
+        with open(cache_path, "rb") as f:
+            return pickle.load(f)
+    else:
+        result = compute(filepaths)
+        with open(cache_path, "wb") as f:
+            pickle.dump(result, f)
+        return result
