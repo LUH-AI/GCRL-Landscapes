@@ -214,9 +214,9 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
         pandas dataframe constructed from results
     """
     # [TODO: this code is a mess, rewrite it]
-    df = pd.DataFrame()
     # results are unpacked here until every step has a column, all hyperparameters have a column and the performance has a column
     run_id = 0
+    rows = []
     for phase_step, result in results.items():
         for config, eval_trajectories in result.items():
             for seed, eval_trajectory in eval_trajectories.items():
@@ -229,7 +229,7 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
                     )
                     for eval_step in eval_trajectory[0].keys()
                 }.items():  # In EvalTrajectory both ResultsPerStep have the same keys
-                    new_df = pd.DataFrame.from_dict(
+                    rows.append(
                         {
                             "run_id": run_id,
                             "seed": seed,
@@ -241,19 +241,13 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
                             "config_index": config["config_index"],
                         }
                         | {
-                            f"hp.{key}": [
-                                value,
-                            ]
+                            f"hp.{key}": value
                             for key, value in config.to_dict().items()
                             if key != "config_index"
                         }
                     )
-                    df = pd.concat(
-                        [df, new_df],
-                        ignore_index=True,
-                    )
             run_id += 1  # every configuration per phase has a distinct run_id
-    return df
+    return pd.DataFrame(rows)
 
 
 def read_results_from_zip(

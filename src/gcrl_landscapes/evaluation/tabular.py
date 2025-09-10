@@ -21,6 +21,8 @@ from typing import Any
 import zipfile
 import re
 import json
+import multiprocessing
+import os
 
 
 def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
@@ -461,6 +463,7 @@ if __name__ == "__main__":
         action="store_true",
         help="Zip contains hp importance data. Only create tables based on hp importance.",
     )
+    parser.add_argument("--no_multiprocessing", action="store_true")
     parser.add_argument("--output_folder", type=Path, required=True)
     args = parser.parse_args()
 
@@ -475,18 +478,31 @@ if __name__ == "__main__":
         create_importance_divergence_table(importance_df, args.output_folder)
         exit(0)
 
+    if not args.no_multiprocessing:
+        try:
+            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 2
+        except Exception as _:
+            thread_count = multiprocessing.cpu_count() // 2
+
+        with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
+            results_from_zips = pool.map(read_results_from_zip, args.zipfiles)
+    else:
+        results_from_zips = [
+            read_results_from_zip(zipfile) for zipfile in args.zipfiles
+        ]
+    print("Finished parsing results")
+
     merged_results_df = merge_experiments(
         {
             prefix: (
                 run_info,
                 compute_additional_information(phase_results_to_pandas(phase_results)),
             )
-            for zipfile in args.zipfiles
-            for prefix, (run_info, phase_results) in read_results_from_zip(
-                zipfile
-            ).items()
+            for result_from_zip in results_from_zips
+            for prefix, (run_info, phase_results) in result_from_zip.items()
         }
     )
+    print("Finished merging results")
 
     create_phased_tables(merged_results_df, output_folder)
     create_igprfit_tables(merged_results_df, output_folder)
