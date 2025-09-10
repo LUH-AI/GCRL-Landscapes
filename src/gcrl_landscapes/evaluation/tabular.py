@@ -1,6 +1,7 @@
 import argparse
 from gcrl_landscapes.util.data import (
     read_results_from_zip,
+    load_or_compute,
 )
 from gcrl_landscapes.util.eval import fit_model
 from gcrl_landscapes.util.data import phase_results_to_pandas
@@ -455,6 +456,30 @@ def parse_hp_importance(zip_path: Path) -> pd.DataFrame:
     return df
 
 
+def compute_merged_df(zipfiles: list[Path]) -> pd.DataFrame:
+    if not args.no_multiprocessing:
+        try:
+            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 2
+        except Exception as _:
+            thread_count = multiprocessing.cpu_count() // 2
+
+        with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
+            results_from_zips = pool.map(read_results_from_zip, zipfiles)
+    else:
+        results_from_zips = [read_results_from_zip(zipfile) for zipfile in zipfiles]
+
+    return merge_experiments(
+        {
+            prefix: (
+                run_info,
+                compute_additional_information(phase_results_to_pandas(phase_results)),
+            )
+            for result_from_zip in results_from_zips
+            for prefix, (run_info, phase_results) in result_from_zip.items()
+        }
+    )
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--zipfiles", nargs="+", type=Path, required=True)
@@ -478,31 +503,7 @@ if __name__ == "__main__":
         create_importance_divergence_table(importance_df, args.output_folder)
         exit(0)
 
-    if not args.no_multiprocessing:
-        try:
-            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 2
-        except Exception as _:
-            thread_count = multiprocessing.cpu_count() // 2
-
-        with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
-            results_from_zips = pool.map(read_results_from_zip, args.zipfiles)
-    else:
-        results_from_zips = [
-            read_results_from_zip(zipfile) for zipfile in args.zipfiles
-        ]
-    print("Finished parsing results")
-
-    merged_results_df = merge_experiments(
-        {
-            prefix: (
-                run_info,
-                compute_additional_information(phase_results_to_pandas(phase_results)),
-            )
-            for result_from_zip in results_from_zips
-            for prefix, (run_info, phase_results) in result_from_zip.items()
-        }
-    )
-    print("Finished merging results")
+    merged_results_df = load_or_compute(args.zipfiles, compute_merged_df)
 
     create_phased_tables(merged_results_df, output_folder)
     create_igprfit_tables(merged_results_df, output_folder)
