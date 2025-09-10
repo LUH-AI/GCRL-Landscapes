@@ -24,6 +24,7 @@ import re
 import json
 import multiprocessing
 import os
+from itertools import combinations, chain
 
 
 def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
@@ -180,25 +181,21 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
         with open(output_folder / f"{regret_col}_table_second_phase.csv", "w") as f:
             f.write(table_pick_second_phase.to_csv())
 
-        base_path = output_folder / f"{regret_col}_table_first_phase"
-        aggregate_and_save_results(
-            table_pick_first_phase, ["agent", "constant_dataset"], base_path
-        )
-        aggregate_and_save_results(table_pick_first_phase, ["dataset"], base_path)
-        aggregate_and_save_results(
-            table_pick_first_phase, ["agent", "dataset"], base_path
-        )
-        aggregate_and_save_results(table_pick_first_phase, ["agent"], base_path)
-
-        base_path = output_folder / f"{regret_col}_table_second_phase"
-        aggregate_and_save_results(
-            table_pick_second_phase, ["agent", "constant_dataset"], base_path
-        )
-        aggregate_and_save_results(table_pick_second_phase, ["dataset"], base_path)
-        aggregate_and_save_results(
-            table_pick_second_phase, ["agent", "dataset"], base_path
-        )
-        aggregate_and_save_results(table_pick_second_phase, ["agent"], base_path)
+        aggregation_columns = ["agent", "dataset", "constant_dataset", "hps"]
+        for combination in chain(
+            combinations(aggregation_columns, 2),
+            [[column] for column in aggregation_columns],
+        ):
+            aggregate_and_save_results(
+                table_pick_first_phase,
+                list(combination),
+                output_folder / f"{regret_col}_table_first_phase",
+            )
+            aggregate_and_save_results(
+                table_pick_second_phase,
+                list(combination),
+                output_folder / f"{regret_col}_table_second_phase",
+            )
 
 
 def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
