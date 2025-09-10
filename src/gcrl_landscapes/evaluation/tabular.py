@@ -82,7 +82,7 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
     with open(output_folder / "table.csv", "w") as f:
         f.write(table.to_csv())
 
-    aggregation_columns = ["agent", "dataset", "hps", "phase_num"]
+    aggregation_columns = ["agent", "dataset", "constant_dataset", "phase_num"]
     for combination in chain(
         combinations(aggregation_columns, 2),
         [[column] for column in aggregation_columns],
@@ -102,7 +102,7 @@ def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
         results_pandas["eval_step"] == results_pandas["phase"]
     ]
     table = final_results_pandas.groupby(
-        by=["agent", "dataset", "hps", "phase_num"]
+        by=["agent", "dataset", "constant_dataset", "hps", "phase_num"]
     ).apply(
         lambda df: fit_model(
             df.reset_index(drop=True),
@@ -123,7 +123,7 @@ def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
     with open(output_folder / "igpr_fit_table.csv", "w") as f:
         f.write(table.to_csv())
 
-    aggregation_columns = ["agent", "dataset", "hps", "phase_num"]
+    aggregation_columns = ["agent", "dataset", "constant_dataset", "hps", "phase_num"]
     for combination in chain(
         combinations(aggregation_columns, 2),
         [[column] for column in aggregation_columns],
