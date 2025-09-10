@@ -107,14 +107,23 @@ def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
         .mean(axis=0),
     )
 
-    with open(output_folder / "additional_table.md", "w") as f:
+    with open(output_folder / "igpr_fit_table.md", "w") as f:
         f.write(table.to_markdown())
 
-    with open(output_folder / "additional_table.tex", "w") as f:
+    with open(output_folder / "igpr_fit_table.tex", "w") as f:
         f.write(table.to_latex())
 
-    with open(output_folder / "additional_table.csv", "w") as f:
+    with open(output_folder / "igpr_fit_table.csv", "w") as f:
         f.write(table.to_csv())
+
+    aggregation_columns = ["agent", "dataset", "hps", "phase_num"]
+    for combination in chain(
+        combinations(aggregation_columns, 2),
+        [[column] for column in aggregation_columns],
+    ):
+        aggregate_and_save_results(
+            table, list(combination), output_folder / "igpr_fit_table"
+        )
 
 
 def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
