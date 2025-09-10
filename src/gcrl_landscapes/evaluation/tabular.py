@@ -496,9 +496,24 @@ if __name__ == "__main__":
         create_importance_divergence_table(importance_df, args.output_folder)
         exit(0)
 
-    merged_results_df = load_or_compute(args.zipfiles, compute_merged_df)
+    merged_results_df: pd.DataFrame = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
 
     create_phased_tables(merged_results_df, output_folder)
     create_igprfit_tables(merged_results_df, output_folder)
     create_regret_table(merged_results_df, output_folder)
     create_optimum_shift_table(merged_results_df, output_folder)
+
+    # Do all calculations once without pure explore
+    output_folder = output_folder / "wo_pure_explore"
+    output_folder.mkdir(exist_ok=True)
+    wo_pure_explore_df = merged_results_df[
+        merged_results_df["dataset"].apply(
+            lambda datasets: any(
+                ["explore-v0" not in dataset for dataset in datasets.split(",")]
+            )
+        )
+    ]
+    create_phased_tables(wo_pure_explore_df, output_folder)
+    create_igprfit_tables(wo_pure_explore_df, output_folder)
+    create_regret_table(wo_pure_explore_df, output_folder)
+    create_optimum_shift_table(wo_pure_explore_df, output_folder)
