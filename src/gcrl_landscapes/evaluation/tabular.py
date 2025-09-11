@@ -473,12 +473,14 @@ def aggregate_and_save_results(
                 )
             ]
             for col in unformatted_aggregated_table.columns.get_level_values(0)
-            if "max " not in col.lower()
+            if not (
+                "max " in col.lower() or "max_" in col.lower() or "max-" in col.lower()
+            )
         }
         | {
             col: [f"{m:.2f}" for m in unformatted_aggregated_table[(col, "max")]]
             for col in unformatted_aggregated_table.columns.get_level_values(0)
-            if "max " in col.lower()
+            if "max " in col.lower() or "max_" in col.lower() or "max-" in col.lower()
         },
         index=unformatted_aggregated_table.index,
     )
