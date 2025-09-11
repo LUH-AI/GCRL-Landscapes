@@ -12,7 +12,6 @@ from .common import (
     compute_additional_information,
     merge_experiments,
     calculate_regret_for_experiment,
-    CVAR_CONFIDENCE_LEVELS,
 )
 from gcrl_landscapes.configurations import hp_to_sobol_codomain, get_bounds
 from scipy.stats import trim_mean
@@ -53,41 +52,67 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
         (results_df for _, results_df in phase_results)
     )
 
-    table = results_only_final_eval_df.groupby(
-        by=["agent", "dataset", "constant_dataset", "hps", "phase_num"]
-    ).agg(
-        **{
-            "Goal Distance Score": pd.NamedAgg(
-                column="mean_normalized_goal_distance_return", aggfunc="mean"
-            ),
-            "Dispersion Score": pd.NamedAgg(
-                column="disp_normalized_goal_distance_score", aggfunc="mean"
-            ),
+    def aggregation(df: pd.DataFrame):
+        return df.groupby(
+            by=["agent", "dataset", "constant_dataset", "hps", "phase_num"]
+        ).agg(
             **{
-                f"CVaR{cvar_level} score": pd.NamedAgg(
-                    column=f"cvar{cvar_level}_normalized_goal_distance_return",
-                    aggfunc="mean",
-                )
-                for cvar_level in CVAR_CONFIDENCE_LEVELS
-            },
-        }
+                "Goal Distance Score Normalized Regret $< 0.1$ Ratio": pd.NamedAgg(
+                    column="mean_normalized_goal_distance_return_normalized_regret",
+                    aggfunc=lambda x: (x < 0.1).mean(),
+                ),
+                "Goal Distance Score Normalized Regret $< 0.2$ Ratio": pd.NamedAgg(
+                    column="mean_normalized_goal_distance_return_normalized_regret",
+                    aggfunc=lambda x: (x < 0.2).mean(),
+                ),
+                "Goal Distance Score": pd.NamedAgg(
+                    column="mean_normalized_goal_distance_return", aggfunc="mean"
+                ),
+                "Max Goal Distance Score": pd.NamedAgg(
+                    column="mean_normalized_goal_distance_return", aggfunc="max"
+                ),
+                "Success": pd.NamedAgg(column="success", aggfunc="mean"),
+            }
+        )
+
+    table = aggregation(results_only_final_eval_df)
+    table_last_phase = aggregation(
+        results_only_final_eval_df[
+            results_only_final_eval_df["phase_num"]
+            == max(results_only_final_eval_df["phase_num"])
+        ]
     )
 
-    with open(output_folder / "table.md", "w") as f:
+    with open(output_folder / "table_all_phases.md", "w") as f:
         f.write(table.to_markdown())
 
-    with open(output_folder / "table.tex", "w") as f:
+    with open(output_folder / "table_all_phases.tex", "w") as f:
         f.write(table.to_latex())
 
-    with open(output_folder / "table.csv", "w") as f:
+    with open(output_folder / "table_all_phases.csv", "w") as f:
         f.write(table.to_csv())
 
-    aggregation_columns = ["agent", "dataset", "constant_dataset", "phase_num"]
+    with open(output_folder / "table_last_phase.md", "w") as f:
+        f.write(table_last_phase.to_markdown())
+
+    with open(output_folder / "table_last_phase.tex", "w") as f:
+        f.write(table_last_phase.to_latex())
+
+    with open(output_folder / "table_last_phase.csv", "w") as f:
+        f.write(table_last_phase.to_csv())
+
+    aggregation_columns = ["agent", "dataset", "constant_dataset", "phase_num", "hps"]
     for combination in chain(
         combinations(aggregation_columns, 2),
         [[column] for column in aggregation_columns],
+        [["agent", "constant_dataset", "phase_num"]],
     ):
-        aggregate_and_save_results(table, list(combination), output_folder / "table")
+        aggregate_and_save_results(
+            table, list(combination), output_folder / "table_all_phases"
+        )
+        aggregate_and_save_results(
+            table_last_phase, list(combination), output_folder / "table_last_phase"
+        )
 
 
 def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
@@ -434,7 +459,9 @@ def parse_hp_importance(zip_path: Path) -> pd.DataFrame:
 def aggregate_and_save_results(
     table: pd.DataFrame, grouping_keys: list[str], output_base_path: Path
 ) -> None:
-    unformatted_aggregated_table = table.groupby(by=grouping_keys).agg(["mean", "std"])
+    unformatted_aggregated_table = table.groupby(by=grouping_keys).agg(
+        ["mean", "std", "max"]
+    )
 
     aggregated_table = pd.DataFrame(
         {
@@ -446,6 +473,12 @@ def aggregate_and_save_results(
                 )
             ]
             for col in unformatted_aggregated_table.columns.get_level_values(0)
+            if "max " not in col.lower()
+        }
+        | {
+            col: [f"{m:.2f}" for m in unformatted_aggregated_table[(col, "max")]]
+            for col in unformatted_aggregated_table.columns.get_level_values(0)
+            if "max " in col.lower()
         },
         index=unformatted_aggregated_table.index,
     )
@@ -519,13 +552,13 @@ if __name__ == "__main__":
     # Do all calculations once without pure explore
     output_folder = output_folder / "wo_pure_explore"
     output_folder.mkdir(exist_ok=True)
-    wo_pure_explore_df = merged_results_df[
+    wo_pure_explore_df: pd.DataFrame = merged_results_df[
         merged_results_df["dataset"].apply(
             lambda datasets: any(
                 ["explore-v0" not in dataset for dataset in datasets.split(",")]
             )
         )
-    ]
+    ]  # type: ignore
     create_phased_tables(wo_pure_explore_df, output_folder)
     create_igprfit_tables(wo_pure_explore_df, output_folder)
     create_regret_table(wo_pure_explore_df, output_folder)
