@@ -158,7 +158,10 @@ def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
         [[column] for column in aggregation_columns],
     ):
         aggregate_and_save_results(
-            table, list(combination), output_folder / "igpr_fit_table"
+            table,
+            list(combination),
+            output_folder / "igpr_fit_table",
+            rounding_decimals=3,
         )
 
 
@@ -463,7 +466,10 @@ def parse_hp_importance(zip_path: Path) -> pd.DataFrame:
 
 
 def aggregate_and_save_results(
-    table: pd.DataFrame, grouping_keys: list[str], output_base_path: Path
+    table: pd.DataFrame,
+    grouping_keys: list[str],
+    output_base_path: Path,
+    rounding_decimals: int = 2,
 ) -> None:
     unformatted_aggregated_table = table.groupby(by=grouping_keys).agg(
         ["mean", "std", "max"]
@@ -472,7 +478,7 @@ def aggregate_and_save_results(
     aggregated_table = pd.DataFrame(
         {
             col: [
-                f"{m:.2f} $\\pm$ {s:.2f}"
+                f"{m:.{rounding_decimals}f} $\\pm$ {s:.{rounding_decimals}f}"
                 for m, s in zip(
                     unformatted_aggregated_table[(col, "mean")],
                     unformatted_aggregated_table[(col, "std")],
@@ -484,7 +490,10 @@ def aggregate_and_save_results(
             )
         }
         | {
-            col: [f"{m:.2f}" for m in unformatted_aggregated_table[(col, "max")]]
+            col: [
+                f"{m:.{rounding_decimals}f}"
+                for m in unformatted_aggregated_table[(col, "max")]
+            ]
             for col in unformatted_aggregated_table.columns.get_level_values(0)
             if "max " in col.lower() or "max_" in col.lower() or "max-" in col.lower()
         },
