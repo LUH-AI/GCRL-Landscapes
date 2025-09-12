@@ -102,10 +102,14 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
         f.write(table_last_phase.to_csv())
 
     aggregation_columns = ["agent", "dataset", "constant_dataset", "phase_num", "hps"]
+    extra_combinations = [
+        ("constant_dataset", "agent"),
+        ("constant_dataset", "agent", "phase_num"),
+    ]
     for combination in chain(
         combinations(aggregation_columns, 2),
         [[column] for column in aggregation_columns],
-        [["agent", "constant_dataset", "phase_num"]],
+        extra_combinations,
     ):
         aggregate_and_save_results(
             table, list(combination), output_folder / "table_all_phases"
@@ -223,9 +227,11 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
             f.write(table_pick_second_phase.to_csv())
 
         aggregation_columns = ["agent", "dataset", "constant_dataset", "hps"]
+        extra_combinations = [("constant_dataset", "agent")]
         for combination in chain(
             combinations(aggregation_columns, 2),
             [[column] for column in aggregation_columns],
+            extra_combinations,
         ):
             aggregate_and_save_results(
                 table_pick_first_phase,
@@ -466,7 +472,7 @@ def aggregate_and_save_results(
     aggregated_table = pd.DataFrame(
         {
             col: [
-                f"{m:.2f} ± {s:.2f}"
+                f"{m:.2f} $\\pm$ {s:.2f}"
                 for m, s in zip(
                     unformatted_aggregated_table[(col, "mean")],
                     unformatted_aggregated_table[(col, "std")],
@@ -483,6 +489,11 @@ def aggregate_and_save_results(
             if "max " in col.lower() or "max_" in col.lower() or "max-" in col.lower()
         },
         index=unformatted_aggregated_table.index,
+    )
+    aggregated_table = (
+        aggregated_table.reorder_levels(grouping_keys)
+        if len(grouping_keys) > 1
+        else aggregated_table
     )
 
     with open(f"{str(output_base_path)}_{'-'.join(grouping_keys)}.md", "w") as f:
