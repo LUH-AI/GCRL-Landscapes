@@ -229,6 +229,15 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
         with open(output_folder / f"{regret_col}_table_second_phase.csv", "w") as f:
             f.write(table_pick_second_phase.to_csv())
 
+        merged_tables = pd.merge(
+            table_pick_first_phase,
+            table_pick_second_phase,
+            how="outer",
+            left_index=True,
+            right_index=True,
+            suffixes=("_firstphase", "_secondphase"),
+        )
+
         aggregation_columns = ["agent", "dataset", "constant_dataset", "hps"]
         extra_combinations = [("constant_dataset", "agent")]
         for combination in chain(
@@ -237,14 +246,9 @@ def create_regret_table(results_pandas: pd.DataFrame, output_folder: Path):
             extra_combinations,
         ):
             aggregate_and_save_results(
-                table_pick_first_phase,
+                merged_tables.loc[:, merged_tables.columns.str.contains("future")],
                 list(combination),
-                output_folder / f"{regret_col}_table_first_phase",
-            )
-            aggregate_and_save_results(
-                table_pick_second_phase,
-                list(combination),
-                output_folder / f"{regret_col}_table_second_phase",
+                output_folder / f"{regret_col}_table",
             )
 
 
