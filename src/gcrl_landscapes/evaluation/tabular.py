@@ -349,6 +349,99 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
     aggregate_and_save_results(full_table, ["phase_num"], base_path)
 
 
+def create_mean_diff_table(results_pandas: pd.DataFrame, output_folder: Path):
+    """Create a table showing mean difference from phase to phase
+
+    Args:
+        results_pandas: pandas dataframe containing all results (all phases)
+        output_folder: folder to save tables in
+    """
+    final_results_pandas = results_pandas[
+        results_pandas["eval_step"] == results_pandas["phase"]
+    ]
+
+    # Marginalize seed
+    final_results_pandas = (
+        final_results_pandas.groupby(
+            by=[
+                "agent",
+                "dataset",
+                "constant_dataset",
+                "hps",
+                "phase_num",
+                "config_index",
+            ]
+        )
+        .agg(
+            {
+                "success": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+            }
+        )
+        .reset_index()
+    )
+
+    def calculate_diff_table(df: pd.DataFrame) -> pd.DataFrame:
+        index = ["phase_num", "agent", "dataset", "constant_dataset", "hps"]
+        df_copy = df.copy().sort_values(by="phase_num").set_index(index)
+        df_copy["mean_normalized_goal_distance_return_scaled"] = df_copy.groupby(
+            by=["phase_num"]
+        )["mean_normalized_goal_distance_return"].transform(
+            lambda values: values / np.max(values)
+        )
+        df_diff = (
+            df_copy.groupby(by=["config_index"])[
+                [
+                    "mean_normalized_goal_distance_return",
+                    "mean_normalized_goal_distance_return_scaled",
+                ]
+            ]
+            .diff()
+            .reset_index(level="phase_num")
+        )
+        df_diff["phase_num"] = df_diff["phase_num"].apply(
+            lambda phase_num: f"{phase_num - 1} -> {phase_num}"
+            if pd.notna(phase_num)
+            else None
+        )
+        return (
+            df_diff.set_index(["phase_num"])
+            .groupby(by=["phase_num"])
+            .agg(lambda values: np.mean(np.abs(values)))
+        )
+
+    full_table = final_results_pandas.groupby(
+        by=["agent", "dataset", "constant_dataset", "hps"]
+    ).apply(calculate_diff_table)
+
+    with open(output_folder / "mean_diff_table.md", "w") as f:
+        f.write(full_table.to_markdown())
+
+    with open(output_folder / "mean_diff_table.tex", "w") as f:
+        f.write(full_table.to_latex())
+
+    with open(output_folder / "mean_diff_table.csv", "w") as f:
+        f.write(full_table.to_csv())
+
+    aggregation_columns = ["agent", "dataset", "constant_dataset", "phase_num", "hps"]
+    extra_combinations = [
+        ("constant_dataset", "agent"),
+        ("constant_dataset", "agent", "phase_num"),
+    ]
+    for combination in chain(
+        combinations(aggregation_columns, 2),
+        [[column] for column in aggregation_columns],
+        extra_combinations,
+    ):
+        aggregate_and_save_results(
+            full_table, list(combination), output_folder / "mean_diff_table"
+        )
+
+
 def create_importance_divergence_table(
     results_pandas: pd.DataFrame, output_folder: Path
 ):
@@ -574,6 +667,7 @@ if __name__ == "__main__":
     create_igprfit_tables(merged_results_df, output_folder)
     create_regret_table(merged_results_df, output_folder)
     create_optimum_shift_table(merged_results_df, output_folder)
+    create_mean_diff_table(merged_results_df, output_folder)
 
     # Do all calculations once without pure explore
     output_folder = output_folder / "wo_pure_explore"
@@ -585,6 +679,7 @@ if __name__ == "__main__":
             )
         )
     ]  # type: ignore
+    create_mean_diff_table(wo_pure_explore_df, output_folder)
     create_phased_tables(wo_pure_explore_df, output_folder)
     create_igprfit_tables(wo_pure_explore_df, output_folder)
     create_regret_table(wo_pure_explore_df, output_folder)
