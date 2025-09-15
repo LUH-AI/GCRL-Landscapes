@@ -322,7 +322,7 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
     else:
         levels = discrete_levels
 
-        labels = [f">={level:.1f}" for level in levels[:-1]]
+        labels = [f">={level:.2f}" for level in levels[:-1]]
 
         cmap = plt.get_cmap("viridis", len(levels) - 1)
         norm = mcolors.BoundaryNorm(levels, ncolors=cmap.N, clip=True)
