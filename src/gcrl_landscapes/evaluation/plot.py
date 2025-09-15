@@ -330,12 +330,12 @@ def plot(
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
         per_config_phase_folder.mkdir(exist_ok=True)
 
-        e_optimal_bins = np.array([0.0, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 1.0])
+        e_optimal_bins = np.array([0.0, 0.5, 0.8, 0.9, 0.95, 1.0])
         landscape_pairs = [
             ("success", "Success Rate", {}),
             (
                 "success",
-                "Success Epsilon Optimality",
+                "Success Epsilon Optimality Bins",
                 # Make this stepped, so that it is easier to interpret
                 {
                     "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
@@ -349,10 +349,17 @@ def plot(
             ),
             (
                 "mean_normalized_goal_distance_return",
-                "Normalized Goal Distance Return Epsilon Optimality",
+                "Normalized Goal Distance Return Epsilon Optimality Bins",
                 {
                     "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
                     "discrete_levels": e_optimal_bins,
+                }
+            ),
+            (
+                "mean_normalized_goal_distance_return",
+                "Normalized Goal Distance Return Epsilon Optimality",
+                {
+                    "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
                 }
             ),
             (
@@ -521,7 +528,7 @@ if __name__ == "__main__":
     parser.add_argument("--no_multiprocessing", action="store_true")
     args = parser.parse_args()
 
-    plt.rcParams.update(sns.plotting_context("talk") | {"figure.figsize": [4, 3]})
+    sns.set_theme(context="talk", rc={"figure.figsize": (4, 3)})
 
     # Parse results
     plots_folder = Path("plots") / os.path.basename(args.zipfile)
