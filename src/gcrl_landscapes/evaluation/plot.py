@@ -316,13 +316,13 @@ def plot(
     phases = sorted(results_pandas["phase"].unique().tolist())
     phase_results = [
         (
-            phase,
+            phase_idx + 1,
             results_pandas[
                 (results_pandas["eval_step"] == phase)
                 & (results_pandas["phase"] == phase)
             ],
         )
-        for phase in phases
+        for phase_idx, phase in enumerate(phases)
     ]
 
     phase_result: pd.DataFrame
@@ -421,7 +421,7 @@ def plot(
         if plot_eval_curves:
             plot_eval_curve(
                 phase,
-                results_pandas[results_pandas["phase"] == phase],
+                results_pandas,
                 "mean_normalized_goal_distance_return",
                 output_folder,
                 per_config_phase_folder,
