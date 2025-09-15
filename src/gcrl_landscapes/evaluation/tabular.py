@@ -52,6 +52,34 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
         (results_df for _, results_df in phase_results)
     )
 
+    # Marginalize Seed
+    final_results_pandas = (
+        results_only_final_eval_df.groupby(
+            by=[
+                "agent",
+                "dataset",
+                "constant_dataset",
+                "hps",
+                "phase_num",
+                "config_index",
+            ]
+        )
+        .agg(
+            {
+                "success": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+            }
+        )
+        .reset_index()
+    )
+
     def aggregation(df: pd.DataFrame):
         return df.groupby(
             by=["agent", "dataset", "constant_dataset", "hps", "phase_num"]
@@ -75,11 +103,10 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
             }
         )
 
-    table = aggregation(results_only_final_eval_df)
+    table = aggregation(final_results_pandas)
     table_last_phase = aggregation(
-        results_only_final_eval_df[
-            results_only_final_eval_df["phase_num"]
-            == max(results_only_final_eval_df["phase_num"])
+        final_results_pandas[
+            final_results_pandas["phase_num"] == max(final_results_pandas["phase_num"])
         ]
     )
 
@@ -105,6 +132,7 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
     extra_combinations = [
         ("constant_dataset", "agent"),
         ("constant_dataset", "agent", "phase_num"),
+        ("agent", "dataset", "hps"),
     ]
     for combination in chain(
         combinations(aggregation_columns, 2),
