@@ -35,14 +35,11 @@ SUPPORTED_AGENTS = [
     "SAC",
 ]
 SUPPORTED_DATASETS = [
-    "CRL",
-    "CMD",
-    "GCBC",
-    "GCIQL",
-    "GCIVL",
-    "QRL",
-    "HIQL",
-    "SAC",
+    "antmaze-medium-navigate-v0",
+    "antmaze-medium-explore90navigate-v0",
+    "antmaze-medium-explore80navigate-v0",
+    "antmaze-medium-explore40navigate-v0",
+    "antmaze-medium-explore-v0",
 ]
 
 
