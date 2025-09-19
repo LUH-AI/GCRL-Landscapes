@@ -14,6 +14,8 @@ from .common import (
     calculate_regret_for_experiment,
 )
 from gcrl_landscapes.configurations import hp_to_sobol_codomain, get_bounds
+from gcrl_landscapes.submission import SUPPORTED_DATASETS
+from gcrl_landscapes.phase_splitting import get_all_phases
 from scipy.stats import trim_mean
 from scipy.optimize import shgo
 from scipy.spatial import distance
@@ -23,7 +25,7 @@ import re
 import json
 import multiprocessing
 import os
-from itertools import combinations, chain
+from itertools import combinations, chain, product
 
 
 def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
@@ -590,6 +592,58 @@ def parse_hp_importance(zip_path: Path) -> pd.DataFrame:
     return df
 
 
+def create_convergence_table(zippath: Path, output_folder: Path) -> None:
+    """Create a convergence table
+    Shows which timesteps were actually used for training
+
+    Args:
+        zippaths: Paths containing convergence data
+        output_folder: folder to save tables in
+    """
+
+    def get_explore_ratio(dataset_name: str) -> int:
+        explore_mix_match = re.fullmatch(
+            r"^.*explore(?P<explore_share>\d+)(?P<secondtype>[^-]*).*$", dataset_name
+        )
+        if explore_mix_match:
+            return int(explore_mix_match.groupdict()["explore_share"])
+        elif "-explore-" in dataset_name:
+            return 100
+        elif "-navigate-" in dataset_name:
+            return 0
+        raise ValueError(f"Unknown explore ratio: {dataset_name}")
+
+    agent_column, dataset_column = zip(
+        *product(["HIQL", "CRL", "QRL"], SUPPORTED_DATASETS)
+    )
+    final_performance_95_column = [
+        get_all_phases(agent, [dataset], "awr", 95, zippath, [95])[0]
+        for agent, dataset in zip(agent_column, dataset_column)
+    ]
+
+    explore_ratio_column = [get_explore_ratio(dataset) for dataset in dataset_column]
+    final_performance_95_df = (
+        pd.DataFrame(
+            {
+                "agent": agent_column,
+                "explore_ratio": explore_ratio_column,
+                "training_steps_95": final_performance_95_column,
+            }
+        )
+        .sort_values(by=["agent", "explore_ratio"])
+        .set_index(["agent", "explore_ratio"], drop=True)
+    )
+
+    with open(output_folder / "convergence_table.md", "w") as f:
+        f.write(final_performance_95_df.to_markdown())
+
+    with open(output_folder / "convergence_table.tex", "w") as f:
+        f.write(final_performance_95_df.to_latex())
+
+    with open(output_folder / "convergence_table.csv", "w") as f:
+        f.write(final_performance_95_df.to_csv())
+
+
 def aggregate_and_save_results(
     table: pd.DataFrame,
     grouping_keys: list[str],
@@ -674,6 +728,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Zip contains hp importance data. Only create tables based on hp importance.",
     )
+    parser.add_argument(
+        "--convergence_data",
+        action="store_true",
+        help="Zip contains convergence data. Only create tables based on convergence data",
+    )
     parser.add_argument("--no_multiprocessing", action="store_true")
     parser.add_argument("--output_folder", type=Path, required=True)
     args = parser.parse_args()
@@ -687,6 +746,12 @@ if __name__ == "__main__":
             [parse_hp_importance(zipfile) for zipfile in args.zipfiles]
         )
         create_importance_divergence_table(importance_df, args.output_folder)
+        exit(0)
+
+    if args.convergence_data:
+        if len(args.zipfiles) != 1:
+            raise ValueError("Only one zipfile allowed when using --convergence_data")
+        create_convergence_table(args.zipfiles[0], args.output_folder)
         exit(0)
 
     merged_results_df: pd.DataFrame = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
