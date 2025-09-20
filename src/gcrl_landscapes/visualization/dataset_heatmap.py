@@ -15,8 +15,6 @@ from functools import partial
 
 
 DATASET_SAMPLE_SIZE = 100_000
-MAX_IMAGE_SIZE = 1000
-SUPERSAMPLING_FACTOR = 10
 
 
 def sample_to_coordinates(sample: dict) -> np.ndarray:
@@ -33,8 +31,10 @@ def fig_on_maze(density_plot: Image.Image, background: Image.Image) -> Image.Ima
     Returns:
         Returns density onto maze (image)
     """
-    white_bg = Image.new("RGBA", background.size, (255, 255, 255, 255))
-    background = background.copy()
+    white_bg = Image.new("RGBA", density_plot.size, (255, 255, 255, 255))
+    background = ImageOps.contain(
+        background.copy(), size=density_plot.size, method=Image.Resampling.BOX
+    )
     background.putalpha(background.split()[0].point(lambda p: 0 if p > 240 else 255))
     density_maze_w_alpha = Image.alpha_composite(density_plot, background)
     return Image.alpha_composite(white_bg, density_maze_w_alpha)
@@ -51,15 +51,8 @@ def plot_dataset_heatmap(dataset: str, output_folder: Path) -> None:
     env.unwrapped.set_goal(goal_xy=(-10, -10))  # type: ignore
     env.unwrapped.set_xy((-10, -10))  # type: ignore
     env.unwrapped.render()
-    maze = ImageOps.contain(
-        ImageOps.invert(
-            Image.fromarray(env.unwrapped.maze_map.astype(np.uint8) * 255)  # type: ignore
-        ),
-        (
-            MAX_IMAGE_SIZE * SUPERSAMPLING_FACTOR,
-            MAX_IMAGE_SIZE * SUPERSAMPLING_FACTOR,
-        ),
-        method=Image.Resampling.BOX,
+    maze = ImageOps.invert(
+        Image.fromarray(env.unwrapped.maze_map.astype(np.uint8) * 255)  # type: ignore
     ).convert("RGBA")
 
     coordinates = (
@@ -69,7 +62,7 @@ def plot_dataset_heatmap(dataset: str, output_folder: Path) -> None:
         )
         / env.unwrapped.maze_map.transpose().shape
     )
-    fig = plt.figure(figsize=(10, 10))
+    fig = plt.figure(figsize=(3, 3))
 
     # Make plot work as an overlay
     plt.axis("off")
@@ -82,24 +75,23 @@ def plot_dataset_heatmap(dataset: str, output_folder: Path) -> None:
     sns.kdeplot(
         x=coordinates[:, 0],
         y=coordinates[:, 1],
-        levels=100,
-        bw_adjust=0.3,
+        levels=10,
+        bw_adjust=0.5,
         fill=True,
         cmap=cmocean.cm.ice_r,
+        gridsize=400,
     )
 
     # Overlay to pillow image
     buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches="tight", transparent=True, pad_inches=0)
+    fig.savefig(
+        buf, dpi=600, format="png", bbox_inches="tight", transparent=True, pad_inches=0
+    )
     plt.close(fig)
     buf.seek(0)
-    overlay = Image.open(buf).convert("RGBA").resize(maze.size)
+    overlay = Image.open(buf).convert("RGBA")
 
-    ImageOps.contain(
-        fig_on_maze(overlay, maze),
-        (MAX_IMAGE_SIZE, MAX_IMAGE_SIZE),
-        method=Image.Resampling.LANCZOS,
-    ).save(output_folder / f"heatmap_{dataset}.png")
+    fig_on_maze(overlay, maze).save(output_folder / f"heatmap_{dataset}.png")
 
 
 if __name__ == "__main__":
