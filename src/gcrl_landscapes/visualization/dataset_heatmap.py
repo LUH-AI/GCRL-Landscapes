@@ -51,9 +51,17 @@ def plot_dataset_heatmap(dataset: str, output_folder: Path) -> None:
     env.unwrapped.set_goal(goal_xy=(-10, -10))  # type: ignore
     env.unwrapped.set_xy((-10, -10))  # type: ignore
     env.unwrapped.render()
-    maze = ImageOps.invert(
-        Image.fromarray(env.unwrapped.maze_map.astype(np.uint8) * 255)  # type: ignore
-    ).convert("RGBA")
+    maze_np = np.array(
+        ImageOps.invert(
+            Image.fromarray(env.unwrapped.maze_map.astype(np.uint8) * 255)  # type: ignore
+        ).convert("RGBA")
+    )
+    background_color = "#303e57"
+    background_color_arr = np.array(
+        [int(background_color[i : i + 2], 16) for i in (1, 3, 5)] + [255]
+    )
+    maze_np[(maze_np == [0, 0, 0, 255]).all(axis=2)] = background_color_arr
+    maze = Image.fromarray(maze_np)
 
     coordinates = (
         xy_to_ij(
