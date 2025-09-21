@@ -504,7 +504,7 @@ def create_importance_divergence_table(
             ~cosine_df.index.str.startswith("100->")
         ].sum()
 
-        return cosine_df
+        return cosine_df.round(decimals=3)
 
     table = results_pandas.groupby(by=["setting", "agent"]).apply(
         lambda df: compute_importance_divergence(df)
@@ -514,7 +514,7 @@ def create_importance_divergence_table(
         f.write(table.to_markdown())
 
     with open(output_folder / "importance_divergence_table.tex", "w") as f:
-        f.write(table.to_latex())
+        f.write(table.to_latex(float_format="%.3f"))
 
     with open(output_folder / "importance_divergence_table.csv", "w") as f:
         f.write(table.to_csv())
