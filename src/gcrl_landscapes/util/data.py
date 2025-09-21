@@ -104,21 +104,9 @@ class PhaseResult(dict[FrozenConfigDict, dict[int, EvalTrajectory]]):
         )
 
 
-def get_best_agent_path(
+def get_best_config_row(
     result_pandas: pd.DataFrame, seed_mode: str = "iqm", eval_step: int | None = None
-) -> Path:
-    """Find the best agent for the given results for a phase.
-    Currently uses success as metric for gauging "best"
-    Uses highest evaluation step if not specified.
-
-    Args:
-        result_pandas: phase results as parsed by `get_phase_results`
-        seed_mode: Which trained model (different seeds) to pick. Currently supports only "iqm", meaning picking the one closest to interquartile mean evaluation
-        eval_step: For which evaluation step to get best agent. Will use highest available if not specified
-
-    Returns:
-         Path to best agent checkpoint
-    """
+) -> pd.DataFrame:
     final_eval_step = eval_step if eval_step else result_pandas["eval_step"].max()
     final_eval_result = result_pandas[result_pandas["eval_step"] == final_eval_step]
 
@@ -147,6 +135,27 @@ def get_best_agent_path(
         & (result_pandas["seed"] == seed)
     ]
     assert len(best_df) == 1
+    return best_df
+
+
+def get_best_agent_path(
+    result_pandas: pd.DataFrame, seed_mode: str = "iqm", eval_step: int | None = None
+) -> Path:
+    """Find the best agent for the given results for a phase.
+    Currently uses success as metric for gauging "best"
+    Uses highest evaluation step if not specified.
+
+    Args:
+        result_pandas: phase results as parsed by `get_phase_results`
+        seed_mode: Which trained model (different seeds) to pick. Currently supports only "iqm", meaning picking the one closest to interquartile mean evaluation
+        eval_step: For which evaluation step to get best agent. Will use highest available if not specified
+
+    Returns:
+         Path to best agent checkpoint
+    """
+    best_df = get_best_config_row(
+        result_pandas, seed_mode=seed_mode, eval_step=eval_step
+    )
     best_path = Path(best_df.iloc[0]["path"])
     assert best_path.exists()
     return best_path

@@ -9,6 +9,7 @@ from gcrl_landscapes.plots.triple_gp import estimate_model_fit, TripleGPModel
 from pathlib import Path
 from gcrl_landscapes.plots.triple_gp import create_contour_plot
 from gcrl_landscapes.util.eval import fit_model
+from gcrl_landscapes.util.data import get_best_config_row
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -47,6 +48,7 @@ def plot_landscape(
     y_label: str | None,
     y_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda y_pred, y: y_pred,
     discrete_levels: np.ndarray | None = None,
+    last_phase_best_config: pd.DataFrame | None = None,
 ):
     """IGPR plot of given data. Fits gaussian process itself
 
@@ -72,6 +74,7 @@ def plot_landscape(
         agent_name=agent_name,
         z_transform=y_transform,
         discrete_levels=discrete_levels,
+        last_phase_best_config=last_phase_best_config,
     )
 
     # Create plot without using gaussian processes
@@ -299,6 +302,9 @@ def plot(
     hp_full_list = results_pandas.columns[results_pandas.columns.str.startswith("hp.")]
     hp_list = [f"hp.{hp_name}" for hp_name in run_info["arguments"]["hyperparameters"]]
     assert all(hp in hp_full_list for hp in hp_list)
+    if not len(hp_list) == 2:
+        raise NotImplementedError("Currently plotting landscapes is only implemented for runs with 2 hyperparameters")
+
 
     # Plots using full experiment results
     regret_targets = [
@@ -325,6 +331,7 @@ def plot(
         for phase_idx, phase in enumerate(phases)
     ]
 
+    best_config_per_phase: dict[int, pd.DataFrame] = {}
     phase_result: pd.DataFrame
     for phase, phase_result in phase_results:  # type: ignore
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
@@ -395,19 +402,22 @@ def plot(
             )
             for confidence_level in CVAR_CONFIDENCE_LEVELS
         ]
-        for hp_pair in combinations(hp_list, 2):
-            for col, title, kwargs in landscape_pairs:
-                model = fit_model(phase_result, col, list(hp_pair))
-                plot_landscape(
-                    phase,
-                    model,
-                    col,
-                    list(hp_pair),
-                    phase_result["hp.agent_name"].iloc[0],
-                    output_folder,
-                    title,
-                    **kwargs
-                )
+        for col, title, kwargs in landscape_pairs:
+            last_phase_best_config = best_config_per_phase[phase-1] if phase > 1 else None
+            model = fit_model(phase_result, col, hp_list)
+            best_config_per_phase[phase] = get_best_config_row(phase_result)
+
+            plot_landscape(
+                phase,
+                model,
+                col,
+                hp_list,
+                phase_result["hp.agent_name"].iloc[0],
+                output_folder,
+                title,
+                last_phase_best_config=last_phase_best_config,
+                **kwargs
+            )
 
         if plot_return_distributions:
             plot_return_distribution(
