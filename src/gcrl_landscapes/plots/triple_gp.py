@@ -272,7 +272,7 @@ class TripleGPModel(BaseEstimator):
         plt.legend()
         plt.show()
 
-def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str],  agent_name:str, z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, discrete_levels: np.ndarray | None = None, grid_length=100):
+def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str],  agent_name:str, z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, discrete_levels: np.ndarray | None = None, last_phase_best_config: pd.DataFrame | None = None, grid_length=100):
     x_lower, x_upper, x_log = get_bounds(model.hp_names[x_dim].removeprefix("hp."), agent_name)
     y_lower, y_upper, y_log = get_bounds(model.hp_names[y_dim].removeprefix("hp."), agent_name)
     # Generate a finer grid for contour plot
@@ -333,12 +333,12 @@ def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_
         ax.legend(handles=handles, title="Value Range")
         contour = ax.contourf(X, Y, Z, levels=levels, cmap=cmap, norm=norm)
 
-    # Mark the peaks and valleys
-    # peaks = np.where(Z == Z.max())
-    # valleys = np.where(Z == Z.min())
-    # plt.scatter(X[peaks], Y[peaks], color='white', marker='^', s=100, edgecolor='black')  # Peaks
-    # plt.scatter(X[valleys], Y[valleys], color='white', marker='v', s=100, edgecolor='black')  # Valleys
-    #
+    # Mark best previous configuration with asterisk
+    if last_phase_best_config is not None:
+        x = last_phase_best_config[model.hp_names[x_dim]].iloc[0]
+        y = last_phase_best_config[model.hp_names[y_dim]].iloc[0]
+        ax.scatter([x], [y], color='white', marker='*', s=100, edgecolor='black')  # Peaks
+
     plt.xlabel(dim_label_mapping(model.hp_names[x_dim].split('.')[-1]), fontsize=18)
     plt.ylabel(dim_label_mapping(model.hp_names[y_dim].split('.')[-1]), fontsize=18)
     # plt.title(f'{z_dim}', fontsize=18)
