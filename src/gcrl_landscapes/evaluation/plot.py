@@ -129,7 +129,7 @@ def plot_eval_curve(
             y=y_col,
             errorbar=("ci", 95),
         )
-        plt.title(f"{y_label if y_label else y_col}", fontsize=18)
+        # plt.title(f"{y_label if y_label else y_col}", fontsize=18)
         ax.set_ylim(0, 1)
         plt.savefig(
             output_per_config_folder
@@ -145,7 +145,7 @@ def plot_eval_curve(
         y=y_col,
         errorbar=("ci", 95),
     )
-    plt.title(f"{y_label if y_label else y_col}", fontsize=18)
+    # plt.title(f"{y_label if y_label else y_col}", fontsize=18)
     ax.set_ylim(0, 1)
     plt.savefig(
         output_folder / f"eval-{y_col}-{phase}.png",
@@ -178,7 +178,7 @@ def plot_return_distribution(
         )
         ax.set_xlim(*RETURN_LIMITS)
         ax.set_ylim(0, 1)
-        plt.title(f"{y_label if y_label else y_col}", fontsize=18)
+        # plt.title(f"{y_label if y_label else y_col}", fontsize=18)
         plt.savefig(
             output_per_config_folder
             / f"returndistribution-{y_col}-config_{config_index}-{phase}.png",
@@ -195,7 +195,7 @@ def plot_return_distribution(
     )
     ax.set_xlim(*RETURN_LIMITS)
     ax.set_ylim(0, 1)
-    plt.title(f"{y_label if y_label else y_col}", fontsize=18)
+    # plt.title(f"{y_label if y_label else y_col}", fontsize=18)
     plt.savefig(
         output_folder / f"returndistribution-{y_col}-{phase}.png",
         bbox_inches="tight",
