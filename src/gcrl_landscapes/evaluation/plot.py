@@ -286,6 +286,7 @@ def plot(
     plot_eval_curves: bool = False,
     plot_gp_fits: bool = False,
     plot_regret: bool = False,
+    plot_landscapes: bool = True,
 ):
     """Main plotting Code to generate the landscapes
 
@@ -294,6 +295,14 @@ def plot(
         output_folder: folder to save plots in
         run_info: info about the run/setup
     """
+    if plot_eval_curves:
+        plot_eval_curve(
+            results_pandas,
+            "success",
+            output_folder,
+            "Success Rate",
+        )
+
     results_pandas = compute_additional_information(results_pandas)
 
     per_config_folder = output_folder / "per_config"
@@ -337,87 +346,87 @@ def plot(
         per_config_phase_folder = per_config_folder / f"phase_{phase}"
         per_config_phase_folder.mkdir(exist_ok=True)
 
-        e_optimal_bins = np.array([0.0, 0.5, 0.8, 0.9, 0.95, 1.0])
-        landscape_pairs = [
-            ("success", "Success Rate", {}),
-            (
-                "success",
-                "Success Epsilon Optimality Bins",
-                # Make this stepped, so that it is easier to interpret
-                {
-                    "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
-                    "discrete_levels": e_optimal_bins,
-                }
-            ),
-            (
-                "mean_normalized_goal_distance_return",
-                "Normalized Goal Distance Return",
-                {}
-            ),
-            (
-                "mean_normalized_goal_distance_return",
-                "Normalized Goal Distance Return Epsilon Optimality Bins",
-                {
-                    "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
-                    "discrete_levels": e_optimal_bins,
-                }
-            ),
-            (
-                "mean_normalized_goal_distance_return",
-                "Normalized Goal Distance Return Epsilon Optimality",
-                {
-                    "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
-                }
-            ),
-            (
-                "disp_normalized_goal_distance_score",
-                "Dispersion score of normalized goal distance return",
-                {}
-            ),
-            (
-                "mean_normalized_goal_distance_return_regret",
-                "Normalized Goal Distance Return Regret",
-                {}
-            ),
-            (
-                "mean_normalized_goal_distance_return_regret_cummean",
-                "Normalized Goal Distance Return Regret Cumulative",
-                {}
-            ),
-            (
-                "success_regret",
-                "Normalized Goal Distance Return Regret",
-                {}
-            ),
-            (
-                "success_regret_cummean",
-                "Normalized Goal Distance Return Regret Cumulative",
-                {}
-            ),
-        ] + [  # Gather all CVaR confidence levels
-            (
-                f"cvar{confidence_level}_normalized_goal_distance_return",
-                f"CVaR ({confidence_level}%)of normalized goal distance return",
-                {}
-            )
-            for confidence_level in CVAR_CONFIDENCE_LEVELS
-        ]
-        for col, title, kwargs in landscape_pairs:
-            last_phase_best_config = best_config_per_phase[phase-1] if phase > 1 else None
-            model = fit_model(phase_result, col, hp_list)
-            best_config_per_phase[phase] = get_best_config_row(phase_result)
-
-            plot_landscape(
-                phase,
-                model,
-                col,
-                hp_list,
-                phase_result["hp.agent_name"].iloc[0],
-                output_folder,
-                title,
-                last_phase_best_config=last_phase_best_config,
-                **kwargs
-            )
+        if plot_landscapes:
+            e_optimal_bins = np.array([0.0, 0.5, 0.8, 0.9, 0.95, 1.0])
+            landscape_pairs = [
+                ("success", "Success Rate", {}),
+                (
+                    "success",
+                    "Success Epsilon Optimality Bins",
+                    # Make this stepped, so that it is easier to interpret
+                    {
+                        "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
+                        "discrete_levels": e_optimal_bins,
+                    }
+                ),
+                (
+                    "mean_normalized_goal_distance_return",
+                    "Normalized Goal Distance Return",
+                    {}
+                ),
+                (
+                    "mean_normalized_goal_distance_return",
+                    "Normalized Goal Distance Return Epsilon Optimality Bins",
+                    {
+                        "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
+                        "discrete_levels": e_optimal_bins,
+                    }
+                ),
+                (
+                    "mean_normalized_goal_distance_return",
+                    "Normalized Goal Distance Return Epsilon Optimality",
+                    {
+                        "y_transform": lambda y_pred, y: y_pred / np.max(y_pred),
+                    }
+                ),
+                (
+                    "disp_normalized_goal_distance_score",
+                    "Dispersion score of normalized goal distance return",
+                    {}
+                ),
+                (
+                    "mean_normalized_goal_distance_return_regret",
+                    "Normalized Goal Distance Return Regret",
+                    {}
+                ),
+                (
+                    "mean_normalized_goal_distance_return_regret_cummean",
+                    "Normalized Goal Distance Return Regret Cumulative",
+                    {}
+                ),
+                (
+                    "success_regret",
+                    "Normalized Goal Distance Return Regret",
+                    {}
+                ),
+                (
+                    "success_regret_cummean",
+                    "Normalized Goal Distance Return Regret Cumulative",
+                    {}
+                ),
+            ] + [  # Gather all CVaR confidence levels
+                (
+                    f"cvar{confidence_level}_normalized_goal_distance_return",
+                    f"CVaR ({confidence_level}%)of normalized goal distance return",
+                    {}
+                )
+                for confidence_level in CVAR_CONFIDENCE_LEVELS
+            ]
+            for col, title, kwargs in landscape_pairs:
+                last_phase_best_config = best_config_per_phase[phase-1] if phase > 1 else None
+                model = fit_model(phase_result, col, hp_list)
+                best_config_per_phase[phase] = get_best_config_row(phase_result)
+                plot_landscape(
+                    phase,
+                    model,
+                    col,
+                    hp_list,
+                    phase_result["hp.agent_name"].iloc[0],
+                    output_folder,
+                    title,
+                    last_phase_best_config=last_phase_best_config,
+                    **kwargs
+                )
 
         if plot_return_distributions:
             plot_return_distribution(
@@ -427,15 +436,6 @@ def plot(
                 output_folder,
                 per_config_phase_folder,
                 "Normalized Goal Distance Return Distribution",
-            )
-        if plot_eval_curves:
-            plot_eval_curve(
-                phase,
-                results_pandas,
-                "mean_normalized_goal_distance_return",
-                output_folder,
-                per_config_phase_folder,
-                "Normalized Goal Distance Return",
             )
         if plot_gp_fits:
             for hp_pair in combinations(hp_list, 2):
@@ -447,6 +447,7 @@ def plot(
                     output_folder,
                     "Normalized Goal Distance Return",
                 )
+
 
 
 def grid_plot(
@@ -507,6 +508,7 @@ def plot_parallel_wrapper(
     plot_eval_curves: bool = False,
     plot_gp_fits: bool = False,
     plot_regret: bool = False,
+    plot_landscapes: bool = True,
 ):
     prefix, (run_info, results_df) = arg
     run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
@@ -525,6 +527,7 @@ def plot_parallel_wrapper(
         plot_eval_curves=plot_eval_curves,
         plot_gp_fits=plot_gp_fits,
         plot_regret=plot_regret,
+        plot_landscapes=plot_landscapes,
     )
 
 
@@ -535,6 +538,7 @@ if __name__ == "__main__":
     parser.add_argument("--plot_eval_curves", action="store_true")
     parser.add_argument("--plot_gp_fits", action="store_true")
     parser.add_argument("--plot_regret", action="store_true")
+    parser.add_argument("--no_plot_landscapes", action="store_true")
     parser.add_argument("--no_multiprocessing", action="store_true")
     args = parser.parse_args()
 
@@ -557,6 +561,7 @@ if __name__ == "__main__":
                     plot_eval_curves=args.plot_eval_curves,
                     plot_gp_fits=args.plot_gp_fits,
                     plot_regret=args.plot_regret,
+                    plot_landscapes=not args.no_plot_landscapes,
                 )
 
     if not args.no_multiprocessing:
