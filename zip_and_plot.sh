@@ -12,7 +12,7 @@
 
 DATE=`date -u +%Y-%m-%d`
 ZIPNAME="${DATE}-${1/\.\//}.zip"
-/home/nhwptopm/bin/zip -r "$ZIPNAME" "$1" -x 'logs*/**/*.pkl' -x 'logs*/**/submitit/*'
+/home/nhwptoem/bin/zip -r "$ZIPNAME" "$1" -x 'logs*/**/*.pkl' -x 'logs*/**/submitit/*'
 
 module load GCC/12.2.0 OpenMPI/4.1.4 Armadillo
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${BIGWORK}/usr/lib"
