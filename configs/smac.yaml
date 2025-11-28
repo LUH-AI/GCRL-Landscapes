@@ -1,4 +1,4 @@
-eval_episodes: 50
+eval_episodes: 10
 tasks_per_node_parallel: 1
 
 hydra:
