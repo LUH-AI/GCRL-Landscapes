@@ -1,5 +1,7 @@
 import tqdm
 import numpy as np
+import jax
+import optax
 from ogbench.impls.utils.datasets import GCDataset
 from ogbench.impls.utils.log_utils import CsvLogger
 from ogbench.impls.utils.flax_utils import save_agent
@@ -16,8 +18,11 @@ from .util.data import (
     ResultsPerStep,
 )
 from .util.misc import retry_call
+from .util.eval import get_gradients, gradient_cosine_similarity, gradient_magnitude_similarity
 import os
+from functools import partial
 
+CONST_VAL_BATCH_SIZE = 512
 
 def train(
     agent_class: Callable[[Any, gym.Env, int], Any],
@@ -63,6 +68,8 @@ def train(
     # Initialize agent.
     random.seed(seed)
     np.random.seed(seed)
+    if val_dataset is not None:
+        held_out_val_batch = val_dataset.sample(CONST_VAL_BATCH_SIZE)
 
     example_batch = train_dataset.sample(1)
     if config["discrete"]:
@@ -98,7 +105,7 @@ def train(
         agent, update_info = agent.update(batch)
 
         # Log metrics.
-        if i % log_interval == 0 or i == 1:
+        if i % log_interval == 0 or i == 1 or i == max(eval_at_steps + save_at_steps):
             train_metrics = {f"training/{k}": v for k, v in update_info.items()}
             if val_dataset is not None:
                 val_batch = val_dataset.sample(config["batch_size"])
@@ -109,6 +116,30 @@ def train(
             train_metrics["time/epoch_time"] = (time.time() - last_time) / log_interval
             train_metrics["time/total_time"] = time.time() - first_time
             last_time = time.time()
+
+            @partial(jax.jit, static_argnames=("fun", "batch_size", "symmetric"))
+            def pairwise_seq_map(fun, batch_size, symmetric, x, y):
+                def batched_tree_to_batched_vector(tree):
+                    flattened_matrices = jax.tree.map(lambda leaf: leaf.reshape((leaf.shape[0], -1)), tree)
+                    return jax.numpy.concatenate(jax.tree.flatten(flattened_matrices)[0], axis=1)
+
+                # We limit the amount of shifts to calculate here due to duplicates. After calling this function we'll filter out the last few remainining duplicate items left over due to vectorization
+                cosine_similarities = jax.lax.map(lambda batch_shift: optax.losses.cosine_similarity(batched_tree_to_batched_vector(x), batched_tree_to_batched_vector(jax.tree.map(lambda tree: jax.numpy.roll(tree, batch_shift, axis=0), y))), jax.numpy.arange(1, 1 + (batch_size // 2 + 1) if symmetric else batch_size), batch_size=1)
+                return jax.numpy.concatenate(jax.tree.flatten(cosine_similarities)[0])
+
+            def remove_duplicates(pairwise_similarities, batch_size, symmetric):
+                return pairwise_similarities.flatten()[:(batch_size ** 2 - batch_size) // 2] if symmetric else pairwise_similarities
+
+
+            value_grads, actor_grads = jax.vmap(lambda sample: get_gradients(agent, sample), in_axes=0, out_axes=0)(batch)
+            value_grad_cossim = remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, value_grads, value_grads), CONST_VAL_BATCH_SIZE, True)
+            actor_grad_cossim = remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, actor_grads, actor_grads), CONST_VAL_BATCH_SIZE, True)
+            train_metrics["grad/value_cosine_similarity_mean"] = jax.numpy.mean(value_grad_cossim)
+            train_metrics["grad/actor_cosine_similarity_mean"] = jax.numpy.mean(actor_grad_cossim)
+            train_metrics["grad/value_cosine_similarity_std"] = jax.numpy.std(value_grad_cossim)
+            train_metrics["grad/actor_cosine_similarity_std"] = jax.numpy.std(actor_grad_cossim)
+            print(train_metrics["grad/value_cosine_similarity_mean"], train_metrics["grad/actor_cosine_similarity_mean"])
+            print(train_metrics["grad/value_cosine_similarity_std"], train_metrics["grad/actor_cosine_similarity_std"])
             train_logger.log(train_metrics, step=i)
 
         # Evaluate agent.
