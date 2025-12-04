@@ -1,4 +1,5 @@
 import numpy as np
+import jax
 import pandas as pd
 from gcrl_landscapes.plots.triple_gp import TripleGPModel
 from gcrl_landscapes.configurations import (
@@ -89,3 +90,30 @@ def fit_model(
     )
     model.fit()
     return model
+
+
+def get_gradients(agent, batch):
+    value_grad = jax.grad(lambda grad_params: agent.value_loss(batch, grad_params), has_aux=True)(agent.network.params)[0]["modules_value"]
+    actor_grad = jax.grad(lambda grad_params: agent.actor_loss(batch, grad_params), has_aux=True)(agent.network.params)[0]["modules_actor"]
+    return value_grad, actor_grad
+
+
+def gradient_cosine_similarity(grad1, grad2):
+    flat_grad1 = grad1.reshape(-1)
+    flat_grad2 = grad2.reshape(-1)
+    return jax.numpy.dot(flat_grad1, flat_grad2) / (jax.numpy.linalg.norm(flat_grad1) * jax.numpy.linalg.norm(flat_grad2))
+
+
+def gradient_magnitude_similarity(grad1, grad2):
+    norm_grad1 = jax.numpy.linalg.norm(grad1)
+    norm_grad2 = jax.numpy.linalg.norm(grad2)
+    return (2 * norm_grad1 * norm_grad2) / (norm_grad1 ** 2 + norm_grad2 ** 2)
+
+
+def fully_flatten_tree(x):
+    return jax.numpy.concatenate(jax.tree.flatten(jax.tree.map(lambda y: jax.numpy.ravel(y), x))[0])
+
+
+def flatten_tree_batch(x):
+    x_flattened, x_flattened_tree = jax.tree.flatten(x)
+    return x_flattened
