@@ -22,7 +22,7 @@ from .util.eval import get_gradients, gradient_cosine_similarity, gradient_magni
 import os
 from functools import partial
 
-CONST_VAL_BATCH_SIZE = 512
+CONST_VAL_BATCH_SIZE = 256
 
 def train(
     agent_class: Callable[[Any, gym.Env, int], Any],
@@ -130,16 +130,19 @@ def train(
             def remove_duplicates(pairwise_similarities, batch_size, symmetric):
                 return pairwise_similarities.flatten()[:(batch_size ** 2 - batch_size) // 2] if symmetric else pairwise_similarities
 
+            @jax.jit
+            def calc_cossim(batch):
+                value_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.value_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_value"], in_axes=0, out_axes=0)(batch)
+                actor_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.actor_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_actor"], in_axes=0, out_axes=0)(batch)
+                value_grad_cossims = remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, value_grads, value_grads), CONST_VAL_BATCH_SIZE, True)
+                actor_grad_cossims = remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, actor_grads, actor_grads), CONST_VAL_BATCH_SIZE, True)
+                return value_grad_cossims, actor_grad_cossims
 
-            value_grads, actor_grads = jax.vmap(lambda sample: get_gradients(agent, sample), in_axes=0, out_axes=0)(batch)
-            value_grad_cossim = remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, value_grads, value_grads), CONST_VAL_BATCH_SIZE, True)
-            actor_grad_cossim = remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, actor_grads, actor_grads), CONST_VAL_BATCH_SIZE, True)
+            value_grad_cossim, actor_grad_cossim = calc_cossim(held_out_val_batch)
             train_metrics["grad/value_cosine_similarity_mean"] = jax.numpy.mean(value_grad_cossim)
             train_metrics["grad/actor_cosine_similarity_mean"] = jax.numpy.mean(actor_grad_cossim)
             train_metrics["grad/value_cosine_similarity_std"] = jax.numpy.std(value_grad_cossim)
             train_metrics["grad/actor_cosine_similarity_std"] = jax.numpy.std(actor_grad_cossim)
-            print(train_metrics["grad/value_cosine_similarity_mean"], train_metrics["grad/actor_cosine_similarity_mean"])
-            print(train_metrics["grad/value_cosine_similarity_std"], train_metrics["grad/actor_cosine_similarity_std"])
             train_logger.log(train_metrics, step=i)
 
         # Evaluate agent.

@@ -91,13 +91,6 @@ def fit_model(
     model.fit()
     return model
 
-
-def get_gradients(agent, batch):
-    value_grad = jax.grad(lambda grad_params: agent.value_loss(batch, grad_params), has_aux=True)(agent.network.params)[0]["modules_value"]
-    actor_grad = jax.grad(lambda grad_params: agent.actor_loss(batch, grad_params), has_aux=True)(agent.network.params)[0]["modules_actor"]
-    return value_grad, actor_grad
-
-
 def gradient_cosine_similarity(grad1, grad2):
     flat_grad1 = grad1.reshape(-1)
     flat_grad2 = grad2.reshape(-1)
