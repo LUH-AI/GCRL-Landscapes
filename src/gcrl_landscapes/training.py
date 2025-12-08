@@ -18,7 +18,7 @@ from .util.data import (
     ResultsPerStep,
 )
 from .util.misc import retry_call
-from .util.eval import get_gradients, gradient_cosine_similarity, gradient_magnitude_similarity
+from .util.eval import gradient_cosine_similarity, gradient_magnitude_similarity
 import os
 from functools import partial
 
