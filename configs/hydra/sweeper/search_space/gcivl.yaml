@@ -31,12 +31,6 @@ hyperparameters:
     lower: 0.0
     upper: 30.0
     default_value: 10.0
-  subgoal_steps:
-    type: uniform_int
-    upper: 500
-    lower: 1
-    log: true
-    default_value: 25
   # Changes network architecture
   # const_std:
   #   type: categorical
