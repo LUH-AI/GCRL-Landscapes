@@ -1,0 +1,72 @@
+hyperparameters:
+  lr:
+    type: uniform_float
+    lower: 1e-6
+    upper: 1.0
+    default_value: 3e-4
+    log: true
+  batch_size:
+    type: uniform_int
+    lower: 1
+    upper: 4096
+    default_value: 1024
+  discount:
+    type: uniform_float
+    lower: 0.8
+    upper: 0.9999
+    default_value: 0.99
+  tau:
+    type: uniform_float
+    lower: 1e-4
+    upper: 1.0
+    log: true
+    default_value: 0.005
+  expectile:
+    type: uniform_float
+    lower: 0.0
+    upper: 1.0
+    default_value: 0.9
+  alpha:
+    type: uniform_float
+    lower: 0.0
+    upper: 30.0
+    default_value: 10.0
+  subgoal_steps:
+    type: uniform_int
+    upper: 500
+    lower: 1
+    log: true
+    default_value: 25
+  # Changes network architecture
+  # const_std:
+  #   type: categorical
+  #   choices: [ true, false ]
+  #   default_value: true
+  value_p_trajgoal:
+    type: uniform_float
+    lower: 0.0
+    upper: 1.0
+    default_value: 0.5
+  value_p_curgoalshare:
+    type: uniform_float
+    lower: 0.0
+    upper: 1.0
+    default_value: 0.4
+  value_geom_sample:
+    type: categorical
+    choices: [ true, false ]
+    default_value: true
+  actor_p_trajgoal:
+    type: uniform_float
+    lower: 0.0
+    upper: 1.0
+    default_value: 1.0
+  actor_p_curgoalshare:
+    type: uniform_float
+    lower: 0.0
+    upper: 1.0
+    default_value: 0.0
+  actor_geom_sample:
+    type: categorical
+    choices: [ true, false ]
+    default_value: false
