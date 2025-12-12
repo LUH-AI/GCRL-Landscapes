@@ -216,10 +216,10 @@ def get_metrics(agent, batch):
     value_scale, actor_scale = calc_scale(value_grads), calc_scale(actor_grads)
 
     # We use trajectories as the notion of a task for pairwise metrics. If a sample is from the same trajectory -> filter it
-    same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (256 // 2 +1))]), CONST_VAL_BATCH_SIZE, True)
+    same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (CONST_VAL_BATCH_SIZE // 2 + 1))]), CONST_VAL_BATCH_SIZE, True)
     return {
         # Cosine similarities
-        "grad/value_cosine_similarity_mean": jax.numpy.mean(value_cosine_similarities[~same_task][~same_task]),
+        "grad/value_cosine_similarity_mean": jax.numpy.mean(value_cosine_similarities[~same_task]),
         "grad/actor_cosine_similarity_mean": jax.numpy.mean(actor_cosine_similarities[~same_task]),
         "grad/value_cosine_similarity_std": jax.numpy.std(value_cosine_similarities[~same_task]),
         "grad/actor_cosine_similarity_std": jax.numpy.std(actor_cosine_similarities[~same_task]),
