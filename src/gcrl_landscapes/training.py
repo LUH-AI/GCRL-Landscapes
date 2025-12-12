@@ -117,32 +117,7 @@ def train(
             train_metrics["time/total_time"] = time.time() - first_time
             last_time = time.time()
 
-            @partial(jax.jit, static_argnames=("fun", "batch_size", "symmetric"))
-            def pairwise_seq_map(fun, batch_size, symmetric, x, y):
-                def batched_tree_to_batched_vector(tree):
-                    flattened_matrices = jax.tree.map(lambda leaf: leaf.reshape((leaf.shape[0], -1)), tree)
-                    return jax.numpy.concatenate(jax.tree.flatten(flattened_matrices)[0], axis=1)
-
-                # We limit the amount of shifts to calculate here due to duplicates. After calling this function we'll filter out the last few remainining duplicate items left over due to vectorization
-                cosine_similarities = jax.lax.map(lambda batch_shift: optax.losses.cosine_similarity(batched_tree_to_batched_vector(x), batched_tree_to_batched_vector(jax.tree.map(lambda tree: jax.numpy.roll(tree, batch_shift, axis=0), y))), jax.numpy.arange(1, 1 + (batch_size // 2 + 1) if symmetric else batch_size), batch_size=1)
-                return jax.numpy.concatenate(jax.tree.flatten(cosine_similarities)[0])
-
-            def remove_duplicates(pairwise_similarities, batch_size, symmetric):
-                return pairwise_similarities.flatten()[:(batch_size ** 2 - batch_size) // 2] if symmetric else pairwise_similarities
-
-            @jax.jit
-            def calc_cossim(batch):
-                value_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.value_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_value"], in_axes=0, out_axes=0)(batch)
-                actor_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.actor_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_actor"], in_axes=0, out_axes=0)(batch)
-                value_grad_cossims = remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, value_grads, value_grads), CONST_VAL_BATCH_SIZE, True)
-                actor_grad_cossims = remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, actor_grads, actor_grads), CONST_VAL_BATCH_SIZE, True)
-                return value_grad_cossims, actor_grad_cossims
-
-            value_grad_cossim, actor_grad_cossim = calc_cossim(held_out_val_batch)
-            train_metrics["grad/value_cosine_similarity_mean"] = jax.numpy.mean(value_grad_cossim)
-            train_metrics["grad/actor_cosine_similarity_mean"] = jax.numpy.mean(actor_grad_cossim)
-            train_metrics["grad/value_cosine_similarity_std"] = jax.numpy.std(value_grad_cossim)
-            train_metrics["grad/actor_cosine_similarity_std"] = jax.numpy.std(actor_grad_cossim)
+            train_metrics.update(get_metrics(agent, held_out_val_batch))
             train_logger.log(train_metrics, step=i)
 
         # Evaluate agent.
@@ -234,22 +209,25 @@ def calc_scale(grads):
     return jax.numpy.linalg.norm(batched_tree_to_batched_vector(grads), axis=1)
 
 
-def get_pairwise_metrics(agent, batch):
+def get_metrics(agent, batch):
     value_grads, actor_grads = get_grads(agent, batch)
     value_cosine_similarities, actor_cosine_similarities = calc_cossim(value_grads), calc_cossim(actor_grads)
     value_magnitude_similarity, actor_magnitude_similarity = calc_magsim(value_grads), calc_magsim(actor_grads)
     value_scale, actor_scale = calc_scale(value_grads), calc_scale(actor_grads)
+
+    # We use trajectories as the notion of a task for pairwise metrics. If a sample is from the same trajectory -> filter it
+    same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (256 // 2 +1))]), CONST_VAL_BATCH_SIZE, True)
     return {
         # Cosine similarities
-        "grad/value_cosine_similarity_mean": jax.numpy.mean(value_cosine_similarities),
-        "grad/actor_cosine_similarity_mean": jax.numpy.mean(actor_cosine_similarities),
-        "grad/value_cosine_similarity_std": jax.numpy.std(value_cosine_similarities),
-        "grad/actor_cosine_similarity_std": jax.numpy.std(actor_cosine_similarities),
+        "grad/value_cosine_similarity_mean": jax.numpy.mean(value_cosine_similarities[~same_task][~same_task]),
+        "grad/actor_cosine_similarity_mean": jax.numpy.mean(actor_cosine_similarities[~same_task]),
+        "grad/value_cosine_similarity_std": jax.numpy.std(value_cosine_similarities[~same_task]),
+        "grad/actor_cosine_similarity_std": jax.numpy.std(actor_cosine_similarities[~same_task]),
         # Magnitude similarities
-        "grad/value_magnitude_similarity_mean": jax.numpy.mean(value_magnitude_similarity),
-        "grad/actor_magnitude_similarity_mean": jax.numpy.mean(actor_magnitude_similarity),
-        "grad/value_magnitude_similarity_std": jax.numpy.std(value_magnitude_similarity),
-        "grad/actor_magnitude_similarity_std": jax.numpy.std(actor_magnitude_similarity),
+        "grad/value_magnitude_similarity_mean": jax.numpy.mean(value_magnitude_similarity[~same_task]),
+        "grad/actor_magnitude_similarity_mean": jax.numpy.mean(actor_magnitude_similarity[~same_task]),
+        "grad/value_magnitude_similarity_std": jax.numpy.std(value_magnitude_similarity[~same_task]),
+        "grad/actor_magnitude_similarity_std": jax.numpy.std(actor_magnitude_similarity[~same_task]),
         # Gradient scale
         "grad/value_scale_mean": jax.numpy.mean(value_scale),
         "grad/actor_scale_mean": jax.numpy.mean(actor_scale),
