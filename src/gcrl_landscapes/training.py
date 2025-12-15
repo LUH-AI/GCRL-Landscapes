@@ -17,7 +17,7 @@ from .util.data import (
     restore_agent,
     ResultsPerStep,
 )
-from .util.misc import retry_call
+from .util.misc import retry_call, get_feature_embedding
 from .util.eval import gradient_cosine_similarity, gradient_magnitude_similarity
 import os
 from functools import partial
@@ -189,10 +189,41 @@ def remove_duplicates(pairwise_similarities, batch_size, symmetric):
 
 
 @jax.jit
-def get_grads(agent, batch):
+def get_grads_standard(agent, batch):
+    """Get gradients for QRL/CRL with single actor."""
     value_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.value_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_value"], in_axes=0, out_axes=0)(batch)
     actor_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.actor_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_actor"], in_axes=0, out_axes=0)(batch)
     return value_grads, actor_grads
+
+
+@jax.jit
+def get_grads_hiql(agent, batch):
+    """Get gradients for HIQL with low and high actors."""
+    value_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.value_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_value"], in_axes=0, out_axes=0)(batch)
+
+    # Get gradients from both low and high actor losses
+    low_actor_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.low_actor_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_low_actor"], in_axes=0, out_axes=0)(batch)
+    high_actor_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.high_actor_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_high_actor"], in_axes=0, out_axes=0)(batch)
+
+    # Flatten both gradient trees and concatenate
+    low_actor_flat = batched_tree_to_batched_vector(low_actor_grads)
+    high_actor_flat = batched_tree_to_batched_vector(high_actor_grads)
+    actor_grads_flat = jax.numpy.concatenate([low_actor_flat, high_actor_flat], axis=-1)
+
+    # Wrap in dict to match expected pytree structure
+    actor_grads = {'concat': actor_grads_flat}
+
+    return value_grads, actor_grads
+
+
+def get_grads(agent, batch):
+    """Get gradients for value and actor networks, handling different agent types."""
+    agent_name = agent.config.get('agent_name', '').lower()
+
+    if agent_name == 'hiql':
+        return get_grads_hiql(agent, batch)
+    else:
+        return get_grads_standard(agent, batch)
 
 
 @jax.jit
@@ -204,16 +235,50 @@ def calc_cossim(grads):
 def calc_magsim(grads):
     return remove_duplicates(pairwise_seq_map(gradient_magnitude_similarity, CONST_VAL_BATCH_SIZE, True, grads, grads), CONST_VAL_BATCH_SIZE, True)
 
+
 @jax.jit
 def calc_scale(grads):
     return jax.numpy.linalg.norm(batched_tree_to_batched_vector(grads), axis=1)
+
+
+@jax.jit
+def calc_feature_embedding_rank(agent, batch):
+    """Calculate the rank of state and goal feature embedding covariance matrices.
+
+    Args:
+        agent: The agent with value network
+        batch: Batch of data
+
+    Returns:
+        state_rank: The matrix rank of the state feature embedding covariance matrix
+        goal_rank: The matrix rank of the goal feature embedding covariance matrix
+    """
+    phi = get_feature_embedding(agent, batch)
+
+    def get_embedding_rank(phi):
+        # Calculate covariance matrices using JAX's built-in function
+        # rowvar=False because features are in columns (batch_size x latent_dim)
+        cov_matrix = jax.numpy.cov(phi, rowvar=False)
+
+        # Calculate matrix ranks using SVD
+        embedding_rank = jax.numpy.linalg.matrix_rank(cov_matrix)
+
+        return embedding_rank
+
+    if (len(phi.shape) > 2 and phi.shape[0] == 2):
+        # Ensemble learning -> two embeddings
+        return (get_embedding_rank(phi[0]) + get_embedding_rank(phi[1])) / 2
+
+    return get_embedding_rank(phi)
 
 
 def get_metrics(agent, batch):
     value_grads, actor_grads = get_grads(agent, batch)
     value_cosine_similarities, actor_cosine_similarities = calc_cossim(value_grads), calc_cossim(actor_grads)
     value_magnitude_similarity, actor_magnitude_similarity = calc_magsim(value_grads), calc_magsim(actor_grads)
+
     value_scale, actor_scale = calc_scale(value_grads), calc_scale(actor_grads)
+    embedding_rank = calc_feature_embedding_rank(agent, batch)
 
     # We use trajectories as the notion of a task for pairwise metrics. If a sample is from the same trajectory -> filter it
     same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (CONST_VAL_BATCH_SIZE // 2 + 1))]), CONST_VAL_BATCH_SIZE, True)
@@ -233,4 +298,6 @@ def get_metrics(agent, batch):
         "grad/actor_scale_mean": jax.numpy.mean(actor_scale),
         "grad/value_scale_std": jax.numpy.std(value_scale),
         "grad/actor_scale_std": jax.numpy.std(actor_scale),
+        # Feature embedding ranks
+        "feature/embedding_rank": embedding_rank,
     }
