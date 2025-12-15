@@ -45,3 +45,32 @@ def retry_call(save_call: Callable) -> Any:
     print("Error saving")
     print(error)
     return None
+
+
+def get_feature_embedding(agent, batch):
+    """Extract feature embeddings (phi_s, phi_g) from the agent's value network.
+
+    Args:
+        agent: The agent (QRL, CRL, or HIQL)
+        batch: A batch of data containing 'observations' and 'value_goals'
+
+    Returns:
+        phi_s: State feature embeddings of shape (batch_size, latent_dim or hidden_dim)
+        phi_g: Goal feature embeddings of shape (batch_size, latent_dim or hidden_dim)
+    """
+    # Call the value network with info=True
+    result = agent.network.select('value')(
+        batch['observations'],
+        batch['value_goals'],
+        info=True
+    )
+
+    if len(result) == 3:
+        # QRL/CRL: returns (v, phi_s, phi_g)
+        _, phi_s, phi_g = result
+        return jax.numpy.concatenate((phi_s, phi_g), axis=-1)
+    else:
+        # HIQL: GCValue returns (v, features) - joint representation
+        v_ensemble, features_ensemble = result
+        # HIQL uses an ensemble. Select correct features
+        return features_ensemble
