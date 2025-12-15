@@ -1,6 +1,6 @@
 defaults:
   - defaults
-  - hydra/sweeper/search_space/hiql
+  - hydra/sweeper/search_space/gcivl
   - smac
   - launcher
   - _self_
