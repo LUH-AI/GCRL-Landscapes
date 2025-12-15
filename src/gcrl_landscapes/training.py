@@ -91,7 +91,7 @@ def train(
     agent_paths: ResultsPerStep[Path] = ResultsPerStep()
     save_dir = log_dir
     os.makedirs(save_dir, exist_ok=True)
-    train_logger = CsvLogger(save_dir / "train_log.csv")
+    train_logger = CsvLogger(save_dir / "train_log.csv", separator=";")
     eval_logger = CsvLogger(save_dir / "eval_log.csv")
     first_time = time.time()
     last_time = time.time()
@@ -281,6 +281,13 @@ def get_metrics(agent, batch):
     value_scale, actor_scale = calc_scale(value_grads), calc_scale(actor_grads)
     embedding_rank = calc_feature_embedding_rank(agent, batch)
 
+    if "target_value" in agent.network.model_def.modules.keys():
+        held_out_val_batch_values = agent.network.select("target_value")(batch["observations"], batch["value_goals"], params=agent.network.params)
+        if len(held_out_val_batch_values.shape) == 3 and held_out_val_batch_values.shape[0] == 2:
+            held_out_val_batch_values = held_out_val_batch_values.mean(axis=0).reshape(-1)
+    else:
+        held_out_val_batch_values = None
+
     # We use trajectories as the notion of a task for pairwise metrics. If a sample is from the same trajectory -> filter it
     same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (CONST_VAL_BATCH_SIZE // 2 + 1))]), CONST_VAL_BATCH_SIZE, True)
     return {
@@ -301,4 +308,5 @@ def get_metrics(agent, batch):
         "grad/actor_scale_std": jax.numpy.std(actor_scale),
         # Feature embedding ranks
         "feature/embedding_rank": embedding_rank,
+        **({"target/held_out_val_batch_values": held_out_val_batch_values.tolist()} if held_out_val_batch_values is not None else {}),
     }
