@@ -39,7 +39,7 @@ def train(
     ],
     config: FrozenConfigDict,
     save_at_steps: list[int] = [],
-    log_interval: int = 5000,
+    log_count: int = 10,
     eval_episodes: int = 20,
     log_dir: Path = Path("./logs"),
     seed: int = 0,
@@ -95,6 +95,7 @@ def train(
     eval_logger = CsvLogger(save_dir / "eval_log.csv")
     first_time = time.time()
     last_time = time.time()
+    log_steps = np.linspace(already_trained_steps + 1, max(eval_at_steps + save_at_steps), log_count, dtype=int).tolist()
     for i in tqdm.tqdm(
         range(already_trained_steps + 1, max(eval_at_steps + save_at_steps) + 1),
         smoothing=0.1,
@@ -105,7 +106,7 @@ def train(
         agent, update_info = agent.update(batch)
 
         # Log metrics.
-        if i % log_interval == 0 or i == 1 or i == max(eval_at_steps + save_at_steps):
+        if i in log_steps:
             train_metrics = {f"training/{k}": v for k, v in update_info.items()}
             if val_dataset is not None:
                 val_batch = val_dataset.sample(config["batch_size"])
@@ -113,7 +114,7 @@ def train(
                 train_metrics.update(
                     {f"validation/{k}": v for k, v in val_info.items()}
                 )
-            train_metrics["time/epoch_time"] = (time.time() - last_time) / log_interval
+            train_metrics["time/epoch_time"] = (time.time() - last_time) / (log_steps[1] - log_steps[0])
             train_metrics["time/total_time"] = time.time() - first_time
             last_time = time.time()
 
