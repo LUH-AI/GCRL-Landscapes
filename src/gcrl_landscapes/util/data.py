@@ -384,7 +384,7 @@ def load_or_compute(
     compute: Callable,
     cache_dir: Path = Path.home() / ".cache" / "gcrl_landscapes",
 ) -> Any | None:
-    cache_path = cache_dir / filehash(filepaths)
+    cache_path = cache_dir / filehash(filepaths) / f"{compute.__name__}.pkl"
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     if cache_path.exists():
         with open(cache_path, "rb") as f:
