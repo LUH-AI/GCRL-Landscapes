@@ -171,8 +171,8 @@ def pairwise_seq_map(fun, batch_size, symmetric, x, y):
     """
 
     # We limit the amount of shifts to calculate here due to duplicates. After calling this function we'll filter out the last few remainining duplicate items left over due to vectorization
-    cosine_similarities = jax.lax.map(lambda batch_shift: optax.losses.cosine_similarity(batched_tree_to_batched_vector(x), batched_tree_to_batched_vector(jax.tree.map(lambda tree: jax.numpy.roll(tree, batch_shift, axis=0), y))), jax.numpy.arange(1, 1 + (batch_size // 2 + 1) if symmetric else batch_size), batch_size=1)
-    return jax.numpy.concatenate(jax.tree.flatten(cosine_similarities)[0])
+    pairwise_fun_results = jax.lax.map(lambda batch_shift: fun(batched_tree_to_batched_vector(x), batched_tree_to_batched_vector(jax.tree.map(lambda tree: jax.numpy.roll(tree, batch_shift, axis=0), y))), jax.numpy.arange(1, 1 + (batch_size // 2 + 1) if symmetric else batch_size), batch_size=1)
+    return jax.numpy.concatenate(jax.tree.flatten(pairwise_fun_results)[0])
 
 
 def remove_duplicates(pairwise_similarities, batch_size, symmetric):
@@ -229,7 +229,7 @@ def get_grads(agent, batch):
 
 @jax.jit
 def calc_cossim(grads):
-    return remove_duplicates(pairwise_seq_map(gradient_cosine_similarity, CONST_VAL_BATCH_SIZE, True, grads, grads), CONST_VAL_BATCH_SIZE, True)
+    return remove_duplicates(pairwise_seq_map(optax.losses.cosine_similarity, CONST_VAL_BATCH_SIZE, True, grads, grads), CONST_VAL_BATCH_SIZE, True)
 
 
 @jax.jit
