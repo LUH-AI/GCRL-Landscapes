@@ -97,9 +97,10 @@ def gradient_cosine_similarity(grad1, grad2):
     return jax.numpy.dot(flat_grad1, flat_grad2) / (jax.numpy.linalg.norm(flat_grad1) * jax.numpy.linalg.norm(flat_grad2))
 
 
+@jax.jit
 def gradient_magnitude_similarity(grad1, grad2):
-    norm_grad1 = jax.numpy.linalg.norm(grad1)
-    norm_grad2 = jax.numpy.linalg.norm(grad2)
+    norm_grad1 = jax.numpy.linalg.norm(grad1, axis=-1)
+    norm_grad2 = jax.numpy.linalg.norm(grad2, axis=-1)
     return (2 * norm_grad1 * norm_grad2) / (norm_grad1 ** 2 + norm_grad2 ** 2)
 
 
