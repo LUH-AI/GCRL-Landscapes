@@ -154,9 +154,9 @@ def compute_additional_information(
 
 
 def merge_experiments(
-    results: dict[str, tuple[dict, pd.DataFrame]],
+    results: dict[str, tuple[dict, pd.DataFrame, pd.DataFrame]],
     # results: dict[str, tuple[dict, ResultsPerStep[PhaseResult]]],
-) -> pd.DataFrame:
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     return pd.concat(
         [
             result.assign(
@@ -168,7 +168,20 @@ def merge_experiments(
                 hps=lambda x: [frozenset(run_info["arguments"]["hyperparameters"])]
                 * len(x),
             )
-            for run_info, result in results.values()
+            for run_info, result, train_log in results.values()
+        ]
+    ), pd.concat(
+        [
+            train_log.assign(
+                agent=run_info["arguments"]["agent"],
+                dataset=",".join(run_info["arguments"]["datasets"])
+                if "datasets" in run_info["arguments"]
+                else run_info["arguments"]["dataset"],
+                constant_dataset=len(set(run_info["arguments"]["datasets"])) == 1,
+                hps=lambda x: [frozenset(run_info["arguments"]["hyperparameters"])]
+                * len(x),
+            )
+            for run_info, result, train_log in results.values()
         ]
     )
 

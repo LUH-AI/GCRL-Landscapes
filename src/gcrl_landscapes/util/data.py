@@ -13,6 +13,7 @@ from glob import glob
 from scipy.stats import trim_mean
 import numpy as np
 import hashlib
+import io
 
 
 T = TypeVar("T")
@@ -50,6 +51,14 @@ class EvaluationResult:
         return {"success": self.success, "metrics": self.metrics, "info": self.info}
 
 
+class TrainResult:
+    """Result of a training run of an algorithm.
+    """
+
+    def __init__(self, train_results: dict):
+        self.train_results = train_results
+
+
 class EvalTrajectory(tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path]]):
     """A mapping of training step to evaluation result and checkpoint path."""
 
@@ -77,6 +86,36 @@ class EvalTrajectory(tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path
                 ),
             )
         )
+
+
+class TrainTrajectory(ResultsPerStep[TrainResult]):
+    """A mapping of training step to training result"""
+
+    def to_json(self) -> str:
+        def convert_evaluation_results(results: ResultsPerStep[TrainResult]):
+            return {step: result.train_results for step, result in results.items()}
+
+        return json.dumps((convert_evaluation_results(self)))
+
+    @classmethod
+    def from_json(cls, train_result: dict) -> "TrainTrajectory":
+        return TrainTrajectory(
+            ResultsPerStep(
+                {
+                    int(step): TrainResult(result)
+                    for step, result in train_result.items()
+                }
+            )
+        )
+
+    @classmethod
+    def from_csv(cls, train_result: pd.DataFrame) -> "TrainTrajectory":
+        return TrainTrajectory(
+            ResultsPerStep(
+                train_result.set_index("step").to_dict(orient="index")
+            )
+        )
+
 
 
 class PhaseResult(dict[FrozenConfigDict, dict[int, EvalTrajectory]]):
@@ -260,9 +299,46 @@ def phase_results_to_pandas(results: ResultsPerStep[PhaseResult]) -> pd.DataFram
     return pd.DataFrame(rows)
 
 
+def training_logs_to_pandas(results: ResultsPerStep[TrainResult]) -> pd.DataFrame:
+    """Create pandas dataframe from training logs
+
+    Args:
+        results: experiment training logs, look at type hints and classes for more documentation
+
+    Returns:
+        pandas dataframe constructed from results
+    """
+    # [TODO: this code is a mess, rewrite it]
+    # results are unpacked here until every step has a column, all hyperparameters have a column and the performance has a column
+    run_id = 0
+    rows = []
+    for phase_step, result in results.items():
+        for config, train_trajectories in result.items():
+            for seed, train_trajectory in train_trajectories.items():
+                for train_step, train_result in train_trajectory.items():
+                    rows.append(
+                        {
+                            "run_id": run_id,
+                            "seed": seed,
+                            "phase": phase_step,
+                            "eval_step": train_step,
+                            "config_index": config["config_index"],
+                            **train_result
+                        }
+                        | {
+                            f"hp.{key}": value
+                            for key, value in config.to_dict().items()
+                            if key != "config_index"
+                        }
+                    )
+            run_id += 1  # every configuration per phase has a distinct run_id
+    return pd.DataFrame(rows)
+
+
+
 def read_results_from_zip(
     zippath: Path,
-) -> dict[str, tuple[dict, ResultsPerStep[PhaseResult]]]:
+) -> dict[str, tuple[dict, ResultsPerStep[PhaseResult], ResultsPerStep[PhaseResult]]]:
     """read results from zip that mirrors file structure as constructed by training scripts.
     This function heavily relies on regex and therefore proper file naming.
 
@@ -338,6 +414,38 @@ def read_results_from_zip(
 
         return results
 
+    def extract_training_log(
+        filenames: list[str],
+        configurations: dict[int, FrozenConfigDict],
+        zip_file: zipfile.ZipFile,
+    ) -> ResultsPerStep[PhaseResult]:
+        def parse_filename(filename: str) -> tuple[int, int, int]:
+            """Return (configuration_number, phase, seed)"""
+            match = re.search(
+                r".*configuration_(\d+)/phase_(\d+)/seed_(\d+).*", filename
+            )
+            return int(match.group(1)), int(match.group(2)), int(match.group(3))
+
+        results: ResultsPerStep[PhaseResult] = ResultsPerStep({})
+        for filename in [
+            filename
+            for filename in filenames
+            if re.search(r".*train_log.csv$", filename)
+        ]:
+            with zip_file.open(filename) as f:
+                file_content = f.read().decode(encoding="utf-8")
+                config_num, phase, seed = parse_filename(filename)
+                if phase not in results:
+                    results[phase] = PhaseResult({})
+                if configurations[config_num] not in results[phase]:
+                    results[phase][configurations[config_num]] = {}
+                results[phase][configurations[config_num]][seed] = (
+                    TrainTrajectory.from_csv(pd.read_csv(io.StringIO(file_content), sep=";"))
+                )
+
+        return results
+
+
     with zipfile.ZipFile(zippath, "r") as zip_file:
         filenames: list[str] = zip_file.namelist()
         prefix_run_mapping = get_prefix_runinfo_mappings(filenames, zip_file)
@@ -359,9 +467,17 @@ def read_results_from_zip(
             )
             for prefix in prefix_run_mapping.keys()
         }
+        prefix_training_results_mapping = {
+            prefix: extract_training_log(
+                prefix_filenames_mapping[prefix],
+                prefix_configuration_mapping[prefix],
+                zip_file,
+            )
+            for prefix in prefix_run_mapping.keys()
+        }
 
     return {
-        prefix: (prefix_run_mapping[prefix], prefix_phase_results_mapping[prefix])
+        prefix: (prefix_run_mapping[prefix], prefix_phase_results_mapping[prefix], prefix_training_results_mapping[prefix])
         for prefix in prefix_run_mapping.keys()
     }
 
