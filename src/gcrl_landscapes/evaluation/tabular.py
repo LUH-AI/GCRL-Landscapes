@@ -4,7 +4,7 @@ from gcrl_landscapes.util.data import (
     load_or_compute,
 )
 from gcrl_landscapes.util.eval import fit_model
-from gcrl_landscapes.util.data import phase_results_to_pandas
+from gcrl_landscapes.util.data import phase_results_to_pandas, training_logs_to_pandas
 from pathlib import Path
 import pandas as pd
 import numpy as np
@@ -713,9 +713,10 @@ def compute_merged_df(zipfiles: list[Path]) -> pd.DataFrame:
             prefix: (
                 run_info,
                 compute_additional_information(phase_results_to_pandas(phase_results)),
+                training_logs_to_pandas(train_log),
             )
             for result_from_zip in results_from_zips
-            for prefix, (run_info, phase_results) in result_from_zip.items()
+            for prefix, (run_info, phase_results, train_log) in result_from_zip.items()
         }
     )
 
@@ -754,7 +755,7 @@ if __name__ == "__main__":
         create_convergence_table(args.zipfiles[0], args.output_folder)
         exit(0)
 
-    merged_results_df: pd.DataFrame = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
+    merged_results_df, merged_training_df = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
 
     create_phased_tables(merged_results_df, output_folder)
     create_igprfit_tables(merged_results_df, output_folder)

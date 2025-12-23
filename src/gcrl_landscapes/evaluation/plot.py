@@ -3,6 +3,7 @@ from gcrl_landscapes.util.data import (
     ResultsPerStep,
     PhaseResult,
     phase_results_to_pandas,
+    training_logs_to_pandas,
     read_results_from_zip,
 )
 from gcrl_landscapes.plots.triple_gp import estimate_model_fit, TripleGPModel
@@ -261,7 +262,7 @@ def plot_regret_curve(
     plt.close()
 
 
-def plot(
+def plot_eval_results(
     results_pandas: pd.DataFrame,
     output_folder: Path,
     run_info: dict[str, Any],
@@ -431,6 +432,44 @@ def plot(
                     "Normalized Goal Distance Return",
                 )
 
+def plot_train_results(
+    results_pandas: pd.DataFrame,
+    output_folder: Path,
+    run_info: dict[str, Any],
+    plot_return_distributions: bool = False,
+    plot_eval_curves: bool = False,
+    plot_gp_fits: bool = False,
+    plot_regret: bool = False,
+):
+    hp_full_list = results_pandas.columns[results_pandas.columns.str.startswith("hp.")]
+    hp_list = [f"hp.{hp_name}" for hp_name in run_info["arguments"]["hyperparameters"]]
+    assert all(hp in hp_full_list for hp in hp_list)
+
+    phases = sorted(results_pandas["phase"].unique().tolist())
+    phase_results = [
+        (
+            phase,
+            results_pandas[
+                (results_pandas["eval_step"] == phase)
+                & (results_pandas["phase"] == phase)
+            ],
+        )
+        for phase in phases
+    ]
+    for hp_pair in combinations(hp_list, 2):
+        for phase, phase_result in phase_results:
+            model = fit_model(phase_result, "grad/value_cosine_similarity_mean", list(hp_pair))
+            plot_landscape(
+                phase,
+                model,
+                "grad/value_cosine_similarity_mean",
+                list(hp_pair),
+                phase_result["hp.agent_name"].iloc[0],
+                output_folder,
+                "test",
+            )
+
+
 
 
 def grid_plot(
@@ -486,14 +525,14 @@ def grid_plot(
 
 def plot_parallel_wrapper(
     plots_folder: Path,
-    arg: tuple[str, tuple[dict, pd.DataFrame]],
+    arg: tuple[str, tuple[dict, pd.DataFrame, pd.DataFrame]],
     plot_return_distributions: bool = False,
     plot_eval_curves: bool = False,
     plot_gp_fits: bool = False,
     plot_regret: bool = False,
     plot_landscapes: bool = True,
 ):
-    prefix, (run_info, results_df) = arg
+    prefix, (run_info, results_df, train_log_df) = arg
     run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
     if not run_match:
         raise ValueError("Naming inside of zipfile not as expected.")
@@ -529,12 +568,12 @@ if __name__ == "__main__":
 
     # Parse results
     plots_folder = Path("plots") / os.path.basename(args.zipfile)
-    results: dict[str, tuple[dict, ResultsPerStep[PhaseResult]]] = (
+    results: dict[str, tuple[dict, ResultsPerStep[PhaseResult], ResultsPerStep[PhaseResult]]] = (
         read_results_from_zip(args.zipfile)
     )
     results_pandas = {
-        identifier: (run_info, phase_results_to_pandas(phase_results))
-        for identifier, (run_info, phase_results) in results.items()
+        identifier: (run_info, phase_results_to_pandas(phase_results), training_logs_to_pandas(training_results))
+        for identifier, (run_info, phase_results, training_results) in results.items()
     }
 
     plot_results = partial(
