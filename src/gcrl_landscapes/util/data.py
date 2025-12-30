@@ -113,6 +113,8 @@ class TrainTrajectory(ResultsPerStep[TrainResult]):
         return TrainTrajectory(
             ResultsPerStep(
                 train_result.set_index("step").to_dict(orient="index")
+                if "step" in train_result.columns
+                else {}
             )
         )
 
