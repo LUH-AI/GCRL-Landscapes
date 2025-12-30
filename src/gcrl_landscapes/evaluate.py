@@ -2,6 +2,7 @@ import gymnasium as gym
 from ogbench.impls.utils.evaluation import evaluate
 from ogbench.locomaze.ant import AntEnv
 from ogbench.locomaze.humanoid import HumanoidEnv
+from ogbench.locomaze.point import PointEnv
 from ogbench.manipspace.envs.cube_env import CubeEnv
 from ogbench.powderworld.powderworld_env import PowderworldEnv
 import numpy as np
@@ -58,7 +59,7 @@ def evaluate_wrapper(
 def calc_goal_distances(
     trajectories, env
 ) -> tuple[list[list[float]], list[list[float]]]:
-    if isinstance(env.unwrapped, (HumanoidEnv, AntEnv)):
+    if isinstance(env.unwrapped, (HumanoidEnv, AntEnv, PointEnv)):
         goal_start_distances = [
             [
                 float(
