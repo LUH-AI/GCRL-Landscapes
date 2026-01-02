@@ -190,41 +190,39 @@ def remove_duplicates(pairwise_similarities, batch_size, symmetric):
 
 
 @jax.jit
-def get_grads_standard(agent, batch):
+def get_grads_and_updates_standard(agent, batch):
     """Get gradients for QRL/CRL with single actor."""
-    value_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.value_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_value"], in_axes=0, out_axes=0)(batch)
-    actor_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.actor_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_actor"], in_axes=0, out_axes=0)(batch)
-    return value_grads, actor_grads
+    total_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0], in_axes=0, out_axes=0)(batch)
+    total_updates = jax.vmap(lambda grad: agent.network.tx.update(grad, agent.network.opt_state, agent.network.params)[0], in_axes=0, out_axes=0)(total_grads)
+
+    return total_grads, total_updates
 
 
 @jax.jit
-def get_grads_hiql(agent, batch):
+def get_grads_and_updates_hiql(agent, batch):
     """Get gradients for HIQL with low and high actors."""
-    value_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.value_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_value"], in_axes=0, out_axes=0)(batch)
-
-    # Get gradients from both low and high actor losses
-    low_actor_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.low_actor_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_low_actor"], in_axes=0, out_axes=0)(batch)
-    high_actor_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.high_actor_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]["modules_high_actor"], in_axes=0, out_axes=0)(batch)
+    total_grads, total_updates = get_grads_and_updates_standard(agent, batch)
 
     # Flatten both gradient trees and concatenate
-    low_actor_flat = batched_tree_to_batched_vector(low_actor_grads)
-    high_actor_flat = batched_tree_to_batched_vector(high_actor_grads)
-    actor_grads_flat = jax.numpy.concatenate([low_actor_flat, high_actor_flat], axis=-1)
+    actor_grads_flat = jax.numpy.concatenate([batched_tree_to_batched_vector(total_grads["modules_low_actor"], total_grads["modules_high_actor"])], axis=-1)
+    actor_updates_flat = jax.numpy.concatenate([batched_tree_to_batched_vector(total_updates["modules_low_actor"], total_updates["modules_high_actor"])], axis=-1)
 
     # Wrap in dict to match expected pytree structure
-    actor_grads = {'concat': actor_grads_flat}
+    total_grads["modules_actor"] = actor_grads_flat
+    total_updates["modules_actor"] = actor_updates_flat
 
-    return value_grads, actor_grads
+    return total_grads, total_updates
 
 
-def get_grads(agent, batch):
+def get_grads_and_updates(agent, batch):
     """Get gradients for value and actor networks, handling different agent types."""
     agent_name = agent.config.get('agent_name', '').lower()
 
     if agent_name == 'hiql':
-        return get_grads_hiql(agent, batch)
+        return get_grads_and_updates_hiql(agent, batch)
     else:
-        return get_grads_standard(agent, batch)
+        return get_grads_and_updates_standard(agent, batch)
+
 
 
 @jax.jit
@@ -274,11 +272,19 @@ def calc_feature_embedding_rank(agent, batch):
 
 
 def get_metrics(agent, batch):
-    value_grads, actor_grads = get_grads(agent, batch)
-    value_cosine_similarities, actor_cosine_similarities = calc_cossim(value_grads), calc_cossim(actor_grads)
-    value_magnitude_similarity, actor_magnitude_similarity = calc_magsim(value_grads), calc_magsim(actor_grads)
+    (total_grads, total_updates) = get_grads_and_updates(agent, batch)
+    value_grads, actor_grads = total_grads["modules_value"], total_grads["modules_actor"]
+    value_updates, actor_updates = total_updates["modules_value"], total_updates["modules_actor"]
 
-    value_scale, actor_scale = calc_scale(value_grads), calc_scale(actor_grads)
+    value_grad_cosine_similarities, actor_grad_cosine_similarities = calc_cossim(value_grads), calc_cossim(actor_grads)
+    value_update_cosine_similarities, actor_update_cosine_similarities = calc_cossim(value_updates), calc_cossim(actor_updates)
+
+    value_grad_magnitude_similarity, actor_grad_magnitude_similarity = calc_magsim(value_grads), calc_magsim(actor_grads)
+    value_update_magnitude_similarity, actor_update_magnitude_similarity = calc_magsim(value_updates), calc_magsim(actor_updates)
+
+    value_grads_cale, actor_grad_scale = calc_scale(value_grads), calc_scale(actor_grads)
+    value_updates_scale, actor_updates_scale = calc_scale(value_updates), calc_scale(actor_updates)
+
     embedding_rank = calc_feature_embedding_rank(agent, batch)
 
     if "target_value" in agent.network.model_def.modules.keys():
@@ -292,20 +298,32 @@ def get_metrics(agent, batch):
     same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (CONST_VAL_BATCH_SIZE // 2 + 1))]), CONST_VAL_BATCH_SIZE, True)
     return {
         # Cosine similarities
-        "grad/value_cosine_similarity_mean": jax.numpy.mean(value_cosine_similarities[~same_task]),
-        "grad/actor_cosine_similarity_mean": jax.numpy.mean(actor_cosine_similarities[~same_task]),
-        "grad/value_cosine_similarity_std": jax.numpy.std(value_cosine_similarities[~same_task]),
-        "grad/actor_cosine_similarity_std": jax.numpy.std(actor_cosine_similarities[~same_task]),
+        "grad/value_cosine_similarity_mean": jax.numpy.mean(value_grad_cosine_similarities[~same_task]),
+        "grad/actor_cosine_similarity_mean": jax.numpy.mean(actor_grad_cosine_similarities[~same_task]),
+        "grad/value_cosine_similarity_std": jax.numpy.std(value_grad_cosine_similarities[~same_task]),
+        "grad/actor_cosine_similarity_std": jax.numpy.std(actor_grad_cosine_similarities[~same_task]),
         # Magnitude similarities
-        "grad/value_magnitude_similarity_mean": jax.numpy.mean(value_magnitude_similarity[~same_task]),
-        "grad/actor_magnitude_similarity_mean": jax.numpy.mean(actor_magnitude_similarity[~same_task]),
-        "grad/value_magnitude_similarity_std": jax.numpy.std(value_magnitude_similarity[~same_task]),
-        "grad/actor_magnitude_similarity_std": jax.numpy.std(actor_magnitude_similarity[~same_task]),
+        "grad/value_magnitude_similarity_mean": jax.numpy.mean(value_grad_magnitude_similarity[~same_task]),
+        "grad/actor_magnitude_similarity_mean": jax.numpy.mean(actor_grad_magnitude_similarity[~same_task]),
+        "grad/value_magnitude_similarity_std": jax.numpy.std(value_grad_magnitude_similarity[~same_task]),
+        "grad/actor_magnitude_similarity_std": jax.numpy.std(actor_grad_magnitude_similarity[~same_task]),
         # Gradient scale
-        "grad/value_scale_mean": jax.numpy.mean(value_scale),
-        "grad/actor_scale_mean": jax.numpy.mean(actor_scale),
-        "grad/value_scale_std": jax.numpy.std(value_scale),
-        "grad/actor_scale_std": jax.numpy.std(actor_scale),
+        "grad/value_scale_mean": jax.numpy.mean(value_grads_cale),
+        "grad/actor_scale_mean": jax.numpy.mean(actor_grad_scale),
+        "grad/value_scale_std": jax.numpy.std(value_grads_cale),
+        "grad/actor_scale_std": jax.numpy.std(actor_grad_scale),
+        # --- Same metrics for updates
+        "update/value_cosine_similarity_mean": jax.numpy.mean(value_update_cosine_similarities[~same_task]),
+        "update/actor_cosine_similarity_mean": jax.numpy.mean(actor_update_cosine_similarities[~same_task]),
+        "update/value_cosine_similarity_std": jax.numpy.std(value_update_cosine_similarities[~same_task]),
+        "update/actor_cosine_similarity_std": jax.numpy.std(actor_update_cosine_similarities[~same_task]),
+        "update/value_magnitude_similarity_mean": jax.numpy.mean(value_update_magnitude_similarity[~same_task]),
+        "update/actor_magnitude_similarity_mean": jax.numpy.mean(actor_update_magnitude_similarity[~same_task]),
+        "update/value_magnitude_similarity_std": jax.numpy.std(value_update_magnitude_similarity[~same_task]),
+        "update/actor_magnitude_similarity_std": jax.numpy.std(actor_update_magnitude_similarity[~same_task]),
+        "update/value_scale_mean": jax.numpy.mean(value_updates_scale),
+        "update/actor_scale_mean": jax.numpy.mean(actor_updates_scale),
+        "update/value_scale_std": jax.numpy.std(value_updates_scale),
         # Feature embedding ranks
         "feature/embedding_rank": embedding_rank,
         **({"target/held_out_val_batch_values": held_out_val_batch_values.tolist()} if held_out_val_batch_values is not None else {}),
