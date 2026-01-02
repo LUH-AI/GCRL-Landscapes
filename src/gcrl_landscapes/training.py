@@ -190,39 +190,49 @@ def remove_duplicates(pairwise_similarities, batch_size, symmetric):
 
 
 @jax.jit
-def get_grads_and_updates_standard(agent, batch):
+def get_grads_standard(agent, batch):
     """Get gradients for QRL/CRL with single actor."""
     total_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0], in_axes=0, out_axes=0)(batch)
-    total_updates = jax.vmap(lambda grad: agent.network.tx.update(grad, agent.network.opt_state, agent.network.params)[0], in_axes=0, out_axes=0)(total_grads)
 
-    return total_grads, total_updates
+    return total_grads
 
 
 @jax.jit
-def get_grads_and_updates_hiql(agent, batch):
-    """Get gradients for HIQL with low and high actors."""
-    total_grads, total_updates = get_grads_and_updates_standard(agent, batch)
-
+def hiql_combine(grads):
     # Flatten both gradient trees and concatenate
-    actor_grads_flat = jax.numpy.concatenate([batched_tree_to_batched_vector(total_grads["modules_low_actor"], total_grads["modules_high_actor"])], axis=-1)
-    actor_updates_flat = jax.numpy.concatenate([batched_tree_to_batched_vector(total_updates["modules_low_actor"], total_updates["modules_high_actor"])], axis=-1)
+    modules_actor = { "modules_low_actor": grads["modules_low_actor"], "modules_high_actor": grads["modules_high_actor"] }
 
-    # Wrap in dict to match expected pytree structure
-    total_grads["modules_actor"] = actor_grads_flat
-    total_updates["modules_actor"] = actor_updates_flat
-
-    return total_grads, total_updates
+    return {"modules_actor": modules_actor, **{k: v for k, v in grads.items() 
+            if k not in ("modules_low_actor", "modules_high_actor")}}
 
 
-def get_grads_and_updates(agent, batch):
+@jax.jit
+def get_grads(agent, batch):
     """Get gradients for value and actor networks, handling different agent types."""
     agent_name = agent.config.get('agent_name', '').lower()
 
     if agent_name == 'hiql':
-        return get_grads_and_updates_hiql(agent, batch)
+        return hiql_combine(get_grads_standard(agent, batch))
     else:
-        return get_grads_and_updates_standard(agent, batch)
+        return get_grads_standard(agent, batch)
 
+
+@jax.jit
+def get_updates_standard(agent, batch):
+    def get_grad(sample):
+        return jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]
+    total_updates = jax.vmap(lambda sample: agent.network.tx.update(get_grad(sample), agent.network.opt_state, agent.network.params)[0], in_axes=0, out_axes=0)(batch)
+    return total_updates
+
+
+@jax.jit
+def get_updates(agent, batch):
+    agent_name = agent.config.get('agent_name', '').lower()
+
+    if agent_name == 'hiql':
+        return hiql_combine(get_updates_standard(agent, batch))
+    else:
+        return get_updates_standard(agent, batch)
 
 
 @jax.jit
@@ -272,18 +282,21 @@ def calc_feature_embedding_rank(agent, batch):
 
 
 def get_metrics(agent, batch):
-    (total_grads, total_updates) = get_grads_and_updates(agent, batch)
+    total_grads = get_grads(agent, batch)
     value_grads, actor_grads = total_grads["modules_value"], total_grads["modules_actor"]
-    value_updates, actor_updates = total_updates["modules_value"], total_updates["modules_actor"]
 
     value_grad_cosine_similarities, actor_grad_cosine_similarities = calc_cossim(value_grads), calc_cossim(actor_grads)
-    value_update_cosine_similarities, actor_update_cosine_similarities = calc_cossim(value_updates), calc_cossim(actor_updates)
-
     value_grad_magnitude_similarity, actor_grad_magnitude_similarity = calc_magsim(value_grads), calc_magsim(actor_grads)
-    value_update_magnitude_similarity, actor_update_magnitude_similarity = calc_magsim(value_updates), calc_magsim(actor_updates)
-
     value_grads_cale, actor_grad_scale = calc_scale(value_grads), calc_scale(actor_grads)
+    del total_grads, value_grads, actor_grads
+
+    total_updates = get_updates(agent, batch)
+    value_updates, actor_updates = total_updates["modules_value"], total_updates["modules_actor"]
+
+    value_update_cosine_similarities, actor_update_cosine_similarities = calc_cossim(value_updates), calc_cossim(actor_updates)
+    value_update_magnitude_similarity, actor_update_magnitude_similarity = calc_magsim(value_updates), calc_magsim(actor_updates)
     value_updates_scale, actor_updates_scale = calc_scale(value_updates), calc_scale(actor_updates)
+    del total_updates, value_updates, actor_updates
 
     embedding_rank = calc_feature_embedding_rank(agent, batch)
 
