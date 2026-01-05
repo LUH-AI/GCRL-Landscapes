@@ -17,7 +17,7 @@ from .util.data import (
     restore_agent,
     ResultsPerStep,
 )
-from .util.misc import retry_call, get_feature_embedding
+from .util.misc import retry_call, get_feature_embedding, crl_total_loss_individual
 from .util.eval import gradient_cosine_similarity, gradient_magnitude_similarity
 import os
 from functools import partial
@@ -192,9 +192,9 @@ def remove_duplicates(pairwise_similarities, batch_size, symmetric):
 @jax.jit
 def get_grads_standard(agent, batch):
     """Get gradients for QRL/CRL with single actor."""
-    total_grads = jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0], in_axes=0, out_axes=0)(batch)
-
-    return total_grads
+    if agent.config.get('agent_name', '').lower() == 'crl':
+        return jax.vmap(lambda index: jax.grad(lambda grad_params: crl_total_loss_individual(agent, batch, index, grad_params), has_aux=True)(agent.network.params)[0], in_axes=0, out_axes=0)(jax.numpy.arange(jax.tree_util.tree_leaves(batch)[0].shape[0]))
+    return jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0], in_axes=0, out_axes=0)(batch)
 
 
 @jax.jit
@@ -219,10 +219,12 @@ def get_grads(agent, batch):
 
 @jax.jit
 def get_updates_standard(agent, batch):
-    def get_grad(sample):
-        return jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]
-    total_updates = jax.vmap(lambda sample: agent.network.tx.update(get_grad(sample), agent.network.opt_state, agent.network.params)[0], in_axes=0, out_axes=0)(batch)
-    return total_updates
+    if agent.config.get('agent_name', '').lower() == 'crl':
+        get_grad = lambda index: jax.grad(lambda grad_params: crl_total_loss_individual(agent, batch, index, grad_params), has_aux=True)(agent.network.params)[0]
+        return jax.vmap(lambda index: agent.network.tx.update(get_grad(index), agent.network.opt_state, agent.network.params)[0], in_axes=0, out_axes=0)(jax.numpy.arange(jax.tree_util.tree_leaves(batch)[0].shape[0]))
+    else:
+        get_grad = lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]
+        return jax.vmap(lambda sample: agent.network.tx.update(get_grad(sample), agent.network.opt_state, agent.network.params)[0], in_axes=0, out_axes=0)(batch)
 
 
 @jax.jit
