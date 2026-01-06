@@ -1,5 +1,5 @@
 version = 1
-revision = 2
+revision = 3
 requires-python = "==3.10.*"
 resolution-markers = [
     "sys_platform == 'linux'",
@@ -230,6 +230,20 @@ wheels = [
 ]
 
 [[package]]
+name = "cmocean"
+version = "4.0.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "matplotlib" },
+    { name = "numpy" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0e/93/6ce32a2749968071b5239c96c54a229f9cb666d1c2d2cead7246ef28282c/cmocean-4.0.3.tar.gz", hash = "sha256:37868399fb5f41b4eac596e69803f9bfaea49946514dfb2e7f48886854250d7c", size = 7145175, upload-time = "2024-04-06T01:05:26.398Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/86/7b/97754548e9da3d41d7334e375b2cd712e9406a3f48823a5f0a166f42d63d/cmocean-4.0.3-py3-none-any.whl", hash = "sha256:f2fc1d5e349db122ee0c9eac80bba969aa92dd2806548fce58dc8bef962f309e", size = 421873, upload-time = "2024-04-06T01:05:24.069Z" },
+]
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 source = { registry = "https://pypi.org/simple" }
@@ -262,6 +276,9 @@ dependencies = [
     { name = "typing-extensions" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/0e/bc/2a53b259ec14101a42690992ea8fc2456edcacc73ede62f803dd3c4b0bdc/configspace-1.2.1.tar.gz", hash = "sha256:2fc1c4477f7839d38b53d8813c2581967df57ccd7d8b4b506e879a8835cb964c", size = 130983, upload-time = "2024-11-21T10:18:39.79Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/f1/d0/e899691a9cdec2b866fbf7c39747195b9402e64260632f415c851ae8e503/configspace-1.2.1-py3-none-any.whl", hash = "sha256:78d3cef1bdb447bf25c2433891580bf6c2b468d47b729356a8646d5b7cd9eb5a", size = 117557, upload-time = "2025-12-16T13:10:39.616Z" },
+]
 
 [[package]]
 name = "contourpy"
@@ -675,9 +692,11 @@ wheels = [
 
 [[package]]
 name = "gcrl-landscapes"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "autorl-landscape" },
+    { name = "cmocean" },
     { name = "configspace" },
     { name = "flax", marker = "sys_platform == 'linux'" },
     { name = "gitpython" },
@@ -711,6 +730,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "autorl-landscape", git = "https://github.com/automl/AutoRL-Landscape.git" },
+    { name = "cmocean" },
     { name = "configspace", specifier = ">=1.2.0" },
     { name = "flax", marker = "sys_platform == 'linux'", specifier = ">=0.10.6" },
     { name = "gitpython" },
@@ -725,7 +745,7 @@ requires-dist = [
     { name = "jinja2" },
     { name = "more-itertools" },
     { name = "numpy", specifier = "<2.0.0" },
-    { name = "ogbench", marker = "sys_platform == 'linux'", git = "https://github.com/CrunchyFlakes/ogbench?branch=master" },
+    { name = "ogbench", marker = "sys_platform == 'linux'", editable = "../ogbench-code" },
     { name = "omegaconf" },
     { name = "pandas" },
     { name = "pydeprecate" },
@@ -1720,8 +1740,8 @@ wheels = [
 
 [[package]]
 name = "ogbench"
-version = "1.1.3"
-source = { git = "https://github.com/CrunchyFlakes/ogbench?branch=master#4bf0ab1953da4b1f3a532e7a83d28734082f4982" }
+version = "1.2.0"
+source = { editable = "../ogbench-code" }
 dependencies = [
     { name = "distrax", marker = "sys_platform == 'linux'" },
     { name = "dm-control", marker = "sys_platform == 'linux'" },
@@ -1729,6 +1749,25 @@ dependencies = [
     { name = "ml-collections", marker = "sys_platform == 'linux'" },
     { name = "mujoco", marker = "sys_platform == 'linux'" },
 ]
+
+[package.metadata]
+requires-dist = [
+    { name = "distrax", specifier = ">=0.1.5" },
+    { name = "distrax", marker = "extra == 'train'", specifier = ">=0.1.5" },
+    { name = "dm-control", specifier = ">=1.0.20" },
+    { name = "flax", marker = "extra == 'train'", specifier = ">=0.8.4" },
+    { name = "gymnasium", extras = ["mujoco"] },
+    { name = "jax", extras = ["cuda12"], marker = "extra == 'train'", specifier = ">=0.4.26" },
+    { name = "matplotlib", marker = "extra == 'train'" },
+    { name = "ml-collections" },
+    { name = "ml-collections", marker = "extra == 'train'" },
+    { name = "moviepy", marker = "extra == 'train'" },
+    { name = "mujoco", specifier = ">=3.1.6" },
+    { name = "ogbench", extras = ["train", "dev"], marker = "extra == 'all'" },
+    { name = "ruff", marker = "extra == 'dev'" },
+    { name = "wandb", marker = "extra == 'train'" },
+]
+provides-extras = ["train", "dev", "all"]
 
 [[package]]
 name = "omegaconf"

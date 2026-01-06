@@ -500,7 +500,8 @@ def submit(args: argparse.Namespace) -> None:
                 * (steps_to_train / 1_000_000)
                 * args.tasks_per_node_total
             ),  # this overestimates, keep safety margin
-            slurm_gpus_per_node=1,
+            #slurm_gpus_per_node=1,
+            slurm_gres="gpu:h100:1",
             tasks_per_node=args.tasks_per_node_parallel,
             slurm_mem_per_cpu=args.mem_per_cpu,
             slurm_array_parallelism=50,

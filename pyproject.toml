@@ -64,7 +64,7 @@ Issues = "https://github.com/LUH-AI/GCRL-Landscapes/issues"
 Source = "https://github.com/LUH-AI/GCRL-Landscapes"
 
 [tool.uv.sources]
-ogbench = { git = "https://github.com/CrunchyFlakes/ogbench", branch = "master" }
+ogbench = { path = "../ogbench-code", editable = true }
 
 [tool.hatch.metadata]
 allow-direct-references = true

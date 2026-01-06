@@ -1,7 +1,7 @@
 #!/bin/bash
 
-#SBATCH --partition=ai,tnt
-#SBATCH --job-name=HPO
+#SBATCH --partition=normal
+#SBATCH --job-name=HPO-HIQL
 #SBATCH --time=5-00:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
@@ -43,6 +43,8 @@ fi
 
 
 module load Miniforge3
+conda init
+conda deactivate
 conda activate gcrl
 
 echo python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5"

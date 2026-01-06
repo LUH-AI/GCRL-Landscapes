@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --partition=ai,tnt
+#SBATCH --partition=normal
 #SBATCH --job-name=ZipAndPlot
 #SBATCH --time=05:00:00
 #SBATCH --ntasks=1
@@ -12,7 +12,7 @@
 
 DATE=`date -u +%Y-%m-%d`
 ZIPNAME="${DATE}-${1/\.\//}.zip"
-/home/nhwptoem/bin/zip -r "$ZIPNAME" "$1" -x 'logs*/**/*.pkl' -x 'logs*/**/submitit/*'
+zip -r "$ZIPNAME" "$1" -x 'logs*/**/*.pkl' -x 'logs*/**/submitit/*'
 
 module load GCC/12.2.0 OpenMPI/4.1.4 Armadillo
 export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${BIGWORK}/usr/lib"

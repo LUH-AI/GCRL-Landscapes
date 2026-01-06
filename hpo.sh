@@ -2,10 +2,10 @@
 
 logdir="./logs_hpo"
 declare -a -r datasets=(
-  antmaze-medium-explore-v0
-  antmaze-medium-explore80navigate-v0
-  antmaze-medium-explore40navigate-v0
-  antmaze-medium-navigate-v0
+  antmaze-large-explore-v0
+  antmaze-large-explore80navigate-v0
+  antmaze-large-explore40navigate-v0
+  antmaze-large-navigate-v0
 )
 declare -a -r phases=(
   25
