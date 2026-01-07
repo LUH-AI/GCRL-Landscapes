@@ -309,6 +309,10 @@ def get_metrics(agent, batch):
     else:
         held_out_val_batch_values = None
 
+    target_quantiles = [0.01, 0.05, 0.1, 0.2, 0.25, 0.5, 0.75, 0.9]
+    def get_quantile_dict(values, value_name, target_quantiles):
+        return {f"{value_name}_quant{target_quantile}": jax.numpy.quantile(values, target_quantile) for target_quantile in target_quantiles}
+
     # We use trajectories as the notion of a task for pairwise metrics. If a sample is from the same trajectory -> filter it
     same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (CONST_VAL_BATCH_SIZE // 2 + 1))]), CONST_VAL_BATCH_SIZE, True)
     return {
@@ -317,11 +321,17 @@ def get_metrics(agent, batch):
         "grad/actor_cosine_similarity_mean": jax.numpy.mean(actor_grad_cosine_similarities[~same_task]),
         "grad/value_cosine_similarity_std": jax.numpy.std(value_grad_cosine_similarities[~same_task]),
         "grad/actor_cosine_similarity_std": jax.numpy.std(actor_grad_cosine_similarities[~same_task]),
+        **get_quantile_dict(value_grad_cosine_similarities[~same_task], "grad/value_cosine_similarity", target_quantiles),
+        **get_quantile_dict(actor_grad_cosine_similarities[~same_task], "grad/actor_cosine_similarity", target_quantiles),
+        "grad/value_cosine_similarity_cvar0.25": jax.numpy.mean(value_grad_cosine_similarities[~same_task][value_grad_cosine_similarities[~same_task] < jax.numpy.quantile(value_grad_cosine_similarities[~same_task], 0.25)]),
+        "grad/actor_cosine_similarity_cvar0.25": jax.numpy.mean(actor_grad_cosine_similarities[~same_task][actor_grad_cosine_similarities[~same_task] < jax.numpy.quantile(actor_grad_cosine_similarities[~same_task], 0.25)]),
         # Magnitude similarities
         "grad/value_magnitude_similarity_mean": jax.numpy.mean(value_grad_magnitude_similarity[~same_task]),
         "grad/actor_magnitude_similarity_mean": jax.numpy.mean(actor_grad_magnitude_similarity[~same_task]),
         "grad/value_magnitude_similarity_std": jax.numpy.std(value_grad_magnitude_similarity[~same_task]),
         "grad/actor_magnitude_similarity_std": jax.numpy.std(actor_grad_magnitude_similarity[~same_task]),
+        **get_quantile_dict(value_grad_magnitude_similarity[~same_task], "grad/value_magnitude_similarity", target_quantiles),
+        **get_quantile_dict(actor_grad_magnitude_similarity[~same_task], "grad/actor_magnitude_similarity", target_quantiles),
         # Gradient scale
         "grad/value_scale_mean": jax.numpy.mean(value_grads_cale),
         "grad/actor_scale_mean": jax.numpy.mean(actor_grad_scale),
@@ -332,10 +342,14 @@ def get_metrics(agent, batch):
         "update/actor_cosine_similarity_mean": jax.numpy.mean(actor_update_cosine_similarities[~same_task]),
         "update/value_cosine_similarity_std": jax.numpy.std(value_update_cosine_similarities[~same_task]),
         "update/actor_cosine_similarity_std": jax.numpy.std(actor_update_cosine_similarities[~same_task]),
+        **get_quantile_dict(value_update_cosine_similarities[~same_task], "update/value_cosine_similarity", target_quantiles),
+        **get_quantile_dict(actor_update_cosine_similarities[~same_task], "update/actor_cosine_similarity", target_quantiles),
         "update/value_magnitude_similarity_mean": jax.numpy.mean(value_update_magnitude_similarity[~same_task]),
         "update/actor_magnitude_similarity_mean": jax.numpy.mean(actor_update_magnitude_similarity[~same_task]),
         "update/value_magnitude_similarity_std": jax.numpy.std(value_update_magnitude_similarity[~same_task]),
         "update/actor_magnitude_similarity_std": jax.numpy.std(actor_update_magnitude_similarity[~same_task]),
+        **get_quantile_dict(value_update_magnitude_similarity[~same_task], "update/value_magnitude_similarity", target_quantiles),
+        **get_quantile_dict(actor_update_magnitude_similarity[~same_task], "update/actor_magnitude_similarity", target_quantiles),
         "update/value_scale_mean": jax.numpy.mean(value_updates_scale),
         "update/actor_scale_mean": jax.numpy.mean(actor_updates_scale),
         "update/value_scale_std": jax.numpy.std(value_updates_scale),
