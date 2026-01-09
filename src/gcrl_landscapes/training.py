@@ -309,7 +309,7 @@ def get_metrics(agent, batch):
     else:
         held_out_val_batch_values = None
 
-    target_quantiles = [0.01, 0.05, 0.1, 0.2, 0.25, 0.5, 0.75, 0.9]
+    target_quantiles = np.arange(100) / 100
     def get_quantile_dict(values, value_name, target_quantiles):
         return {f"{value_name}_quant{target_quantile}": jax.numpy.quantile(values, target_quantile) for target_quantile in target_quantiles}
 
