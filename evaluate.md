@@ -107,7 +107,6 @@ print(best_config_df.groupby(["hp.agent_name", "eval_bins5"])["grad/value_cosine
 Keep only configurations that reach a minimal performance and do analysis
 
 ```python
-
 good_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] > -1.1)]
 print(good_configs_df.groupby(["dataset", "hp.agent_name"])[["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]].describe())
 print(good_configs_df.groupby(["hp.agent_name"])[["grad/value_cosine_similarity_std", "grad/actor_cosine_similarity_std"]].describe())
@@ -124,6 +123,13 @@ print(good_configs_df.groupby(["eval_bins5", "hp.agent_name"])[["grad/value_cosi
 print(merged_training_with_iqm_df.groupby(["eval_bins5", "hp.agent_name"])[["grad/value_cosine_similarity_mean"]].apply(lambda x: (x[x <= np.quantile(x, 0.25)].mean(), x[x >= np.quantile(x, 0.75)].mean())))
 ```
 Look at metrics inside of batch
+
+```python
+bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 0.2)]
+bad_configs_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_quant0.25"].mean()
+#(merged_training_with_iqm_df.groupby(["hp.agent_name"])[merged_training_with_iqm_df.columns[merged_training_with_iqm_df.columns.str.contains(r"grad/.*quant\d+")]].mean())
+
+```
 
 ```python
 fig, ax = plt.subplots()
