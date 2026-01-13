@@ -155,6 +155,16 @@ sns.lineplot(data=df_long[df_long["variable"] == "grad/value_cosine_similarity"]
 plt.ylabel("Value-Function Cosine Similarity")
 plt.title("Value-Function Cosine Similarity Quantiles Inside of Batch")
 plt.savefig("grad_cosine_similarity_quantiles.png")
+fig, ax = plt.subplots()
+mean_df = df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["hp.agent_name", "quantile"])["value"].mean().reset_index()
+sns.lineplot(data=mean_df, x="value", y="quantile", hue="hp.agent_name", errorbar=None, marker="o")
+plt.xlim(-1, 1)
+plt.ylim(0, 1)
+plt.title("Inter-Task Gradient Cosine Similarity")
+plt.xlabel("Gradient Cosine Similarity")
+plt.ylabel("Cumulative Probability")
+plt.savefig("cdf-value_cosine_similarity.png")
+plt.close()
 
 ```
 
