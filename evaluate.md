@@ -122,6 +122,33 @@ print(good_configs_df.groupby(["eval_bins5", "dataset", "hp.agent_name"])[["grad
 print(good_configs_df.groupby(["eval_bins5", "hp.agent_name"])[["grad/value_cosine_similarity_std"]].describe())
 
 print(merged_training_with_iqm_df.groupby(["eval_bins5", "hp.agent_name"])[["grad/value_cosine_similarity_mean"]].apply(lambda x: (x[x <= np.quantile(x, 0.25)].mean(), x[x >= np.quantile(x, 0.75)].mean())))
+```
+Look at metrics inside of batch
+
+```python
+fig, ax = plt.subplots()
+merged_training_with_iqm_df["id"] = merged_training_with_iqm_df.index
+df = merged_training_with_iqm_df.copy()
+quant_cols = [col for col in df.columns if 'quant' in col]
+id_cols = [col for col in df.columns if 'quant' not in col]
+
+df_long = df.melt(
+    id_vars=id_cols,
+    value_vars=quant_cols,
+    var_name='column',
+    value_name='value'
+)
+df_long['quantile'] = df_long['column'].str.extract(r'quant([\d.]+)')[0].astype(float)
+
+# Extract the base column name (everything before 'quant')
+df_long['variable'] = df_long['column'].str.replace(r'_?quant[\d.]+', '', regex=True)
+
+# Clean up
+df_long = df_long.drop('column', axis=1)
+sns.lineplot(data=df_long[df_long["variable"] == "grad/value_cosine_similarity"], x="quantile", y="value", hue="hp.agent_name", errorbar=None, marker="o")
+plt.ylabel("Value-Function Cosine Similarity")
+plt.title("Value-Function Cosine Similarity Quantiles Inside of Batch")
+plt.savefig("grad_cosine_similarity_quantiles.png")
 
 ```
 
