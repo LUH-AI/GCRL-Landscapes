@@ -736,6 +736,7 @@ if __name__ == "__main__":
     )
     parser.add_argument("--no_multiprocessing", action="store_true")
     parser.add_argument("--output_folder", type=Path, required=True)
+    parser.add_argument("--start_kernel", action="store_true")
     args = parser.parse_args()
 
     # Parse results
@@ -756,6 +757,9 @@ if __name__ == "__main__":
         exit(0)
 
     merged_results_df, merged_training_df = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
+    if args.start_kernel:
+        from IPython import embed_kernel
+        embed_kernel()
 
     create_phased_tables(merged_results_df, output_folder)
     create_igprfit_tables(merged_results_df, output_folder)
