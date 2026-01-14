@@ -1,8 +1,63 @@
 ```python
 import pandas as pd
 import numpy as np
+
+def marginalize_seeds(df: pd.DataFrame):
+    def agg_constant_col(column_values):
+        if column_values.nunique() > 1:
+            raise ValueError(f"Not all values are the same:\n{column_values}")
+        return column_values.iloc[0]
+    return (
+        df.groupby(
+            by=[
+                "agent",
+                "dataset",
+                "constant_dataset",
+                "hps",
+            ]
+            + [
+                "phase_num",
+                "config_index",
+            ]
+        )
+        .agg(
+            {
+                "success": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                **{col: agg_constant_col for col in df.columns[df.columns.str.startswith("hp.")]},
+            }
+        )
+        .reset_index()
+    )
+
+def eps_optimality(df: pd.DataFrame, col: str) -> pd.Series:
+  grouping = [
+                "agent",
+                "dataset",
+                "constant_dataset",
+                "hps",
+                "phase_num",
+            ]
+
+  return df[col] / df.groupby(grouping)[col].transform("max")
+```
+
+```python
+
+```
+
+```python
 merged_training_df: pd.DataFrame = merged_training_df
 merged_results_df: pd.DataFrame = merged_results_df
+merged_results_df["mean_normalized_goal_distance_return_eps_optimality"] = eps_optimality(merged_results_df, "mean_normalized_goal_distance_return")
+merged_marginalized_results_df: pd.DataFrame = marginalize_seeds(merged_results_df)
 merged_training_df.columns.tolist()
 ```
 
