@@ -1,8 +1,13 @@
 ```python
 import pandas as pd
 import numpy as np
+from scipy.stats import trim_mean
+
 
 def marginalize_seeds(df: pd.DataFrame):
+    def trim_mean_with_assert(values, proportiontocut=0.25):
+        assert values.nunique() == 5
+        return trim_mean(values, proportiontocut=proportiontocut)
     def agg_constant_col(column_values):
         if column_values.nunique() > 1:
             raise ValueError(f"Not all values are the same:\n{column_values}")
@@ -31,6 +36,7 @@ def marginalize_seeds(df: pd.DataFrame):
                 "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
                     column_values, proportiontocut=0.25
                 ),
+                "seed": trim_mean_with_assert,
                 **{col: agg_constant_col for col in df.columns[df.columns.str.startswith("hp.")]},
             }
         )
@@ -50,14 +56,10 @@ def eps_optimality(df: pd.DataFrame, col: str) -> pd.Series:
 ```
 
 ```python
-
-```
-
-```python
 merged_training_df: pd.DataFrame = merged_training_df
 merged_results_df: pd.DataFrame = merged_results_df
-merged_results_df["mean_normalized_goal_distance_return_eps_optimality"] = eps_optimality(merged_results_df, "mean_normalized_goal_distance_return")
 merged_marginalized_results_df: pd.DataFrame = marginalize_seeds(merged_results_df)
+merged_marginalized_results_df["mean_normalized_goal_distance_return_eps_optimality"] = eps_optimality(merged_marginalized_results_df, "mean_normalized_goal_distance_return")
 merged_training_df.columns.tolist()
 ```
 
@@ -510,4 +512,97 @@ merged_training_with_iqm_df["target_drift_neighbor"] = merged_training_with_iqm_
 print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_end"].agg(["mean", "std"]))
 print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_start"].agg(["mean", "std"]))
 print(merged_training_with_iqm_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])["target_drift_neighbor"].agg(["mean", "std"]))
+```
+
+# Combine Landscape Plots
+
+## Seaborn KDE-like plot
+
+```python
+merged_results_df.groupby(["hp.agent_name", "dataset"])
+```
+
+```python
+from src.gcrl_landscapes.util.eval import fit_model
+from src.gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
+from gcrl_landscapes.plots.triple_gp import create_contour_plot
+from gcrl_landscapes.evaluation.common import map_labels
+agent_name = "hiql"
+grid_length = 100
+
+fig, ax = plt.subplots()
+clipped_merged_results_df = merged_results_df.copy()
+clipped_merged_results_df["mean_normalized_goal_distance_return"] = clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
+data_temp = clipped_merged_results_df[ (merged_results_df["hp.agent_name"] == agent_name)
+                                & (merged_results_df["dataset"] == "antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0")
+                                & (merged_results_df["hps"] == frozenset(set(["lr", "discount"])))
+                                ]
+# for phase_num ...
+point_dfs = []
+for name, group in data_temp.groupby(["phase_num"]):
+  group_copy = group.copy().reset_index()
+  model = fit_model(group, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
+  model.fit()
+  create_contour_plot(model, x_dim=0, y_dim=1, z_dim="mean_normalized_goal_distance_return", bounds=[0, 1], filename="test_contour.png", dim_label_mapping=map_labels, agent_name=agent_name, z_transform=lambda x, _: x, discrete_levels=None, last_phase_best_config=None)
+  x_lower, x_upper, x_log = get_bounds(model.hp_names[0].removeprefix("hp."), agent_name)
+  y_lower, y_upper, y_log = get_bounds(model.hp_names[1].removeprefix("hp."), agent_name)
+  x, y = np.linspace(0, 1, grid_length), np.linspace(0, 1, grid_length)
+  X, Y = np.meshgrid(x, y)
+  points = np.vstack([X.ravel(), Y.ravel()]).transpose()
+  Z = model.get_middle(points).clip(0, 1)
+  Z_normalized = Z / Z.max()
+  Z_selected = (Z_normalized > 0.9).squeeze()
+  points_x, points_y = sobol_codomain_to_hp(points[:, 0], x_lower, x_upper, x_log), sobol_codomain_to_hp(points[:, 1], y_lower, y_upper, y_log)
+  print(np.vstack([points_x, points_y]))
+
+  # # TODO: decide
+  # group_copy["hp.lr"] = hp_to_sobol_codomain(group_copy["hp.lr"], x_lower, x_upper, x_log)
+  # group_copy["hp.discount"] = hp_to_sobol_codomain(group_copy["hp.discount"], y_lower, y_upper, y_log)
+  # marginalized_group_copy = group_copy.groupby(["hp.lr", "hp.discount"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
+  # marginalized_group_copy["goal_distance_return_eps"] = marginalized_group_copy["mean_normalized_goal_distance_return"] / marginalized_group_copy["mean_normalized_goal_distance_return"].max()
+
+
+  points_prediction_df = pd.DataFrame({"hp.lr": points_x, "hp.discount": points_y, "mean_normalized_goal_distance_return": Z_normalized.squeeze()})
+  # points_prediction_df = marginalized_group_copy[marginalized_group_copy["goal_distance_return_eps"] > 0.8]
+  points_prediction_df["phase_num"] = name[0]
+  point_dfs.append(points_prediction_df)
+point_df = pd.concat(point_dfs)
+print(point_df.describe())
+
+print(len(point_df))
+# sns.scatterplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.9], x="hp.lr", y="hp.discount", hue="phase_num")
+x_lower, x_upper, x_log = get_bounds("lr", agent_name)
+y_lower, y_upper, y_log = get_bounds("discount", agent_name)
+sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=2, bw_adjust=1, fill=True, alpha=0.35, palette="viridis")
+plt.xlim(x_lower, x_upper)
+plt.ylim(y_lower, y_upper)
+if x_log:
+  ax.set_xscale("log", base=10)
+if y_log:
+  ax.set_yscale("log", base=10)
+plt.savefig("test.png")
+plt.close()
+
+
+
+```
+
+## Optimum Movement line plot
+
+```python
+data_temp = merged_results_df[(merged_results_df["dataset"] == "antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0") & (merged_results_df["hps"] == frozenset(set(["lr", "discount"])))]
+optima = []
+for name, group in data_temp.groupby(["hp.agent_name", "phase_num"]):
+  marginalized_group = group.groupby(["hp.lr", "hp.discount"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
+  t = marginalized_group[marginalized_group["mean_normalized_goal_distance_return"] == marginalized_group["mean_normalized_goal_distance_return"].max()].iloc[0][["hp.lr", "hp.discount"]]
+  t["Algorithm"] = name[0]
+  optima.append(t)
+x_lower, x_upper, x_log = get_bounds("lr", agent_name)
+y_lower, y_upper, y_log = get_bounds("discount", agent_name)
+fig, ax = plt.subplots()
+sns.lineplot(data=pd.DataFrame(optima), x="hp.lr", y="hp.discount", hue="Algorithm", errorbar=None, marker="o")
+ax.set(xscale="log")
+plt.xlim(x_lower, x_upper)
+plt.ylim(y_lower, y_upper)
+plt.savefig("test.png")
 ```

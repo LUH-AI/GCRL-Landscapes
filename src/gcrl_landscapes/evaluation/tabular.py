@@ -28,6 +28,36 @@ import os
 from itertools import combinations, chain, product
 
 
+def marginalize_seeds(df: pd.DataFrame):
+    return (
+        df.groupby(
+            by=[
+                "agent",
+                "dataset",
+                "constant_dataset",
+                "hps",
+                "phase_num",
+                "config_index",
+            ]
+        )
+        .agg(
+            {
+                "success": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+            }
+        )
+        .reset_index()
+    )
+
+
+
 def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
     """Main code to generate the tabular data for data grouped by phases
 
