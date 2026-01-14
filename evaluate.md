@@ -527,7 +527,7 @@ from src.gcrl_landscapes.util.eval import fit_model
 from src.gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
 from gcrl_landscapes.plots.triple_gp import create_contour_plot
 from gcrl_landscapes.evaluation.common import map_labels
-agent_name = "hiql"
+agent_name = "qrl"
 grid_length = 100
 
 fig, ax = plt.subplots()
@@ -573,7 +573,103 @@ print(len(point_df))
 # sns.scatterplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.9], x="hp.lr", y="hp.discount", hue="phase_num")
 x_lower, x_upper, x_log = get_bounds("lr", agent_name)
 y_lower, y_upper, y_log = get_bounds("discount", agent_name)
-sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=2, bw_adjust=1, fill=True, alpha=0.35, palette="viridis")
+# ax = sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=10, bw_adjust=1, fill=True, alpha=0.4, palette="rocket")
+df = point_df[point_df["mean_normalized_goal_distance_return"] > 0.95]
+
+# ax = sns.kdeplot(
+#     data=df,
+#     x="hp.lr", y="hp.discount",
+#     hue="phase_num",
+#     log_scale=(x_log, y_log),
+#     fill=True,
+#     levels=2,
+#     thresh=0.15,
+#     bw_adjust=1.0,
+#     alpha=0.12,
+#     palette="magma",
+#     linewidth=0,
+# )
+#
+# sns.kdeplot(
+#     data=df,
+#     x="hp.lr", y="hp.discount",
+#     hue="phase_num",
+#     log_scale=(x_log, y_log),
+#     fill=False,
+#     levels=[0.5, 0.8],
+#     thresh=0.15,
+#     bw_adjust=1.0,
+#     alpha=0.9,
+#     palette="magma",
+#     linewidths=2.0,
+#     ax=ax,
+# )
+fig, ax = plt.subplots(figsize=(12, 8))
+
+palette = sns.color_palette("viridis", n_colors=df["phase_num"].nunique())
+
+for i, phase in enumerate(sorted(df["phase_num"].unique())):
+    phase_df = df[df["phase_num"] == phase]
+    color = palette[i]
+    
+    sns.kdeplot(
+        data=phase_df,
+        x="hp.lr", 
+        y="hp.discount",
+        log_scale=(x_log, y_log),
+        fill=True,
+        levels=4,
+        thresh=0.05,
+        bw_adjust=0.7,
+        alpha=0.12,
+        color=color,
+        linewidth=0,
+        ax=ax,
+    )
+    
+    sns.kdeplot(
+        data=phase_df,
+        x="hp.lr", 
+        y="hp.discount",
+        log_scale=(x_log, y_log),
+        fill=False,
+        levels=[0.7],
+        thresh=0.05,
+        bw_adjust=0.7,
+        alpha=0.9,
+        color=color,
+        linewidths=3.5,
+        ax=ax,
+        label=f"Phase {phase}"
+    )
+    
+    centroid_x = phase_df["hp.lr"].median()
+    centroid_y = phase_df["hp.discount"].median()
+    ax.scatter(centroid_x, centroid_y, s=150, c=[color], edgecolors='white', 
+               linewidths=2, zorder=100, marker='o')
+    ax.text(centroid_x, centroid_y, str(phase), fontsize=11, fontweight='bold', 
+            ha='center', va='center', color='white', zorder=101)
+
+ax.set_xlabel("Learning Rate", fontsize=14, fontweight='bold')
+ax.set_ylabel("Discount Factor", fontsize=14, fontweight='bold')
+ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases", 
+             fontsize=15, fontweight='bold', pad=20)
+
+ax.legend(title="Training Phase", title_fontsize=12, fontsize=11, 
+          loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True, 
+          fancybox=True, shadow=True)
+
+ax.grid(True, alpha=0.25, linestyle='--', linewidth=0.6)
+ax.set_facecolor('#fafafa')
+for i in range(len(centroids)-1):
+    ax.annotate('', xy=centroids[i+1], xytext=centroids[i],
+                arrowprops=dict(arrowstyle='->', lw=2.5, color='black', alpha=0.6,
+                               connectionstyle="arc3,rad=0.1"))
+
+
+#sns.move_legend(ax, "upper left", bbox_to_anchor=(1.02, 1), frameon=False, title="phase")
+ax.grid(True, alpha=0.15)
+print(ax.collections[0].levels)
 plt.xlim(x_lower, x_upper)
 plt.ylim(y_lower, y_upper)
 if x_log:
