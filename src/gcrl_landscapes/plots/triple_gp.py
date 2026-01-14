@@ -98,9 +98,9 @@ class TripleGPModel(BaseEstimator):
 
         # group runs with the same configuration:
         self.dim_info = hp_names
-        conf_groups = data.groupby(["run_id"] + hp_names)
+        conf_groups = data.groupby(hp_names)
         # all groups (configurations):
-        self.x_unscaled = np.array(list(conf_groups.groups.keys()))[:, 1:]
+        self.x_unscaled = np.array(list(conf_groups.groups.keys()))[:, :]
         """(num_confs, num_ls_dims). LS dimensions are sorted by name"""
         # all evaluations (y values) for a group (configuration):
         self.x_normalizing_offset = self.x_unscaled.min(axis=0)
@@ -110,8 +110,7 @@ class TripleGPModel(BaseEstimator):
 
         self.x = self._scale_x(self.x_unscaled)
 
-        y = np.concatenate(conf_groups[y_col].apply(list))
-        y = np.array([np.array(ys) for ys in y])
+        y = np.array(conf_groups[y_col].apply(list).tolist())
 
         # handle crashed runs by assigning 0 return:
         self.crashed = np.isnan(y)
