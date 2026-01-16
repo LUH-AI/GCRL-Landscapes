@@ -743,12 +743,11 @@ if __name__ == "__main__":
     output_folder = args.output_folder
     output_folder.mkdir(exist_ok=True, parents=True)
 
+    importance_df = None
     if args.hp_importance_data:
         importance_df = pd.concat(
             [parse_hp_importance(zipfile) for zipfile in args.zipfiles]
         )
-        create_importance_divergence_table(importance_df, args.output_folder)
-        exit(0)
 
     if args.convergence_data:
         if len(args.zipfiles) != 1:
@@ -756,10 +755,16 @@ if __name__ == "__main__":
         create_convergence_table(args.zipfiles[0], args.output_folder)
         exit(0)
 
-    merged_results_df, merged_training_df = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
+    merged_results_df, merged_training_df = None, None
+    if not (args.hp_importance_data or args.convergence_data):
+        merged_results_df, merged_training_df = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
     if args.start_kernel:
         from IPython import embed_kernel
         embed_kernel()
+
+    if args.hp_importance_data:
+        create_importance_divergence_table(importance_df, args.output_folder)
+        exit(0)
 
     create_phased_tables(merged_results_df, output_folder)
     create_igprfit_tables(merged_results_df, output_folder)
