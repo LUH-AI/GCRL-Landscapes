@@ -196,11 +196,15 @@ df_long[(df_long["variable"] == "grad/value_cosine_similarity")].groupby(["hp.ag
 ```python
 fig, ax = plt.subplots()
 merged_training_with_iqm_df["id"] = merged_training_with_iqm_df.index
-df = merged_training_with_iqm_df.copy()
-quant_cols = [col for col in df.columns if 'quant' in col]
-id_cols = [col for col in df.columns if 'quant' not in col]
+# df = merged_training_with_iqm_merged_with_iqm_df.copy()
+float_cols = merged_training_with_iqm_df.select_dtypes(include="float64").columns
+for col in float_cols:
+  print(col)
+  merged_training_with_iqm_df[col] = merged_training_with_iqm_df[col].astype("float16")
+quant_cols = [col for col in merged_training_with_iqm_df.columns if 'grad/value_cosine_similarity_quant' in col]
+id_cols = [col for col in merged_training_with_iqm_df.columns if 'quant' not in col]
 
-df_long = df.melt(
+df_long = merged_training_with_iqm_df.melt(
     id_vars=id_cols,
     value_vars=quant_cols,
     var_name='column',
@@ -213,69 +217,70 @@ df_long['variable'] = df_long['column'].str.replace(r'_?quant[\d.]+', '', regex=
 
 # Clean up
 df_long = df_long.drop('column', axis=1)
-sns.lineplot(data=df_long[df_long["variable"] == "grad/value_cosine_similarity"], x="quantile", y="value", hue="hp.agent_name", errorbar=None, marker="o")
-
-# Normal distribution
-quantiles = np.linspace(0, 1, 100)
-import scipy.stats
-values = scipy.stats.truncnorm(-1, 1, loc=0, scale=1).ppf(quantiles)
-sns.lineplot(x=quantiles, y=values, color="black")
-
-plt.ylabel("Value-Function Cosine Similarity")
-plt.title("Value-Function Cosine Similarity Quantiles Inside of Batch")
-plt.savefig("grad_cosine_similarity_quantiles.png")
-plt.close()
-
-fig, ax = plt.subplots()
-# Construct PDF from quantiles
-# TODO: all agents
-df_long_filtered = df_long[(df_long["variable"] == "grad/value_cosine_similarity") & (df_long["hp.agent_name"] == "hiql")]
-p = df_long[(df_long["variable"] == "grad/value_cosine_similarity") & (df_long["hp.agent_name"] == "qrl")]["value"].values
-q = df_long[df_long["variable"] == "grad/value_cosine_similarity"]["quantile"].values
-df_q = df_long_filtered.groupby(["quantile"])["value"].mean()
-p = df_q.index
-q = df_q.values
-print(p)
-print(q)
-x_vals = []
-pdf_vals = []
-
-for i in range(len(p) - 1):
-    x_segment = (q[i] + q[i+1]) / 2
-    pdf_segment = (p[i+1] - p[i]) / (q[i+1] - q[i])
-    x_vals.append(x_segment)
-    pdf_vals.append(pdf_segment)
-
-x = np.array(x_vals)
-pdf = np.array(pdf_vals)
-sns.lineplot(x=x, y=pdf)
-plt.xlim(-1, 1)
-plt.ylim(0, 2)
-plt.savefig("test.png")
-
-
-plt.close()
-
+# sns.lineplot(data=df_long[df_long["variable"] == "grad/value_cosine_similarity"], x="quantile", y="value", hue="hp.agent_name", errorbar=None, marker="o")
+#
+# # Normal distribution
+# quantiles = np.linspace(0, 1, 100)
+# import scipy.stats
+# values = scipy.stats.truncnorm(-1, 1, loc=0, scale=1).ppf(quantiles)
+# sns.lineplot(x=quantiles, y=values, color="black")
+#
+# plt.ylabel("Value-Function Cosine Similarity")
+# plt.title("Value-Function Cosine Similarity Quantiles Inside of Batch")
+# plt.savefig("grad_cosine_similarity_quantiles.png")
+# plt.close()
+#
+# fig, ax = plt.subplots()
+# # Construct PDF from quantiles
+# # TODO: all agents
+# df_long_filtered = df_long[(df_long["variable"] == "grad/value_cosine_similarity") & (df_long["hp.agent_name"] == "hiql")]
+# p = df_long[(df_long["variable"] == "grad/value_cosine_similarity") & (df_long["hp.agent_name"] == "qrl")]["value"].values
+# q = df_long[df_long["variable"] == "grad/value_cosine_similarity"]["quantile"].values
+# df_q = df_long_filtered.groupby(["quantile"])["value"].mean()
+# p = df_q.index
+# q = df_q.values
+# print(p)
+# print(q)
+# x_vals = []
+# pdf_vals = []
+#
+# for i in range(len(p) - 1):
+#     x_segment = (q[i] + q[i+1]) / 2
+#     pdf_segment = (p[i+1] - p[i]) / (q[i+1] - q[i])
+#     x_vals.append(x_segment)
+#     pdf_vals.append(pdf_segment)
+#
+# x = np.array(x_vals)
+# pdf = np.array(pdf_vals)
+# sns.lineplot(x=x, y=pdf)
+# plt.xlim(-1, 1)
+# plt.ylim(0, 2)
+# plt.savefig("test.png")
+#
+#
+# plt.close()
+#
 
 # Calculate densities for each interval
 # density = ΔP / Δx
 fig, ax = plt.subplots()
-prob_changes = np.diff(p)
-value_changes = np.diff(q)
-densities = prob_changes / value_changes
-x_points = (q[:-1] + q[1:]) / 2
+# prob_changes = np.diff(p)
+# value_changes = np.diff(q)
+# densities = prob_changes / value_changes
+# x_points = (q[:-1] + q[1:]) / 2
 
 # For plotting, we need the density at each quantile point
-x_plot = np.linspace(q.min(), q.max(), 1000)
-y_plot = np.interp(x_plot, q, p)
-print(len(x_plot))
-print(len(y_plot))
-fig, ax = plt.subplots()
-print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
+# x_plot = np.linspace(q.min(), q.max(), 1000)
+# y_plot = np.interp(x_plot, q, p)
+# print(len(x_plot))
+# print(len(y_plot))
+sns.set_theme(context="paper", style="whitegrid")
+fig, ax = plt.subplots(figsize=(3.5, 2.5))
+# print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
 mean_df = df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["hp.agent_name", "quantile"])["value"].mean().reset_index()
 mean_df = mean_df.rename(columns={"hp.agent_name": "Algorithm"})
 mean_df["Algorithm"] = mean_df["Algorithm"].str.upper()
-ax = sns.lineplot(data=mean_df, x="value", y="quantile", hue="Algorithm", errorbar="ci", marker="o")
+ax = sns.lineplot(data=mean_df, x="value", y="quantile", hue="Algorithm", errorbar=None)
 
 # # Overlay normal distribution
 # x = np.linspace(-1, 1, 200)  # fine-grained x-values
@@ -292,8 +297,8 @@ plt.ylim(0, 1)
 plt.title("Inter-Goal Gradient Alignment")
 plt.xlabel("Gradient Cosine Similarity")
 plt.ylabel("Cumulative Probability")
-# Swap axes to get cdf
-plt.savefig("gradient-alignment-cdf.png")
+plt.tight_layout()
+plt.savefig("gradient-alignment-cdf.png", dpi=1200)
 
 plt.close()
 
