@@ -527,7 +527,7 @@ from src.gcrl_landscapes.util.eval import fit_model
 from src.gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
 from gcrl_landscapes.plots.triple_gp import create_contour_plot
 from gcrl_landscapes.evaluation.common import map_labels
-agent_name = "qrl"
+agent_name = "crl"
 grid_length = 100
 
 fig, ax = plt.subplots()
@@ -574,7 +574,7 @@ print(len(point_df))
 x_lower, x_upper, x_log = get_bounds("lr", agent_name)
 y_lower, y_upper, y_log = get_bounds("discount", agent_name)
 # ax = sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=10, bw_adjust=1, fill=True, alpha=0.4, palette="rocket")
-df = point_df[point_df["mean_normalized_goal_distance_return"] > 0.95]
+df = point_df[point_df["mean_normalized_goal_distance_return"] > 0.90]
 
 # ax = sns.kdeplot(
 #     data=df,
@@ -604,9 +604,21 @@ df = point_df[point_df["mean_normalized_goal_distance_return"] > 0.95]
 #     linewidths=2.0,
 #     ax=ax,
 # )
-fig, ax = plt.subplots(figsize=(12, 8))
+fig, ax = plt.subplots(figsize=(6, 4))
 
 palette = sns.color_palette("viridis", n_colors=df["phase_num"].nunique())
+
+sns.set_context(context="paper", font_scale=1.75)
+
+# plt.rcParams.update({
+#     "font.size": 20,          # base font size
+#     "axes.titlesize": 16,
+#     "axes.labelsize": 20,
+#     "xtick.labelsize": 20,
+#     "ytick.labelsize": 20,
+#     "legend.fontsize": 12,
+#     "figure.titlesize": 18,
+# })
 
 for i, phase in enumerate(sorted(df["phase_num"].unique())):
     phase_df = df[df["phase_num"] == phase]
@@ -650,22 +662,43 @@ for i, phase in enumerate(sorted(df["phase_num"].unique())):
     ax.text(centroid_x, centroid_y, str(phase), fontsize=11, fontweight='bold', 
             ha='center', va='center', color='white', zorder=101)
 
+# ax.set_xlabel("")
+# ax.set_ylabel("")
 ax.set_xlabel("Learning Rate", fontsize=14, fontweight='bold')
 ax.set_ylabel("Discount Factor", fontsize=14, fontweight='bold')
-ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases", 
-             fontsize=15, fontweight='bold', pad=20)
+# ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases", 
+#              fontsize=15, fontweight='bold', pad=20)
 
-ax.legend(title="Training Phase", title_fontsize=12, fontsize=11, 
-          loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True, 
-          fancybox=True, shadow=True)
+# ax.legend(title="Training Phase", title_fontsize=12, fontsize=11, 
+#           loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True, 
+#           fancybox=True, shadow=True)
+# Replace your current legend section with this:
 
-ax.grid(True, alpha=0.25, linestyle='--', linewidth=0.6)
-ax.set_facecolor('#fafafa')
-for i in range(len(centroids)-1):
-    ax.annotate('', xy=centroids[i+1], xytext=centroids[i],
-                arrowprops=dict(arrowstyle='->', lw=2.5, color='black', alpha=0.6,
-                               connectionstyle="arc3,rad=0.1"))
+# Create the legend
+# legend = plt.legend(
+#     handles = [1, 2, 3, 4],
+#     title="Training Phase", 
+#     title_fontsize=14,
+#     fontsize=12, 
+#     loc="center left", 
+#     bbox_to_anchor=(1.05, 0.5),  # Position to the right of the plot
+#     frameon=True,
+#     fancybox=True,
+#     shadow=True,
+#     borderpad=1.2,  # Padding inside legend box
+#     labelspacing=1.2,  # Space between legend entries
+#     handlelength=2.5,  # Length of the legend lines
+#     handleheight=1.5   # Height of the legend lines
+# )
 
+
+# ax.grid(True, alpha=0.25, linestyle='--', linewidth=0.6)
+# ax.set_facecolor('#fafafa')
+# for i in range(len(centroids)-1):
+#     ax.annotate('', xy=centroids[i+1], xytext=centroids[i],
+#                 arrowprops=dict(arrowstyle='->', lw=2.5, color='black', alpha=0.6,
+#                                connectionstyle="arc3,rad=0.1"))
+#
 
 #sns.move_legend(ax, "upper left", bbox_to_anchor=(1.02, 1), frameon=False, title="phase")
 ax.grid(True, alpha=0.15)
@@ -676,7 +709,8 @@ if x_log:
   ax.set_xscale("log", base=10)
 if y_log:
   ax.set_yscale("log", base=10)
-plt.savefig("test.png")
+plt.tight_layout()
+plt.savefig("test.png", dpi=600)
 plt.close()
 
 
