@@ -789,8 +789,12 @@ if __name__ == "__main__":
     if not (args.hp_importance_data or args.convergence_data):
         merged_results_df, merged_training_df = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
     if args.start_kernel:
-        from IPython import start_ipython
-        start_ipython()
+        from IPython import start_kernel
+        import sys
+        del args
+        sys.argv = [sys.argv[0]]
+
+        start_kernel(user_ns=locals())
 
     if args.hp_importance_data:
         create_importance_divergence_table(importance_df, args.output_folder)

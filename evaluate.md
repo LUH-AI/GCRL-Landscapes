@@ -190,8 +190,17 @@ bad_configs_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_quant0.2
 ```
 
 ```python
+fig, ax = plt.subplots()
+sns.displot(data=merged_training_with_iqm_df, x="grad/value_cosine_similarity_mean", hue="hp.agent_name")
+plt.savefig("grad_cosine_similarity_distributions.png")
+```
+
+
+```python
 merged_training_with_iqm_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_quant0.05"].describe()
 ```
+
+### Intra-Batch Goal Gradient Alignment
 
 ```python
 fig, ax = plt.subplots()
@@ -204,7 +213,7 @@ for col in float_cols:
 quant_cols = [col for col in merged_training_with_iqm_df.columns if 'grad/value_cosine_similarity_quant' in col]
 id_cols = [col for col in merged_training_with_iqm_df.columns if 'quant' not in col]
 
-df_long = merged_training_with_iqm_df.melt(
+df_long = merged_training_with_iqm_df[merged_training_with_iqm_df["grad/value_cosine_similarity_quant0.74"].notna()].melt(
     id_vars=id_cols,
     value_vars=quant_cols,
     var_name='column',
@@ -246,10 +255,45 @@ for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"
 ```
 
 ```python
-fig, ax = plt.subplots()
-sns.displot(data=merged_training_with_iqm_df, x="grad/value_cosine_similarity_mean", hue="hp.agent_name")
-plt.savefig("grad_cosine_similarity_distributions.png")
+def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
+  fig, ax = plt.subplots(figsize=(3.5, 2.5))
+  # print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
+  ax = sns.lineplot(data=df, x="quantile", y="value", hue="Algorithm", errorbar="ci")
+  print(df.groupby(["eval_bins5"]).size())
+  # print(df.groupby(["quantile"]).size())
+
+  plt.ylim(-1, 1)
+  plt.xlim(0, 1)
+  plt.title("Inter-Goal Gradient Alignment")
+  plt.ylabel("Gradient Cosine Similarity")
+  plt.xlabel("Cumulative Probability")
+  plt.tight_layout()
+  plt.savefig(f"plots/cdf_swapped/gradient-alignment-cdf-{name}.png", dpi=1200)
+
+  plt.close()
+
+
+plot_swapped_cdf(df_long[df_long["variable"] == "grad/value_cosine_similarity"], "antmaze-medium-all")
+for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["dataset"]):
+  plot_swapped_cdf(group, name)
 ```
+
+```python
+#df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["Algorithm", "dataset"])["value"].describe()
+t = df_long[df_long["variable"] == "grad/value_cosine_similarity"]
+# t.groupby(["dataset"])["value"].size()
+df_teleport = t[t["dataset"].str.contains("teleport")]
+df_teleport.loc[:, "value"] = df_teleport["value"].astype("float64")
+# df_teleport.groupby(["quantile"])["value"].describe()  # Here we can see too many values for the bumps
+error_quant = df_teleport[df_teleport["quantile"] == 0.75]
+non_error_quant = df_teleport[df_teleport["quantile"] == 0.74]
+print(error_quant["run_id"].describe())
+print(non_error_quant["run_id"].describe())
+print(error_quant.mean(numeric_only=True) - non_error_quant.mean(numeric_only=True))
+print(merged_training_with_iqm_df[(merged_training_with_iqm_df["grad/value_cosine_similarity_quant0.74"].isna()) & (merged_training_with_iqm_df["dataset"].str.contains("teleport"))].iloc[0])
+```
+
+### Magnitude Similarity
 
 Let's take a look at gradient magnitude similarity:
 
