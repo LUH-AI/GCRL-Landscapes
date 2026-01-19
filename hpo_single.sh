@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --partition=ai,tnt
+#SBATCH --partition=kisski-inference
 #SBATCH --job-name=HPO
 #SBATCH --time=5-00:00:00
 #SBATCH --ntasks=1

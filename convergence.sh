@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#SBATCH --partition=ai,tnt
+#SBATCH --partition=kisski-inference
 #SBATCH --job-name=ConvergenceSetup
 #SBATCH --time=01:00:00
 #SBATCH --ntasks=1
@@ -22,7 +22,7 @@ extraevalsteps="1000 2500 5000 7500 10000 20000 30000 40000 50000 75000 100000 1
 nseeds="5"
 taskspernodetotal="5"
 taskspernodeparallel="5"
-partitions="ai,tnt"
+partitions="kisski-inference"
 mempercpu="3G"
 
 module load Miniforge3

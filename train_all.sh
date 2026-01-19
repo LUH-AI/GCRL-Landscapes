@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-#SBATCH --partition=ai,tnt
+#SBATCH --partition=kisski-inference
 #SBATCH --job-name=TrainSetup
 #SBATCH --time=01:00:00
 #SBATCH --ntasks=1
@@ -21,7 +21,7 @@ numevalepisodes="10"
 nseeds="5"
 taskspernodetotal="16"
 taskspernodeparallel="4"
-partitions="ai,tnt"
+partitions="kisski-inference"
 mempercpu="3G"
 
 module load Miniforge3

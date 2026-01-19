@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --partition=ai,tnt
+#SBATCH --partition=kisski-inference
 #SBATCH --job-name=ZipAndPlot
 #SBATCH --time=05:00:00
 #SBATCH --ntasks=1
