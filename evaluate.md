@@ -207,13 +207,13 @@ fig, ax = plt.subplots()
 merged_training_with_iqm_df["id"] = merged_training_with_iqm_df.index
 # df = merged_training_with_iqm_merged_with_iqm_df.copy()
 float_cols = merged_training_with_iqm_df.select_dtypes(include="float64").columns
-for col in float_cols:
-  print(col)
-  merged_training_with_iqm_df[col] = merged_training_with_iqm_df[col].astype("float16")
+# for col in float_cols:
+#   print(col)
+#   merged_training_with_iqm_df[col] = merged_training_with_iqm_df[col].astype("float16")
 quant_cols = [col for col in merged_training_with_iqm_df.columns if 'grad/value_cosine_similarity_quant' in col]
 id_cols = [col for col in merged_training_with_iqm_df.columns if 'quant' not in col]
 
-df_long = merged_training_with_iqm_df[merged_training_with_iqm_df["grad/value_cosine_similarity_quant0.74"].notna()].melt(
+df_long = merged_training_with_iqm_df.melt(
     id_vars=id_cols,
     value_vars=quant_cols,
     var_name='column',
