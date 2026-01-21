@@ -191,7 +191,7 @@ merged_training_with_iqm_df["target_drift_end"] = merged_training_with_iqm_df.gr
 merged_training_with_iqm_df["target_drift_start"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="start")
 merged_training_with_iqm_df["target_drift_neighbor"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="neighbor")
 print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_end"].agg(["mean", "std"]))
-jrint(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_start"].agg(["mean", "std"]))
+print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_start"].agg(["mean", "std"]))
 print(merged_training_with_iqm_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])["target_drift_neighbor"].agg(["mean", "std"]))
 ```
 
@@ -216,7 +216,7 @@ print(best_config_df.groupby(["hp.agent_name", "eval_bins5"])["grad/value_cosine
 Keep only configurations that reach a minimal performance and do analysis
 
 ```python
-good_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] > -1.1)]
+good_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] > 0.5)]
 print(good_configs_df.groupby(["dataset", "hp.agent_name"])[["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]].describe())
 print(good_configs_df.groupby(["hp.agent_name"])[["grad/value_cosine_similarity_std", "grad/actor_cosine_similarity_std"]].describe())
 
@@ -333,12 +333,18 @@ for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"
   plot_swapped_cdf(group, name)
 ```
 
-**Look at tail mass**  
+**Look at tail statistics**  
+
+Simulate data and test
+
+```python
+
+```
 
 We can not properly do this due to aggregation. Maybe use CVar?
 
 ```python
-merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "eval_bins5"])["grad/value_cosine_similarity_quant0.25"].describe()
+merged_training_with_iqm_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_cvar0.25"].describe()
 ```
 
 ```python
@@ -522,189 +528,195 @@ from gcrl_landscapes.evaluation.common import map_labels
 agent_name = "crl"
 grid_length = 100
 
-clipped_merged_results_df = merged_results_df.copy()
-clipped_merged_results_df["mean_normalized_goal_distance_return"] = clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
-data_temp = clipped_merged_results_df[ (merged_results_df["hp.agent_name"] == agent_name)
-                                & (merged_results_df["dataset"] == "antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0")
-                                & (merged_results_df["hps"] == frozenset(set(["lr", "discount"])))
-                                ]
-# for phase_num ...
-point_dfs = []
-for name, group in data_temp.groupby(["phase_num"]):
-  group_copy = group.copy().reset_index()
-  model = fit_model(group, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
-  model.fit()
-  create_contour_plot(model, x_dim=0, y_dim=1, z_dim="mean_normalized_goal_distance_return", bounds=[0, 1], filename="test_contour.png", dim_label_mapping=map_labels, agent_name=agent_name, z_transform=lambda x, _: x, discrete_levels=None, last_phase_best_config=None)
-  x_lower, x_upper, x_log = get_bounds(model.hp_names[0].removeprefix("hp."), agent_name)
-  y_lower, y_upper, y_log = get_bounds(model.hp_names[1].removeprefix("hp."), agent_name)
-  x, y = np.linspace(0, 1, grid_length), np.linspace(0, 1, grid_length)
-  X, Y = np.meshgrid(x, y)
-  points = np.vstack([X.ravel(), Y.ravel()]).transpose()
-  Z = model.get_middle(points).clip(0, 1)
-  Z_normalized = Z / Z.max()
-  Z_selected = (Z_normalized > 0.9).squeeze()
-  points_x, points_y = sobol_codomain_to_hp(points[:, 0], x_lower, x_upper, x_log), sobol_codomain_to_hp(points[:, 1], y_lower, y_upper, y_log)
-  print(np.vstack([points_x, points_y]))
+def mobility_plot(df, title):
+  clipped_merged_results_df = df.copy()
+  clipped_merged_results_df["mean_normalized_goal_distance_return"] = clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
+  data_temp = clipped_merged_results_df
+  # for phase_num ...
+  point_dfs = []
+  for name, group in data_temp.groupby(["phase_num"]):
+    group_copy = group.copy().reset_index()
+    model = fit_model(group, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
+    model.fit()
+    create_contour_plot(model, x_dim=0, y_dim=1, z_dim="mean_normalized_goal_distance_return", bounds=[0, 1], filename="test_contour.png", dim_label_mapping=map_labels, agent_name=agent_name, z_transform=lambda x, _: x, discrete_levels=None, last_phase_best_config=None)
+    x_lower, x_upper, x_log = get_bounds(model.hp_names[0].removeprefix("hp."), agent_name)
+    y_lower, y_upper, y_log = get_bounds(model.hp_names[1].removeprefix("hp."), agent_name)
+    x, y = np.linspace(0, 1, grid_length), np.linspace(0, 1, grid_length)
+    X, Y = np.meshgrid(x, y)
+    points = np.vstack([X.ravel(), Y.ravel()]).transpose()
+    Z = model.get_middle(points).clip(0, 1)
+    Z_normalized = Z / Z.max()
+    Z_selected = (Z_normalized > 0.9).squeeze()
+    points_x, points_y = sobol_codomain_to_hp(points[:, 0], x_lower, x_upper, x_log), sobol_codomain_to_hp(points[:, 1], y_lower, y_upper, y_log)
+    print(np.vstack([points_x, points_y]))
 
-  # # TODO: decide
-  # group_copy["hp.lr"] = hp_to_sobol_codomain(group_copy["hp.lr"], x_lower, x_upper, x_log)
-  # group_copy["hp.discount"] = hp_to_sobol_codomain(group_copy["hp.discount"], y_lower, y_upper, y_log)
-  # marginalized_group_copy = group_copy.groupby(["hp.lr", "hp.discount"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
-  # marginalized_group_copy["goal_distance_return_eps"] = marginalized_group_copy["mean_normalized_goal_distance_return"] / marginalized_group_copy["mean_normalized_goal_distance_return"].max()
+    # # TODO: decide
+    # group_copy["hp.lr"] = hp_to_sobol_codomain(group_copy["hp.lr"], x_lower, x_upper, x_log)
+    # group_copy["hp.discount"] = hp_to_sobol_codomain(group_copy["hp.discount"], y_lower, y_upper, y_log)
+    # marginalized_group_copy = group_copy.groupby(["hp.lr", "hp.discount"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
+    # marginalized_group_copy["goal_distance_return_eps"] = marginalized_group_copy["mean_normalized_goal_distance_return"] / marginalized_group_copy["mean_normalized_goal_distance_return"].max()
 
 
-  points_prediction_df = pd.DataFrame({"hp.lr": points_x, "hp.discount": points_y, "mean_normalized_goal_distance_return": Z_normalized.squeeze()})
-  # points_prediction_df = marginalized_group_copy[marginalized_group_copy["goal_distance_return_eps"] > 0.8]
-  points_prediction_df["phase_num"] = name[0]
-  point_dfs.append(points_prediction_df)
-point_df = pd.concat(point_dfs)
-print(point_df.describe())
+    points_prediction_df = pd.DataFrame({"hp.lr": points_x, "hp.discount": points_y, "mean_normalized_goal_distance_return": Z_normalized.squeeze()})
+    # points_prediction_df = marginalized_group_copy[marginalized_group_copy["goal_distance_return_eps"] > 0.8]
+    points_prediction_df["phase_num"] = name[0]
+    point_dfs.append(points_prediction_df)
+  point_df = pd.concat(point_dfs)
+  print(point_df.describe())
 
-print(len(point_df))
-# sns.scatterplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.9], x="hp.lr", y="hp.discount", hue="phase_num")
-x_lower, x_upper, x_log = get_bounds("lr", agent_name)
-y_lower, y_upper, y_log = get_bounds("discount", agent_name)
-# ax = sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=10, bw_adjust=1, fill=True, alpha=0.4, palette="rocket")
-df = point_df[point_df["mean_normalized_goal_distance_return"] > 0.90]
+  print(len(point_df))
+  # sns.scatterplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.9], x="hp.lr", y="hp.discount", hue="phase_num")
+  x_lower, x_upper, x_log = get_bounds("lr", agent_name)
+  y_lower, y_upper, y_log = get_bounds("discount", agent_name)
+  # ax = sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=10, bw_adjust=1, fill=True, alpha=0.4, palette="rocket")
+  df = point_df[point_df["mean_normalized_goal_distance_return"] > 0.90]
 
-# ax = sns.kdeplot(
-#     data=df,
-#     x="hp.lr", y="hp.discount",
-#     hue="phase_num",
-#     log_scale=(x_log, y_log),
-#     fill=True,
-#     levels=2,
-#     thresh=0.15,
-#     bw_adjust=1.0,
-#     alpha=0.12,
-#     palette="magma",
-#     linewidth=0,
-# )
-#
-# sns.kdeplot(
-#     data=df,
-#     x="hp.lr", y="hp.discount",
-#     hue="phase_num",
-#     log_scale=(x_log, y_log),
-#     fill=False,
-#     levels=[0.5, 0.8],
-#     thresh=0.15,
-#     bw_adjust=1.0,
-#     alpha=0.9,
-#     palette="magma",
-#     linewidths=2.0,
-#     ax=ax,
-# )
-fig, ax = plt.subplots(figsize=(6, 4))
+  # ax = sns.kdeplot(
+  #     data=df,
+  #     x="hp.lr", y="hp.discount",
+  #     hue="phase_num",
+  #     log_scale=(x_log, y_log),
+  #     fill=True,
+  #     levels=2,
+  #     thresh=0.15,
+  #     bw_adjust=1.0,
+  #     alpha=0.12,
+  #     palette="magma",
+  #     linewidth=0,
+  # )
+  #
+  # sns.kdeplot(
+  #     data=df,
+  #     x="hp.lr", y="hp.discount",
+  #     hue="phase_num",
+  #     log_scale=(x_log, y_log),
+  #     fill=False,
+  #     levels=[0.5, 0.8],
+  #     thresh=0.15,
+  #     bw_adjust=1.0,
+  #     alpha=0.9,
+  #     palette="magma",
+  #     linewidths=2.0,
+  #     ax=ax,
+  # )
+  fig, ax = plt.subplots(figsize=(6, 4))
 
-palette = sns.color_palette("viridis", n_colors=df["phase_num"].nunique())
+  palette = sns.color_palette("viridis", n_colors=df["phase_num"].nunique())
 
-sns.set_context(context="paper", font_scale=1.75)
+  sns.set_context(context="paper", font_scale=1.75)
 
-# plt.rcParams.update({
-#     "font.size": 20,          # base font size
-#     "axes.titlesize": 16,
-#     "axes.labelsize": 20,
-#     "xtick.labelsize": 20,
-#     "ytick.labelsize": 20,
-#     "legend.fontsize": 12,
-#     "figure.titlesize": 18,
-# })
+  # plt.rcParams.update({
+  #     "font.size": 20,          # base font size
+  #     "axes.titlesize": 16,
+  #     "axes.labelsize": 20,
+  #     "xtick.labelsize": 20,
+  #     "ytick.labelsize": 20,
+  #     "legend.fontsize": 12,
+  #     "figure.titlesize": 18,
+  # })
 
-for i, phase in enumerate(sorted(df["phase_num"].unique())):
-    phase_df = df[df["phase_num"] == phase]
-    color = palette[i]
-    
-    sns.kdeplot(
-        data=phase_df,
-        x="hp.lr", 
-        y="hp.discount",
-        log_scale=(x_log, y_log),
-        fill=True,
-        levels=4,
-        thresh=0.05,
-        bw_adjust=0.7,
-        alpha=0.12,
-        color=color,
-        linewidth=0,
-        ax=ax,
-    )
-    
-    sns.kdeplot(
-        data=phase_df,
-        x="hp.lr", 
-        y="hp.discount",
-        log_scale=(x_log, y_log),
-        fill=False,
-        levels=[0.7],
-        thresh=0.05,
-        bw_adjust=0.7,
-        alpha=0.9,
-        color=color,
-        linewidths=3.5,
-        ax=ax,
-        label=f"Phase {phase}"
-    )
-    
-    centroid_x = phase_df["hp.lr"].median()
-    centroid_y = phase_df["hp.discount"].median()
-    ax.scatter(centroid_x, centroid_y, s=150, c=[color], edgecolors='white', 
-               linewidths=2, zorder=100, marker='o')
-    ax.text(centroid_x, centroid_y, str(phase), fontsize=11, fontweight='bold', 
-            ha='center', va='center', color='white', zorder=101)
+  for i, phase in enumerate(sorted(df["phase_num"].unique())):
+      phase_df = df[df["phase_num"] == phase]
+      color = palette[i]
+      
+      sns.kdeplot(
+          data=phase_df,
+          x="hp.lr", 
+          y="hp.discount",
+          log_scale=(x_log, y_log),
+          fill=True,
+          levels=4,
+          thresh=0.05,
+          bw_adjust=0.7,
+          alpha=0.12,
+          color=color,
+          linewidth=0,
+          ax=ax,
+      )
+      
+      sns.kdeplot(
+          data=phase_df,
+          x="hp.lr", 
+          y="hp.discount",
+          log_scale=(x_log, y_log),
+          fill=False,
+          levels=[0.7],
+          thresh=0.05,
+          bw_adjust=0.7,
+          alpha=0.9,
+          color=color,
+          linewidths=3.5,
+          ax=ax,
+          label=f"Phase {phase}"
+      )
+      
+      centroid_x = phase_df["hp.lr"].median()
+      centroid_y = phase_df["hp.discount"].median()
+      ax.scatter(centroid_x, centroid_y, s=150, c=[color], edgecolors='white', 
+                 linewidths=2, zorder=100, marker='o')
+      ax.text(centroid_x, centroid_y, str(phase), fontsize=11, fontweight='bold', 
+              ha='center', va='center', color='white', zorder=101)
 
-# ax.set_xlabel("")
-# ax.set_ylabel("")
-ax.set_xlabel("Learning Rate", fontsize=14, fontweight='bold')
-ax.set_ylabel("Discount Factor", fontsize=14, fontweight='bold')
-# ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases", 
-#              fontsize=15, fontweight='bold', pad=20)
+  # ax.set_xlabel("")
+  # ax.set_ylabel("")
+  ax.set_xlabel("Learning Rate", fontsize=14, fontweight='bold')
+  ax.set_ylabel("Discount Factor", fontsize=14, fontweight='bold')
+  # ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases", 
+  #              fontsize=15, fontweight='bold', pad=20)
 
-# ax.legend(title="Training Phase", title_fontsize=12, fontsize=11, 
-#           loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True, 
-#           fancybox=True, shadow=True)
-# Replace your current legend section with this:
+  # ax.legend(title="Training Phase", title_fontsize=12, fontsize=11, 
+  #           loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True, 
+  #           fancybox=True, shadow=True)
+  # Replace your current legend section with this:
 
-# Create the legend
-# legend = plt.legend(
-#     handles = [1, 2, 3, 4],
-#     title="Training Phase", 
-#     title_fontsize=14,
-#     fontsize=12, 
-#     loc="center left", 
-#     bbox_to_anchor=(1.05, 0.5),  # Position to the right of the plot
-#     frameon=True,
-#     fancybox=True,
-#     shadow=True,
-#     borderpad=1.2,  # Padding inside legend box
-#     labelspacing=1.2,  # Space between legend entries
-#     handlelength=2.5,  # Length of the legend lines
-#     handleheight=1.5   # Height of the legend lines
-# )
-
-
-# ax.grid(True, alpha=0.25, linestyle='--', linewidth=0.6)
-# ax.set_facecolor('#fafafa')
-# for i in range(len(centroids)-1):
-#     ax.annotate('', xy=centroids[i+1], xytext=centroids[i],
-#                 arrowprops=dict(arrowstyle='->', lw=2.5, color='black', alpha=0.6,
-#                                connectionstyle="arc3,rad=0.1"))
-#
-
-#sns.move_legend(ax, "upper left", bbox_to_anchor=(1.02, 1), frameon=False, title="phase")
-ax.grid(True, alpha=0.15)
-print(ax.collections[0].levels)
-plt.xlim(x_lower, x_upper)
-plt.ylim(y_lower, y_upper)
-if x_log:
-  ax.set_xscale("log", base=10)
-if y_log:
-  ax.set_yscale("log", base=10)
-plt.tight_layout()
-plt.savefig("test.png", dpi=600)
-plt.close()
+  # Create the legend
+  # legend = plt.legend(
+  #     handles = [1, 2, 3, 4],
+  #     title="Training Phase", 
+  #     title_fontsize=14,
+  #     fontsize=12, 
+  #     loc="center left", 
+  #     bbox_to_anchor=(1.05, 0.5),  # Position to the right of the plot
+  #     frameon=True,
+  #     fancybox=True,
+  #     shadow=True,
+  #     borderpad=1.2,  # Padding inside legend box
+  #     labelspacing=1.2,  # Space between legend entries
+  #     handlelength=2.5,  # Length of the legend lines
+  #     handleheight=1.5   # Height of the legend lines
+  # )
 
 
+  # ax.grid(True, alpha=0.25, linestyle='--', linewidth=0.6)
+  # ax.set_facecolor('#fafafa')
+  # for i in range(len(centroids)-1):
+  #     ax.annotate('', xy=centroids[i+1], xytext=centroids[i],
+  #                 arrowprops=dict(arrowstyle='->', lw=2.5, color='black', alpha=0.6,
+  #                                connectionstyle="arc3,rad=0.1"))
+  #
+
+  #sns.move_legend(ax, "upper left", bbox_to_anchor=(1.02, 1), frameon=False, title="phase")
+  ax.grid(True, alpha=0.15)
+  print(ax.collections[0].levels)
+  plt.xlim(x_lower, x_upper)
+  plt.ylim(y_lower, y_upper)
+  if x_log:
+    ax.set_xscale("log", base=10)
+  if y_log:
+    ax.set_yscale("log", base=10)
+  plt.tight_layout()
+  plt.savefig(f"plots/{title}.png", dpi=1200)
+  plt.close()
+
+
+for name, group in merged_results_df.groupby(["hp.agent_name", "dataset"]):
+  agent = name[0]
+  datasets = name[1].split(",")
+  dataset: str
+  datasets = datasets[0] if len(set(datasets)) == 1 else ",".join(datasets)
+
+  print(f"mobility-{agent}-{datasets}")
+  mobility_plot(group, f"mobility-{agent}-{datasets}")
 
 ```
 
