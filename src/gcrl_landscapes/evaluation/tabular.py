@@ -788,6 +788,13 @@ if __name__ == "__main__":
     merged_results_df, merged_training_df = None, None
     if not (args.hp_importance_data or args.convergence_data):
         merged_results_df, merged_training_df = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
+        to_category_columns = ["dataset", "hps", "agent"] + merged_training_df.columns[merged_training_df.columns.str.startswith("hp.")].tolist()
+        for col in to_category_columns:
+          merged_training_df[col] = merged_training_df[col].astype("category")
+        float_cols = merged_training_df.select_dtypes(include="float64").columns
+        for col in float_cols:
+          merged_training_df[col] = merged_training_df[col].astype("float16")
+
     if args.start_kernel:
         from IPython import start_kernel
         import sys

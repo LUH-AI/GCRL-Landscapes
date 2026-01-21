@@ -1,0 +1,12 @@
+time = "2025-06-27T04:28:34"
+
+[arguments]
+logdir = "PosixPath('logs_convergence/GCIVL_antmaze-medium-navigate-v0_1c_discount-actor_p_trajgoal')"
+phase = 1000000
+configuration_index = 0
+seed = 1
+tasks_per_node_parallel = 5
+
+[git]
+commit = "016552753321c5091f48d21965dbb979b08418a4"
+branch = "temp"

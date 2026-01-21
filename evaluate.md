@@ -86,10 +86,10 @@ print(datasets_to_exploration_schedule("antmaze-medium-explore-v0,antmaze-medium
 ```python
 import re
 # TODO: generalize this to dfs containing multiple hyperparameter combinations. Does this even have an influence?
-merged_training_df["eval_percent"] = round(merged_training_df["eval_step"] / merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max") * 100)
-merged_training_df["eval_bins10"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 10, labels=False, duplicates="drop"))
-merged_training_df["eval_bins5"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 5, labels=False, duplicates="drop"))
-merged_training_df["exploration_schedule"] = merged_training_df["dataset"].apply(datasets_to_exploration_schedule)
+merged_training_df["eval_percent"] = round(merged_training_df["eval_step"] / merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max") * 100).astype("category")
+merged_training_df["eval_bins10"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 10, labels=False, duplicates="drop")).astype("category")
+merged_training_df["eval_bins5"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 5, labels=False, duplicates="drop")).astype("category")
+merged_training_df["exploration_schedule"] = merged_training_df["dataset"].apply(datasets_to_exploration_schedule).astype("category")
 ```
 
 Get dataframe with only best performing model per experiment.
@@ -126,17 +126,19 @@ Capture this in a boxplot:
 import seaborn as sns
 sns.set_theme(context="paper", style="whitegrid")
 import matplotlib.pyplot as plt
-merged_training_with_iqm_df["name_dataset_combination"] = merged_training_with_iqm_df["hp.agent_name"] + " - " + merged_training_with_iqm_df["dataset"]
+merged_training_with_iqm_df["name_dataset_combination"] = (merged_training_with_iqm_df["hp.agent_name"].astype("str") + " - " + merged_training_with_iqm_df["dataset"].astype("str")).astype("category")
 end_of_training_df = merged_training_with_iqm_df[merged_training_with_iqm_df["eval_step"] == merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max")]
 fig, ax = plt.subplots()
 sns.boxplot(data=end_of_training_df, x="hp.agent_name", y="feature/embedding_rank")
 plt.savefig("rank_boxplot_agent.png")
+plt.close()
 for dataset in merged_training_with_iqm_df["dataset"].unique():
   fig, ax = plt.subplots()
   sns.boxplot(data=end_of_training_df[end_of_training_df["dataset"] == dataset], x="hp.agent_name", y="feature/embedding_rank")
   print(dataset)
   print(merged_training_with_iqm_df[merged_training_with_iqm_df["dataset"] == dataset].groupby("hp.agent_name")["iqm"].max())
   plt.savefig(f"rank_boxplot_agent_{dataset}.png")
+  plt.close()
 ```
 
 Now for only best config per experiment:
@@ -145,6 +147,55 @@ Now for only best config per experiment:
 print(best_config_df.groupby("hp.agent_name")["feature/embedding_rank"].describe())
 print(best_config_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])["feature/embedding_rank"].describe())
 ```
+
+# Target drift
+
+```python
+def literal_lists_to_numpy(s):
+  import ast  # I do not know why this can't be imported up front
+  try:
+    return np.array(ast.literal_eval(s), dtype=np.float16)
+  except:
+    return None
+try:
+  merged_training_with_iqm_df["target/held_out_val_batch_values_np"] = merged_training_with_iqm_df["target/held_out_val_batch_values"].apply(literal_lists_to_numpy)
+  merged_training_with_iqm_df = merged_training_with_iqm_df.drop(["target/held_out_val_batch_values"], axis=1)
+except KeyError:
+  pass
+```
+```python
+def compute_drift_to(group: pd.DataFrame, target: str = "end"):
+  def target_drift(a, b):
+    if a is None or b is None:
+      return None
+    if not a.shape == b.shape:
+      raise ValueError("Arrays must have the same shape")
+    return np.linalg.norm(a - b)
+
+  start_value = group.loc[group["eval_step"] == group["eval_step"].min(), "target/held_out_val_batch_values_np"].values[0]
+  end_value = group.loc[group["eval_step"] == group["eval_step"].max(), "target/held_out_val_batch_values_np"].values[0]
+  drift_start_end = target_drift(start_value, end_value)
+  if target == "neighbor":
+    values = group["target/held_out_val_batch_values_np"]
+    compare_values = group["target/held_out_val_batch_values_np"].shift(1)
+    return pd.Series([target_drift(a, b) for a, b in zip(values, compare_values)], index=group.index) / drift_start_end
+  elif target == "end":
+    compare_value = end_value
+  elif target == "start":
+    compare_value = start_value
+  else:
+    raise ValueError(f"Unknown target: {target}")
+  return group["target/held_out_val_batch_values_np"].apply(lambda x: target_drift(x, compare_value) / drift_start_end if drift_start_end else None)
+
+merged_training_with_iqm_df["target_drift_end"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="end")
+merged_training_with_iqm_df["target_drift_start"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="start")
+merged_training_with_iqm_df["target_drift_neighbor"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="neighbor")
+print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_end"].agg(["mean", "std"]))
+jrint(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_start"].agg(["mean", "std"]))
+print(merged_training_with_iqm_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])["target_drift_neighbor"].agg(["mean", "std"]))
+```
+
+
 
 # Gradient Interference
 
@@ -183,7 +234,7 @@ print(merged_training_with_iqm_df.groupby(["eval_bins5", "hp.agent_name"])[["gra
 Look at metrics inside of batch
 
 ```python
-bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 0.2)]
+bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 10)]
 bad_configs_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_quant0.25"].mean()
 #(merged_training_with_iqm_df.groupby(["hp.agent_name"])[merged_training_with_iqm_df.columns[merged_training_with_iqm_df.columns.str.contains(r"grad/.*quant\d+")]].mean())
 
@@ -193,6 +244,7 @@ bad_configs_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_quant0.2
 fig, ax = plt.subplots()
 sns.displot(data=merged_training_with_iqm_df, x="grad/value_cosine_similarity_mean", hue="hp.agent_name")
 plt.savefig("grad_cosine_similarity_distributions.png")
+plt.close()
 ```
 
 
@@ -203,36 +255,41 @@ merged_training_with_iqm_df.groupby(["hp.agent_name"])["grad/value_cosine_simila
 ### Intra-Batch Goal Gradient Alignment
 
 ```python
-fig, ax = plt.subplots()
 merged_training_with_iqm_df["id"] = merged_training_with_iqm_df.index
+```
+```python
 # df = merged_training_with_iqm_merged_with_iqm_df.copy()
-float_cols = merged_training_with_iqm_df.select_dtypes(include="float64").columns
-# for col in float_cols:
-#   print(col)
-#   merged_training_with_iqm_df[col] = merged_training_with_iqm_df[col].astype("float16")
+try:
+  merged_training_with_iqm_df = merged_training_with_iqm_df.drop("target/held_out_val_batch_values", axis=1)
+except:
+  pass
 quant_cols = [col for col in merged_training_with_iqm_df.columns if 'grad/value_cosine_similarity_quant' in col]
-id_cols = [col for col in merged_training_with_iqm_df.columns if 'quant' not in col]
+id_cols = [col for col in merged_training_with_iqm_df.columns if 'quant' not in col and "target/held_out_val_batch_values_np" not in col]
 
-df_long = merged_training_with_iqm_df.melt(
+df_long = merged_training_with_iqm_df.drop("target/held_out_val_batch_values_np", axis=1).melt(
     id_vars=id_cols,
     value_vars=quant_cols,
     var_name='column',
     value_name='value'
 )
+df_long["dataset"] = df_long["dataset"].astype("category")
+
 df_long['quantile'] = df_long['column'].str.extract(r'quant([\d.]+)')[0].astype(float)
 
 # Extract the base column name (everything before 'quant')
-df_long['variable'] = df_long['column'].str.replace(r'_?quant[\d.]+', '', regex=True)
+df_long['variable'] = df_long['column'].str.replace(r'_?quant[\d.]+', '', regex=True).astype("category")
 
 # Clean up
 df_long = df_long.drop('column', axis=1).rename(columns={"hp.agent_name": "Algorithm"})
-df_long["Algorithm"] = df_long["Algorithm"].str.upper()
+df_long["Algorithm"] = df_long["Algorithm"].str.upper().astype("category")
+
+mem_usage = df_long.memory_usage(deep=True)
+print(mem_usage.sort_values(ascending=False).sum()/1024/1024/1024)
+print(mem_usage.sort_values(ascending=False)/1024/1024/1024)
 ```
 
 ```python
 def plot_cdf(df: pd.DataFrame, name: str) -> None:
-  import matplotlib.pyplot as plt
-  import seaborn as sns
   fig, ax = plt.subplots(figsize=(3.5, 2.5))
   # print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
   ax = sns.lineplot(data=df, x="value", y="quantile", hue="Algorithm", errorbar=None)
@@ -258,9 +315,7 @@ for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"
 def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
   fig, ax = plt.subplots(figsize=(3.5, 2.5))
   # print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
-  ax = sns.lineplot(data=df, x="quantile", y="value", hue="Algorithm", errorbar="ci")
-  print(df.groupby(["eval_bins5"]).size())
-  # print(df.groupby(["quantile"]).size())
+  ax = sns.lineplot(data=df, x="quantile", y="value", hue="Algorithm", errorbar="sd")
 
   plt.ylim(-1, 1)
   plt.xlim(0, 1)
@@ -278,20 +333,20 @@ for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"
   plot_swapped_cdf(group, name)
 ```
 
+**Look at tail mass**  
+
+We can not properly do this due to aggregation. Maybe use CVar?
+
 ```python
-#df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["Algorithm", "dataset"])["value"].describe()
-t = df_long[df_long["variable"] == "grad/value_cosine_similarity"]
-# t.groupby(["dataset"])["value"].size()
-df_teleport = t[t["dataset"].str.contains("teleport")]
-df_teleport.loc[:, "value"] = df_teleport["value"].astype("float64")
-# df_teleport.groupby(["quantile"])["value"].describe()  # Here we can see too many values for the bumps
-error_quant = df_teleport[df_teleport["quantile"] == 0.75]
-non_error_quant = df_teleport[df_teleport["quantile"] == 0.74]
-print(error_quant["run_id"].describe())
-print(non_error_quant["run_id"].describe())
-print(error_quant.mean(numeric_only=True) - non_error_quant.mean(numeric_only=True))
-print(merged_training_with_iqm_df[(merged_training_with_iqm_df["grad/value_cosine_similarity_quant0.74"].isna()) & (merged_training_with_iqm_df["dataset"].str.contains("teleport"))].iloc[0])
+merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "eval_bins5"])["grad/value_cosine_similarity_quant0.25"].describe()
 ```
+
+```python
+quantile_mean_df = df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["Algorithm", "quantile"])["value"].mean().reset_index()
+
+# quantile_mean_df.groupby(["Algorithm"]).apply(lambda group: group[group["value"] < -0.2][["quantile", "value"]])
+```
+
 
 ### Magnitude Similarity
 
@@ -451,49 +506,6 @@ corr_progress_sorted[corr_progress_sorted["eval_bins5"] == 0]
 ```
 
 
-# Target drift
-
-```python
-def literal_lists_to_numpy(s):
-  import ast  # I do not know why this can't be imported up front
-  try:
-    return np.array(ast.literal_eval(s))
-  except:
-    return None
-merged_training_with_iqm_df["target/held_out_val_batch_values_np"] = merged_training_with_iqm_df["target/held_out_val_batch_values"].apply(literal_lists_to_numpy)
-```
-```python
-def compute_drift_to(group: pd.DataFrame, target: str = "end"):
-  def target_drift(a, b):
-    if a is None or b is None:
-      return None
-    if not a.shape == b.shape:
-      raise ValueError("Arrays must have the same shape")
-    return np.linalg.norm(a - b)
-
-  start_value = group.loc[group["eval_step"] == group["eval_step"].min(), "target/held_out_val_batch_values_np"].values[0]
-  end_value = group.loc[group["eval_step"] == group["eval_step"].max(), "target/held_out_val_batch_values_np"].values[0]
-  drift_start_end = target_drift(start_value, end_value)
-  if target == "neighbor":
-    values = group["target/held_out_val_batch_values_np"]
-    compare_values = group["target/held_out_val_batch_values_np"].shift(1)
-    return pd.Series([target_drift(a, b) for a, b in zip(values, compare_values)], index=group.index) / drift_start_end
-  elif target == "end":
-    compare_value = end_value
-  elif target == "start":
-    compare_value = start_value
-  else:
-    raise ValueError(f"Unknown target: {target}")
-  return group["target/held_out_val_batch_values_np"].apply(lambda x: target_drift(x, compare_value) / drift_start_end if drift_start_end else None)
-
-merged_training_with_iqm_df["target_drift_end"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="end")
-merged_training_with_iqm_df["target_drift_start"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="start")
-merged_training_with_iqm_df["target_drift_neighbor"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="neighbor")
-print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_end"].agg(["mean", "std"]))
-print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_start"].agg(["mean", "std"]))
-print(merged_training_with_iqm_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])["target_drift_neighbor"].agg(["mean", "std"]))
-```
-
 # Combine Landscape Plots
 
 ## Seaborn KDE-like plot
@@ -510,7 +522,6 @@ from gcrl_landscapes.evaluation.common import map_labels
 agent_name = "crl"
 grid_length = 100
 
-fig, ax = plt.subplots()
 clipped_merged_results_df = merged_results_df.copy()
 clipped_merged_results_df["mean_normalized_goal_distance_return"] = clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
 data_temp = clipped_merged_results_df[ (merged_results_df["hp.agent_name"] == agent_name)
@@ -715,4 +726,5 @@ ax.set(xscale="log")
 plt.xlim(x_lower, x_upper)
 plt.ylim(y_lower, y_upper)
 plt.savefig("test.png")
+plt.close()
 ```

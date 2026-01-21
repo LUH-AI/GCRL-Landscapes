@@ -1,0 +1,12 @@
+time = "2025-07-23T21:50:00"
+
+[arguments]
+logdir = "PosixPath('logs_convergence_rest_mixed_navigate/CRL_antmaze-medium-explore90navigate-v0_1c_discount-actor_p_trajgoal')"
+phase = 1000000
+configuration_index = 0
+seed = 2
+tasks_per_node_parallel = 5
+
+[git]
+commit = "31a6338cd2e95ea8a86fc5e72e52218c0c1e9041"
+branch = "temp"
