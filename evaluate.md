@@ -276,14 +276,14 @@ def keep_constants(g):
       out[col] = g[col].mean()
   return pd.Series(out)
 
-marginalized_training_df = merged_training_with_iqm_df.groupby(["hp.agent_name", "seed", "dataset"])[quant_cols].mean().reset_index()
+marginalized_training_df = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "seed"])[quant_cols].mean().reset_index()
 df_long = marginalized_training_df.melt(
-    id_vars=["hp.agent_name", "seed", "dataset"],
+    id_vars=["hp.agent_name", "dataset", "seed"],
     value_vars=quant_cols,
     var_name='column',
     value_name='value'
 )
-df_long["dataset"] = df_long["dataset"].astype("category")
+# df_long["dataset"] = df_long["dataset"].astype("category")
 
 df_long['quantile'] = df_long['column'].str.extract(r'quant([\d.]+)')[0].astype(float)
 
@@ -326,7 +326,7 @@ for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"
 def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
   fig, ax = plt.subplots(figsize=(3.5, 2.5))
   # print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
-  ax = sns.lineplot(data=df, x="quantile", y="value", hue="Algorithm", errorbar=("ci", 95), estimator=np.mean)
+  ax = sns.lineplot(data=df, x="quantile", y="value", hue="Algorithm", errorbar=("pi", 95), estimator=np.mean)
 
   for line in ax.lines:
     # get data from first line of the plot
@@ -546,6 +546,7 @@ merged_results_df.groupby(["hp.agent_name", "dataset"])
 ```
 
 ```python
+from adjustText import adjust_text
 from src.gcrl_landscapes.util.eval import fit_model
 from src.gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
 from gcrl_landscapes.plots.triple_gp import create_contour_plot
@@ -677,15 +678,15 @@ def mobility_plot(df, title, by_col: str = "phase_num", performance_threshold=0.
       
       centroid_x = phase_df["hp.lr"].median()
       centroid_y = phase_df["hp.discount"].median()
-      ax.scatter(centroid_x, centroid_y, s=150 if by_col == "phase_num" else 500, c=[color], edgecolors='white', 
-                 linewidths=2, zorder=100, marker='o')
-      ax.text(centroid_x, centroid_y, str(phase), fontsize=11, fontweight='bold', 
-              ha='center', va='center', color='white', zorder=101)
+      ax.scatter(centroid_x, centroid_y, s=750 if by_col == "phase_num" else 1500, c=[color], edgecolors='white', 
+                 linewidths=2, zorder=100, marker='o', alpha=1)
+      ax.text(centroid_x, centroid_y, str(phase), fontsize=20, fontweight='bold', 
+              ha='center', va='center', color='white', zorder=101, alpha=1)
 
   # ax.set_xlabel("")
   # ax.set_ylabel("")
-  ax.set_xlabel("Learning Rate", fontsize=14, fontweight='bold')
-  ax.set_ylabel("Discount Factor", fontsize=14, fontweight='bold')
+  ax.set_xlabel("Learning Rate")
+  ax.set_ylabel("Discount Factor")
   # ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases", 
   #              fontsize=15, fontweight='bold', pad=20)
 
@@ -740,7 +741,7 @@ for name, group in merged_results_df.groupby(["hp.agent_name", "dataset_condense
   datasets = name[1]
 
   print(f"mobility-{agent}-{datasets}")
-  mobility_plot(group, f"mobility-{agent}-{datasets}")
+  mobility_plot(group, f"mobility-{agent}-{datasets}", performance_threshold=0.90)
 
 ```
 
@@ -756,7 +757,7 @@ for name, group in merged_results_df_constant_last_phase.groupby(["hp.agent_name
   envs = name[1]
 
   print(f"mobility-last-phase-{agent}-{envs}")
-  mobility_plot(group, f"mobility-last-phase-{agent}-{envs}", by_col="Exploration Ratio", performance_threshold=0.9)
+  mobility_plot(group, f"mobility-last-phase-{agent}-{envs}", by_col="Exploration Ratio", performance_threshold=0.95)
 ```
 
 ## Optimum Movement line plot
