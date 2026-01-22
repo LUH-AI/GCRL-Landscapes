@@ -1,0 +1,9 @@
+constant_dataset,agent,phase_num,mean_normalized_goal_distance_return,mean_normalized_goal_distance_return_scaled
+False,HIQL,0 -> 1,nan $\pm$ nan,nan $\pm$ nan
+False,HIQL,1 -> 2,0.21 $\pm$ nan,0.47 $\pm$ nan
+False,HIQL,2 -> 3,0.06 $\pm$ nan,0.13 $\pm$ nan
+False,HIQL,3 -> 4,0.03 $\pm$ nan,0.07 $\pm$ nan
+False,QRL,0 -> 1,nan $\pm$ nan,nan $\pm$ nan
+False,QRL,1 -> 2,0.22 $\pm$ nan,0.30 $\pm$ nan
+False,QRL,2 -> 3,0.13 $\pm$ nan,0.14 $\pm$ nan
+False,QRL,3 -> 4,0.04 $\pm$ nan,0.07 $\pm$ nan

@@ -1,0 +1,10 @@
+|                    | Goal Distance Score Normalized Regret $< 0.1$ Ratio   | Goal Distance Score Normalized Regret $< 0.2$ Ratio   | Goal Distance Score   | Success        |   Max Goal Distance Score |
+|:-------------------|:------------------------------------------------------|:------------------------------------------------------|:----------------------|:---------------|--------------------------:|
+| (False, 'HIQL', 1) | 0.02 $\pm$ nan                                        | 0.03 $\pm$ nan                                        | 0.09 $\pm$ nan        | 0.00 $\pm$ nan |                      0.4  |
+| (False, 'HIQL', 2) | 0.22 $\pm$ nan                                        | 0.38 $\pm$ nan                                        | 0.30 $\pm$ nan        | 0.05 $\pm$ nan |                      0.44 |
+| (False, 'HIQL', 3) | 0.11 $\pm$ nan                                        | 0.38 $\pm$ nan                                        | 0.32 $\pm$ nan        | 0.07 $\pm$ nan |                      0.47 |
+| (False, 'HIQL', 4) | 0.14 $\pm$ nan                                        | 0.47 $\pm$ nan                                        | 0.31 $\pm$ nan        | 0.07 $\pm$ nan |                      0.44 |
+| (False, 'QRL', 1)  | 0.08 $\pm$ nan                                        | 0.23 $\pm$ nan                                        | 0.09 $\pm$ nan        | 0.00 $\pm$ nan |                      0.17 |
+| (False, 'QRL', 2)  | 0.19 $\pm$ nan                                        | 0.34 $\pm$ nan                                        | 0.31 $\pm$ nan        | 0.04 $\pm$ nan |                      0.44 |
+| (False, 'QRL', 3)  | 0.55 $\pm$ nan                                        | 0.80 $\pm$ nan                                        | 0.43 $\pm$ nan        | 0.12 $\pm$ nan |                      0.52 |
+| (False, 'QRL', 4)  | 0.28 $\pm$ nan                                        | 0.83 $\pm$ nan                                        | 0.46 $\pm$ nan        | 0.19 $\pm$ nan |                      0.56 |

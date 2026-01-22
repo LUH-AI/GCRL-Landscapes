@@ -1,0 +1,6 @@
+|                                    | Goal Distance Score Normalized Regret $< 0.1$ Ratio   | Goal Distance Score Normalized Regret $< 0.2$ Ratio   | Goal Distance Score   | Success         |   Max Goal Distance Score |
+|:-----------------------------------|:------------------------------------------------------|:------------------------------------------------------|:----------------------|:----------------|--------------------------:|
+| (1, frozenset({'lr', 'discount'})) | 0.05 $\pm$ 0.04                                       | 0.13 $\pm$ 0.14                                       | 0.09 $\pm$ 0.00       | 0.00 $\pm$ 0.00 |                      0.4  |
+| (2, frozenset({'lr', 'discount'})) | 0.20 $\pm$ 0.02                                       | 0.36 $\pm$ 0.02                                       | 0.30 $\pm$ 0.01       | 0.04 $\pm$ 0.01 |                      0.44 |
+| (3, frozenset({'lr', 'discount'})) | 0.33 $\pm$ 0.31                                       | 0.59 $\pm$ 0.30                                       | 0.38 $\pm$ 0.08       | 0.10 $\pm$ 0.03 |                      0.52 |
+| (4, frozenset({'lr', 'discount'})) | 0.21 $\pm$ 0.10                                       | 0.65 $\pm$ 0.25                                       | 0.38 $\pm$ 0.11       | 0.13 $\pm$ 0.09 |                      0.56 |

@@ -1,0 +1,9 @@
+agent,dataset,constant_dataset,hps,phase_num,mean_normalized_goal_distance_return,mean_normalized_goal_distance_return_scaled
+HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",0 -> 1,,
+HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",1 -> 2,0.21439143298402777,0.4743092739671476
+HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",2 -> 3,0.05966858470704583,0.1262662533163238
+HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",3 -> 4,0.03294412809472336,0.0713788956028167
+QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",0 -> 1,,
+QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",1 -> 2,0.2187336765070868,0.30374672227467503
+QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",2 -> 3,0.1250648373098962,0.14006734048291047
+QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",3 -> 4,0.040004067702526194,0.06864884774222763

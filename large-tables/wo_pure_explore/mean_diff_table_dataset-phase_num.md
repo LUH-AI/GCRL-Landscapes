@@ -1,0 +1,6 @@
+|                                                                                                                                        | mean_normalized_goal_distance_return   | mean_normalized_goal_distance_return_scaled   |
+|:---------------------------------------------------------------------------------------------------------------------------------------|:---------------------------------------|:----------------------------------------------|
+| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', '0 -> 1') | nan $\pm$ nan                          | nan $\pm$ nan                                 |
+| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', '1 -> 2') | 0.22 $\pm$ 0.00                        | 0.39 $\pm$ 0.12                               |
+| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', '2 -> 3') | 0.09 $\pm$ 0.05                        | 0.13 $\pm$ 0.01                               |
+| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', '3 -> 4') | 0.04 $\pm$ 0.00                        | 0.07 $\pm$ 0.00                               |

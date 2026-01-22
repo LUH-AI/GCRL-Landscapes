@@ -3,6 +3,7 @@ import pandas as pd
 importance_df: pd.DataFrame
 importance_reset_df = importance_df.reset_index()
 importance_reset_df.columns
+importance_reset_df = importance_reset_df[importance_reset_df["agent"] != "crl"]
 ```
 
 The importance scores we currently have do not sum to one due to only looking at singular hyperparameters.

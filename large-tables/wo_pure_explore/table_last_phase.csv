@@ -1,0 +1,3 @@
+agent,dataset,constant_dataset,hps,phase_num,Goal Distance Score Normalized Regret $< 0.1$ Ratio,Goal Distance Score Normalized Regret $< 0.2$ Ratio,Goal Distance Score,Max Goal Distance Score,Success
+HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",4,0.140625,0.46875,0.3081281306279662,0.4369613588821375,0.06510416666666667
+QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",4,0.28125,0.828125,0.4618068004366307,0.5602548279548397,0.18937500000000002

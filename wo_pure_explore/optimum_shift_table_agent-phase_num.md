@@ -1,0 +1,6 @@
+|            | hp0_opt         | hp1_opt        | optimum_shift   |
+|:-----------|:----------------|:---------------|:----------------|
+| ('CRL', 1) | nan $\pm$ nan   | nan $\pm$ nan  | nan $\pm$ nan   |
+| ('CRL', 2) | -0.00 $\pm$ nan | 0.48 $\pm$ nan | 0.48 $\pm$ nan  |
+| ('CRL', 3) | -0.11 $\pm$ nan | 0.20 $\pm$ nan | 0.22 $\pm$ nan  |
+| ('CRL', 4) | -0.02 $\pm$ nan | 0.12 $\pm$ nan | 0.12 $\pm$ nan  |

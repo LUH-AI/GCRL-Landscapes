@@ -266,8 +266,19 @@ except:
 quant_cols = [col for col in merged_training_with_iqm_df.columns if 'grad/value_cosine_similarity_quant' in col]
 id_cols = [col for col in merged_training_with_iqm_df.columns if 'quant' not in col and "target/held_out_val_batch_values_np" not in col]
 
-df_long = merged_training_with_iqm_df.drop("target/held_out_val_batch_values_np", axis=1).melt(
-    id_vars=id_cols,
+def keep_constants(g):
+  out = {}
+  for col in g.columns:
+    if g[col].nunique() == 1:
+      out[col] = g[col].iloc[0]
+    else:
+      print(col)
+      out[col] = g[col].mean()
+  return pd.Series(out)
+
+marginalized_training_df = merged_training_with_iqm_df.groupby(["hp.agent_name", "seed", "dataset"])[quant_cols].mean().reset_index()
+df_long = marginalized_training_df.melt(
+    id_vars=["hp.agent_name", "seed", "dataset"],
     value_vars=quant_cols,
     var_name='column',
     value_name='value'
@@ -292,7 +303,7 @@ print(mem_usage.sort_values(ascending=False)/1024/1024/1024)
 def plot_cdf(df: pd.DataFrame, name: str) -> None:
   fig, ax = plt.subplots(figsize=(3.5, 2.5))
   # print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
-  ax = sns.lineplot(data=df, x="value", y="quantile", hue="Algorithm", errorbar=None)
+  ax = sns.lineplot(data=df, x="value", y="quantile", hue="Algorithm", errorbar=("pi", 95))
 
   plt.xlim(-1, 1)
   plt.ylim(0, 1)
@@ -315,13 +326,27 @@ for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"
 def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
   fig, ax = plt.subplots(figsize=(3.5, 2.5))
   # print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
-  ax = sns.lineplot(data=df, x="quantile", y="value", hue="Algorithm", errorbar="sd")
+  ax = sns.lineplot(data=df, x="quantile", y="value", hue="Algorithm", errorbar=("ci", 95), estimator=np.mean)
 
-  plt.ylim(-1, 1)
-  plt.xlim(0, 1)
+  for line in ax.lines:
+    # get data from first line of the plot
+    newx = line.get_ydata()
+    newy = line.get_xdata()
+
+    # set new x- and y- data for the line
+    line.set_xdata(newx)
+    line.set_ydata(newy)
+  from matplotlib.collections import PolyCollection
+
+  for coll in ax.collections:
+    if isinstance(coll, PolyCollection):
+      verts = coll.get_paths()[0].vertices  # shape: (npoints, 2)
+      verts[:, [0, 1]] = verts[:, [1, 0]]    # swap columns x<->y
+  plt.xlim(-1, 1)
+  plt.ylim(0, 1)
   plt.title("Inter-Goal Gradient Alignment")
-  plt.ylabel("Gradient Cosine Similarity")
-  plt.xlabel("Cumulative Probability")
+  plt.xlabel("Gradient Cosine Similarity")
+  plt.ylabel("Cumulative Probability")
   plt.tight_layout()
   plt.savefig(f"plots/cdf_swapped/gradient-alignment-cdf-{name}.png", dpi=1200)
 
@@ -344,7 +369,7 @@ Simulate data and test
 We can not properly do this due to aggregation. Maybe use CVar?
 
 ```python
-merged_training_with_iqm_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_cvar0.25"].describe()
+merged_training_with_iqm_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_cvar0.25"].std()
 ```
 
 ```python
@@ -528,13 +553,13 @@ from gcrl_landscapes.evaluation.common import map_labels
 agent_name = "crl"
 grid_length = 100
 
-def mobility_plot(df, title):
+def mobility_plot(df, title, by_col: str = "phase_num", performance_threshold=0.95):
   clipped_merged_results_df = df.copy()
   clipped_merged_results_df["mean_normalized_goal_distance_return"] = clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
   data_temp = clipped_merged_results_df
   # for phase_num ...
   point_dfs = []
-  for name, group in data_temp.groupby(["phase_num"]):
+  for name, group in data_temp.groupby([by_col]):
     group_copy = group.copy().reset_index()
     model = fit_model(group, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
     model.fit()
@@ -559,7 +584,7 @@ def mobility_plot(df, title):
 
     points_prediction_df = pd.DataFrame({"hp.lr": points_x, "hp.discount": points_y, "mean_normalized_goal_distance_return": Z_normalized.squeeze()})
     # points_prediction_df = marginalized_group_copy[marginalized_group_copy["goal_distance_return_eps"] > 0.8]
-    points_prediction_df["phase_num"] = name[0]
+    points_prediction_df[by_col] = name[0]
     point_dfs.append(points_prediction_df)
   point_df = pd.concat(point_dfs)
   print(point_df.describe())
@@ -569,7 +594,7 @@ def mobility_plot(df, title):
   x_lower, x_upper, x_log = get_bounds("lr", agent_name)
   y_lower, y_upper, y_log = get_bounds("discount", agent_name)
   # ax = sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=10, bw_adjust=1, fill=True, alpha=0.4, palette="rocket")
-  df = point_df[point_df["mean_normalized_goal_distance_return"] > 0.90]
+  df = point_df[point_df["mean_normalized_goal_distance_return"] > performance_threshold]
 
   # ax = sns.kdeplot(
   #     data=df,
@@ -601,7 +626,7 @@ def mobility_plot(df, title):
   # )
   fig, ax = plt.subplots(figsize=(6, 4))
 
-  palette = sns.color_palette("viridis", n_colors=df["phase_num"].nunique())
+  palette = sns.color_palette("viridis", n_colors=df[by_col].nunique())
 
   sns.set_context(context="paper", font_scale=1.75)
 
@@ -615,8 +640,8 @@ def mobility_plot(df, title):
   #     "figure.titlesize": 18,
   # })
 
-  for i, phase in enumerate(sorted(df["phase_num"].unique())):
-      phase_df = df[df["phase_num"] == phase]
+  for i, phase in enumerate(sorted(df[by_col].unique())):
+      phase_df = df[df[by_col] == phase]
       color = palette[i]
       
       sns.kdeplot(
@@ -652,7 +677,7 @@ def mobility_plot(df, title):
       
       centroid_x = phase_df["hp.lr"].median()
       centroid_y = phase_df["hp.discount"].median()
-      ax.scatter(centroid_x, centroid_y, s=150, c=[color], edgecolors='white', 
+      ax.scatter(centroid_x, centroid_y, s=150 if by_col == "phase_num" else 500, c=[color], edgecolors='white', 
                  linewidths=2, zorder=100, marker='o')
       ax.text(centroid_x, centroid_y, str(phase), fontsize=11, fontweight='bold', 
               ha='center', va='center', color='white', zorder=101)
@@ -709,15 +734,29 @@ def mobility_plot(df, title):
   plt.close()
 
 
-for name, group in merged_results_df.groupby(["hp.agent_name", "dataset"]):
+merged_results_df["dataset_condensed"] = merged_results_df["dataset"].apply(lambda x: x.split(",")[0] if len(set(x.split(","))) == 1 else x).astype("category")
+for name, group in merged_results_df.groupby(["hp.agent_name", "dataset_condensed"]):
   agent = name[0]
-  datasets = name[1].split(",")
-  dataset: str
-  datasets = datasets[0] if len(set(datasets)) == 1 else ",".join(datasets)
+  datasets = name[1]
 
   print(f"mobility-{agent}-{datasets}")
   mobility_plot(group, f"mobility-{agent}-{datasets}")
 
+```
+
+**Now do it across dataset qualities for the last phase**
+
+```python
+merged_results_df_constant_last_phase = merged_results_df[(merged_results_df["constant_dataset"]) & (merged_results_df["phase_num"] == 4)].copy()
+merged_results_df_constant_last_phase["env"] = merged_results_df_constant_last_phase["dataset_condensed"].apply(lambda x: re.match(r"(.*)-(explore|navigate).*", x).group(1)).astype("category")
+merged_results_df_constant_last_phase["Exploration Ratio"] = merged_results_df_constant_last_phase["dataset"].apply(lambda x: datasets_to_exploration_schedule(x).split(",")[0]).astype("category")
+
+for name, group in merged_results_df_constant_last_phase.groupby(["hp.agent_name", "env"]):
+  agent = name[0]
+  envs = name[1]
+
+  print(f"mobility-last-phase-{agent}-{envs}")
+  mobility_plot(group, f"mobility-last-phase-{agent}-{envs}", by_col="Exploration Ratio", performance_threshold=0.9)
 ```
 
 ## Optimum Movement line plot

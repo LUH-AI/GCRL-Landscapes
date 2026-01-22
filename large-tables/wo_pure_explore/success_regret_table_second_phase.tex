@@ -1,0 +1,11 @@
+\begin{tabular}{llllrrrrrrr}
+\toprule
+ &  &  &  & phase & regret_phase_1 & regret_phase_2 & regret_phase_3 & regret_phase_4 & mean_regret_over_phases & mean_future_regret_over_phases \\
+agent & dataset & constant_dataset & hps &  &  &  &  &  &  &  \\
+\midrule
+HIQL & antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0 & False & frozenset({'lr', 'discount'}) & 2 & 0.093333 & 0.000000 & 0.053333 & 0.100000 & 0.061667 & 0.076667 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+QRL & antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0 & False & frozenset({'lr', 'discount'}) & 2 & 0.000000 & -0.000000 & 0.013333 & 0.026667 & 0.010000 & 0.020000 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+\bottomrule
+\end{tabular}

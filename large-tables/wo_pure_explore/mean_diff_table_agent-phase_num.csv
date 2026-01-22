@@ -1,0 +1,9 @@
+agent,phase_num,mean_normalized_goal_distance_return,mean_normalized_goal_distance_return_scaled
+HIQL,0 -> 1,nan $\pm$ nan,nan $\pm$ nan
+HIQL,1 -> 2,0.21 $\pm$ nan,0.47 $\pm$ nan
+HIQL,2 -> 3,0.06 $\pm$ nan,0.13 $\pm$ nan
+HIQL,3 -> 4,0.03 $\pm$ nan,0.07 $\pm$ nan
+QRL,0 -> 1,nan $\pm$ nan,nan $\pm$ nan
+QRL,1 -> 2,0.22 $\pm$ nan,0.30 $\pm$ nan
+QRL,2 -> 3,0.13 $\pm$ nan,0.14 $\pm$ nan
+QRL,3 -> 4,0.04 $\pm$ nan,0.07 $\pm$ nan

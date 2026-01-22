@@ -1,0 +1,5 @@
+agent,dataset,constant_dataset,hps,phase_num,mean_squared_error,mean_absolute_error,max_error
+CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",1,0.0029252656853713983,0.041554708810244444,0.1131416180677737
+CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",2,0.004286706192966967,0.04820395077632702,0.13048502766184855
+CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",3,0.003591457968240229,0.041549722103269474,0.1633618076884725
+CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",4,0.0056596104350631945,0.05356528009659882,0.1613707665384459

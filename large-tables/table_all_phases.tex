@@ -1,0 +1,17 @@
+\begin{tabular}{lllllrrrrr}
+\toprule
+ &  &  &  &  & Goal Distance Score Normalized Regret $< 0.1$ Ratio & Goal Distance Score Normalized Regret $< 0.2$ Ratio & Goal Distance Score & Max Goal Distance Score & Success \\
+agent & dataset & constant_dataset & hps & phase_num &  &  &  &  &  \\
+\midrule
+\multirow[t]{4}{*}{HIQL} & \multirow[t]{4}{*}{antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0} & \multirow[t]{4}{*}{False} & \multirow[t]{4}{*}{frozenset({'lr', 'discount'})} & 1 & 0.015625 & 0.031250 & 0.087772 & 0.398261 & 0.002812 \\
+ &  &  &  & 2 & 0.218750 & 0.375000 & 0.296126 & 0.438371 & 0.049896 \\
+ &  &  &  & 3 & 0.109375 & 0.375000 & 0.321361 & 0.474399 & 0.073958 \\
+ &  &  &  & 4 & 0.140625 & 0.468750 & 0.308128 & 0.436961 & 0.065104 \\
+\cline{1-10} \cline{2-10} \cline{3-10} \cline{4-10}
+\multirow[t]{4}{*}{QRL} & \multirow[t]{4}{*}{antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0} & \multirow[t]{4}{*}{False} & \multirow[t]{4}{*}{frozenset({'lr', 'discount'})} & 1 & 0.078125 & 0.234375 & 0.091611 & 0.166010 & 0.000000 \\
+ &  &  &  & 2 & 0.187500 & 0.343750 & 0.310345 & 0.441242 & 0.035521 \\
+ &  &  &  & 3 & 0.546875 & 0.796875 & 0.432027 & 0.523702 & 0.120417 \\
+ &  &  &  & 4 & 0.281250 & 0.828125 & 0.461807 & 0.560255 & 0.189375 \\
+\cline{1-10} \cline{2-10} \cline{3-10} \cline{4-10}
+\bottomrule
+\end{tabular}

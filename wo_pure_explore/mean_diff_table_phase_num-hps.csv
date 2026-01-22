@@ -1,0 +1,5 @@
+phase_num,hps,mean_normalized_goal_distance_return,mean_normalized_goal_distance_return_scaled
+0 -> 1,"frozenset({'lr', 'discount'})",nan $\pm$ nan,nan $\pm$ nan
+1 -> 2,"frozenset({'lr', 'discount'})",0.15 $\pm$ nan,0.19 $\pm$ nan
+2 -> 3,"frozenset({'lr', 'discount'})",0.08 $\pm$ nan,0.08 $\pm$ nan
+3 -> 4,"frozenset({'lr', 'discount'})",0.04 $\pm$ nan,0.07 $\pm$ nan

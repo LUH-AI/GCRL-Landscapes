@@ -1,0 +1,3 @@
+| hps                           | mean_future_regret_over_phases_firstphase   | mean_future_regret_over_phases_secondphase   |
+|:------------------------------|:--------------------------------------------|:---------------------------------------------|
+| frozenset({'lr', 'discount'}) | 0.65 $\pm$ 0.19                             | 0.29 $\pm$ 0.29                              |

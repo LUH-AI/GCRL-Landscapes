@@ -1,0 +1,6 @@
+|                  | Goal Distance Score Normalized Regret $< 0.1$ Ratio   | Goal Distance Score Normalized Regret $< 0.2$ Ratio   | Goal Distance Score   | Success        |   Max Goal Distance Score |
+|:-----------------|:------------------------------------------------------|:------------------------------------------------------|:----------------------|:---------------|--------------------------:|
+| (True, 'CRL', 1) | 0.16 $\pm$ nan                                        | 0.28 $\pm$ nan                                        | 0.25 $\pm$ nan        | 0.04 $\pm$ nan |                      0.46 |
+| (True, 'CRL', 2) | 0.08 $\pm$ nan                                        | 0.55 $\pm$ nan                                        | 0.39 $\pm$ nan        | 0.14 $\pm$ nan |                      0.58 |
+| (True, 'CRL', 3) | 0.45 $\pm$ nan                                        | 0.67 $\pm$ nan                                        | 0.46 $\pm$ nan        | 0.25 $\pm$ nan |                      0.64 |
+| (True, 'CRL', 4) | 0.17 $\pm$ nan                                        | 0.55 $\pm$ nan                                        | 0.45 $\pm$ nan        | 0.26 $\pm$ nan |                      0.67 |

@@ -1,0 +1,4 @@
+|                                         | Goal Distance Score Normalized Regret $< 0.1$ Ratio   | Goal Distance Score Normalized Regret $< 0.2$ Ratio   | Goal Distance Score   | Success        |   Max Goal Distance Score |
+|:----------------------------------------|:------------------------------------------------------|:------------------------------------------------------|:----------------------|:---------------|--------------------------:|
+| ('HIQL', frozenset({'lr', 'discount'})) | 0.14 $\pm$ nan                                        | 0.47 $\pm$ nan                                        | 0.31 $\pm$ nan        | 0.07 $\pm$ nan |                      0.44 |
+| ('QRL', frozenset({'lr', 'discount'}))  | 0.28 $\pm$ nan                                        | 0.83 $\pm$ nan                                        | 0.46 $\pm$ nan        | 0.19 $\pm$ nan |                      0.56 |

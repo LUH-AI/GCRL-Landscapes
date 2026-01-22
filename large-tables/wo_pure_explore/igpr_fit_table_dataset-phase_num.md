@@ -1,0 +1,6 @@
+|                                                                                                                                 | mean_squared_error   | mean_absolute_error   |   max_error |
+|:--------------------------------------------------------------------------------------------------------------------------------|:---------------------|:----------------------|------------:|
+| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', 1) | 0.003 $\pm$ 0.001    | 0.041 $\pm$ 0.006     |       0.12  |
+| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', 2) | 0.001 $\pm$ 0.001    | 0.025 $\pm$ 0.009     |       0.087 |
+| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', 3) | 0.003 $\pm$ 0.002    | 0.038 $\pm$ 0.016     |       0.125 |
+| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', 4) | 0.002 $\pm$ 0.001    | 0.031 $\pm$ 0.008     |       0.118 |
