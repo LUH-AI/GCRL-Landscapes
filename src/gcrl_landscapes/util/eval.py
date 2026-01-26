@@ -77,7 +77,7 @@ def fit_model(
         result_copy[hp_name] = hp_to_sobol_codomain(
             result_copy[hp_name],
             *get_bounds(
-                hp_name.removeprefix("hp."), phase_result["hp.agent_name"].iloc[0]
+                hp_name.removeprefix("hp."), phase_result["hp.agent_name"].tolist()[0]
             ),
         )
 

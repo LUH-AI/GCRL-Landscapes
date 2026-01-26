@@ -5,6 +5,7 @@ from gcrl_landscapes.util.data import (
     phase_results_to_pandas,
     training_logs_to_pandas,
     read_results_from_zip,
+    load_or_compute,
 )
 from gcrl_landscapes.plots.triple_gp import estimate_model_fit, TripleGPModel
 from pathlib import Path
@@ -590,6 +591,7 @@ if __name__ == "__main__":
             thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 3
         except Exception as _:
             thread_count = multiprocessing.cpu_count() // 3
+        thread_count = 6
         with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
             pool.map(
                 plot_results,
