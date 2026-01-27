@@ -341,7 +341,7 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
                         column_values, proportiontocut=0.25
                     ),
                 }
-                | {f"hp.{hp_name}": retain_hp for hp_name in df["hps"].iloc[0]}
+                | {f"hp.{hp_name}": retain_hp for hp_name in df.reset_index()["hps"].iloc[0]}
             )
             .reset_index()
         )
@@ -810,7 +810,7 @@ if __name__ == "__main__":
     create_phased_tables(merged_results_df, output_folder)
     create_igprfit_tables(merged_results_df, output_folder)
     create_regret_table(merged_results_df, output_folder)
-    create_optimum_shift_table(merged_results_df, output_folder)
+    # create_optimum_shift_table(merged_results_df, output_folder)
     create_mean_diff_table(merged_results_df, output_folder)
 
     # Do all calculations once without pure explore
@@ -827,4 +827,5 @@ if __name__ == "__main__":
     create_phased_tables(wo_pure_explore_df, output_folder)
     create_igprfit_tables(wo_pure_explore_df, output_folder)
     create_regret_table(wo_pure_explore_df, output_folder)
-    create_optimum_shift_table(wo_pure_explore_df, output_folder)
+    # TODO: for some reason this does not work in rare cases, but we do not use the table anyways
+    # create_optimum_shift_table(wo_pure_explore_df, output_folder)

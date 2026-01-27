@@ -1,0 +1,9 @@
+dataset,mean_squared_error,mean_absolute_error,max_error
+"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",0.002 $\pm$ 0.001,0.034 $\pm$ 0.009,0.144
+"antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0",0.002 $\pm$ 0.001,0.035 $\pm$ 0.005,0.130
+"antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0",0.002 $\pm$ 0.001,0.030 $\pm$ 0.008,0.114
+"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",0.002 $\pm$ 0.001,0.033 $\pm$ 0.007,0.111
+"antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0",0.004 $\pm$ 0.002,0.045 $\pm$ 0.013,0.186
+"antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0",0.004 $\pm$ 0.003,0.047 $\pm$ 0.016,0.265
+"antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0",0.005 $\pm$ 0.004,0.054 $\pm$ 0.020,0.264
+"antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0",0.003 $\pm$ 0.002,0.042 $\pm$ 0.013,0.175

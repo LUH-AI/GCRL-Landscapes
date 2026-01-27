@@ -1,0 +1,39 @@
+\begin{tabular}{llllrrrrrrr}
+\toprule
+ &  &  &  & phase & regret_phase_1 & regret_phase_2 & regret_phase_3 & regret_phase_4 & mean_regret_over_phases & mean_future_regret_over_phases \\
+agent & dataset & constant_dataset & hps &  &  &  &  &  &  &  \\
+\midrule
+\multirow[t]{3}{*}{QRL} & antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.481132 & -0.000000 & 0.084577 & 0.081210 & 0.161730 & 0.082894 \\
+\cline{2-11} \cline{3-11}
+ & antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.031047 & 0.000000 & 0.074502 & 0.030582 & 0.034033 & 0.052542 \\
+\cline{2-11} \cline{3-11}
+ & antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0 & False & frozenset({'discount', 'lr'}) & 2 & 0.780738 & 0.000000 & 0.000000 & 0.093890 & 0.218657 & 0.046945 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+HIQL & antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.132014 & -0.000000 & 0.050928 & 0.087698 & 0.067660 & 0.069313 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+\multirow[t]{3}{*}{QRL} & antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.099434 & 0.000000 & 0.018607 & 0.074124 & 0.048041 & 0.046366 \\
+\cline{2-11} \cline{3-11}
+ & antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0 & False & frozenset({'discount', 'lr'}) & 2 & 0.419560 & 0.000000 & 0.000000 & 0.066935 & 0.121624 & 0.033468 \\
+\cline{2-11} \cline{3-11}
+ & antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.259182 & 0.000000 & 0.057348 & 0.093609 & 0.102535 & 0.075479 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+\multirow[t]{2}{*}{HIQL} & antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.244189 & -0.000000 & 0.152454 & 0.147280 & 0.135981 & 0.149867 \\
+\cline{2-11} \cline{3-11}
+ & antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.000000 & 0.000000 & -0.000000 & 0.121889 & 0.030472 & 0.060944 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+QRL & antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.539648 & 0.000000 & 0.037779 & 0.083232 & 0.165165 & 0.060506 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+\multirow[t]{2}{*}{HIQL} & antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0 & False & frozenset({'discount', 'lr'}) & 2 & 0.663840 & 0.000000 & 0.413708 & 0.187637 & 0.316296 & 0.300672 \\
+\cline{2-11} \cline{3-11}
+ & antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0 & False & frozenset({'discount', 'lr'}) & 2 & 0.039949 & -0.000000 & 0.015358 & 0.105088 & 0.040099 & 0.060223 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+QRL & antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.209776 & -0.000000 & 0.063931 & 0.057523 & 0.082807 & 0.060727 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+\multirow[t]{3}{*}{HIQL} & antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.517555 & -0.000000 & 0.159427 & 0.149328 & 0.206578 & 0.154378 \\
+\cline{2-11} \cline{3-11}
+ & antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 1.059978 & 0.000000 & 0.011229 & 0.056547 & 0.281938 & 0.033888 \\
+\cline{2-11} \cline{3-11}
+ & antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0 & True & frozenset({'discount', 'lr'}) & 2 & 0.000000 & -0.000000 & 0.030483 & 0.000000 & 0.007621 & 0.015242 \\
+\cline{1-11} \cline{2-11} \cline{3-11}
+\bottomrule
+\end{tabular}

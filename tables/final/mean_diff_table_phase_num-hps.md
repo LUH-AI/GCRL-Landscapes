@@ -1,0 +1,6 @@
+|                                           | mean_normalized_goal_distance_return   | mean_normalized_goal_distance_return_scaled   |
+|:------------------------------------------|:---------------------------------------|:----------------------------------------------|
+| ('0 -> 1', frozenset({'discount', 'lr'})) | nan $\pm$ nan                          | nan $\pm$ nan                                 |
+| ('1 -> 2', frozenset({'discount', 'lr'})) | 0.20 $\pm$ 0.08                        | 0.30 $\pm$ 0.08                               |
+| ('2 -> 3', frozenset({'discount', 'lr'})) | 0.07 $\pm$ 0.05                        | 0.09 $\pm$ 0.04                               |
+| ('3 -> 4', frozenset({'discount', 'lr'})) | 0.04 $\pm$ 0.03                        | 0.07 $\pm$ 0.04                               |

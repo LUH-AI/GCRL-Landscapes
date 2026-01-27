@@ -1,0 +1,6 @@
+|                 | mean_future_regret_over_phases_firstphase   | mean_future_regret_over_phases_secondphase   |
+|:----------------|:--------------------------------------------|:---------------------------------------------|
+| (False, 'HIQL') | 0.07 $\pm$ 0.07                             | 0.05 $\pm$ 0.03                              |
+| (False, 'QRL')  | 0.06 $\pm$ 0.03                             | 0.04 $\pm$ 0.03                              |
+| (True, 'HIQL')  | 0.07 $\pm$ 0.07                             | 0.03 $\pm$ 0.04                              |
+| (True, 'QRL')   | 0.06 $\pm$ 0.07                             | 0.05 $\pm$ 0.03                              |

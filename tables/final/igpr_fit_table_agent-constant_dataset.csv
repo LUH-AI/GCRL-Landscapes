@@ -1,0 +1,5 @@
+agent,constant_dataset,mean_squared_error,mean_absolute_error,max_error
+HIQL,False,0.004 $\pm$ 0.002,0.049 $\pm$ 0.009,0.178
+HIQL,True,0.005 $\pm$ 0.003,0.051 $\pm$ 0.014,0.266
+QRL,False,0.002 $\pm$ 0.001,0.031 $\pm$ 0.007,0.124
+QRL,True,0.002 $\pm$ 0.001,0.029 $\pm$ 0.006,0.124

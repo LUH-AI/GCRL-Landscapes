@@ -428,6 +428,8 @@ print(
       )
 ```
 
+### Correlation
+
 Is there correlation between learning rate (and maybe discount factor) and cosine similarity?
 
 ```python
@@ -454,10 +456,33 @@ corr_diff_sorted = corr_diff.reindex(corr_diff.abs().sort_values(ascending=False
 corr_diff_sorted[~corr_diff_sorted.index.str.contains("grad/|update/")]
 ```
 
+**We have found correlation for HIQL between regret/performance and gradient alignment.**
+Let us take a closer look.  
+There was also a bit of correlation for QRL between eval_step and gradient alignment.
+
+```python
+from scipy.stats import bootstrap, pearsonr
+
+col1, col2 = "grad/value_cosine_similarity_std", "mean_normalized_goal_distance_return_normalized_regret"
+col1, col2 = "grad/value_cosine_similarity_std", "eval_step"
+for name, group in merged_training_with_iqm_df.groupby(["hp.agent_name"]):
+  # filtered_df = group[[col1, col2]].reset_index()
+  #
+  # def corr_bootstrap(indices):
+  #   return pearsonr(filtered_df.loc[indices, col1], filtered_df.loc[indices, col2]).statistic
+  #
+  # bootstrap((filtered_df.index, ), corr_bootstrap)
+  numpy_col1 = group[col1].to_numpy()
+  print(f"{name[0]}: {pearsonr(group[col1], group[col2])[0]}")
+  print(len(group))
+```
+
+
 Now lets do this sorted by training progress
 
 ```python
-corr_progress = good_configs_df.groupby(["hp.agent_name", "eval_bins5"]).apply(lambda g: g.corr(numeric_only=True)["grad/value_cosine_similarity_mean"])
+col = "grad/value_cosine_similarity_std"
+corr_progress = merged_training_with_iqm_df[merged_training_with_iqm_df.columns[~merged_training_with_iqm_df.columns.str.contains("grad/|update/")].tolist() + [col]].groupby(["hp.agent_name", "eval_bins5"]).apply(lambda g: g.corr(numeric_only=True)[col])
 corr_progress_sorted = corr_progress.stack().rename("corr").reset_index()
 corr_progress_sorted = corr_progress_sorted.reindex(corr_progress_sorted["corr"].abs().sort_values(ascending=False).index)
 corr_progress_sorted[corr_progress_sorted["eval_bins5"] == 0]

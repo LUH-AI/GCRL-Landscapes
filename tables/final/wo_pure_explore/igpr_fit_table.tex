@@ -1,0 +1,87 @@
+\begin{tabular}{lllllrrr}
+\toprule
+ &  &  &  &  & mean_squared_error & mean_absolute_error & max_error \\
+agent & dataset & constant_dataset & hps & phase_num &  &  &  \\
+\midrule
+\multirow[t]{32}{*}{HIQL} & \multirow[t]{4}{*}{antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0} & \multirow[t]{4}{*}{False} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.003391 & 0.046091 & 0.116962 \\
+ &  &  &  & 2 & 0.001548 & 0.029518 & 0.080773 \\
+ &  &  &  & 3 & 0.003426 & 0.043648 & 0.122345 \\
+ &  &  &  & 4 & 0.003614 & 0.041963 & 0.143674 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.002509 & 0.039427 & 0.110823 \\
+ &  &  &  & 2 & 0.003555 & 0.042890 & 0.130484 \\
+ &  &  &  & 3 & 0.002514 & 0.036527 & 0.116673 \\
+ &  &  &  & 4 & 0.002485 & 0.038002 & 0.108583 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.003420 & 0.048404 & 0.114454 \\
+ &  &  &  & 2 & 0.001937 & 0.032650 & 0.100473 \\
+ &  &  &  & 3 & 0.001463 & 0.030637 & 0.069937 \\
+ &  &  &  & 4 & 0.001772 & 0.031494 & 0.093007 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.001992 & 0.036072 & 0.093588 \\
+ &  &  &  & 2 & 0.002822 & 0.040848 & 0.109580 \\
+ &  &  &  & 3 & 0.002728 & 0.042294 & 0.106980 \\
+ &  &  &  & 4 & 0.002124 & 0.035184 & 0.110784 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0} & \multirow[t]{4}{*}{False} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.006854 & 0.059363 & 0.186159 \\
+ &  &  &  & 2 & 0.005387 & 0.055519 & 0.169904 \\
+ &  &  &  & 3 & 0.006116 & 0.061125 & 0.170883 \\
+ &  &  &  & 4 & 0.004578 & 0.050867 & 0.156206 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.005866 & 0.061570 & 0.161380 \\
+ &  &  &  & 2 & 0.004660 & 0.053323 & 0.143097 \\
+ &  &  &  & 3 & 0.003109 & 0.041910 & 0.114739 \\
+ &  &  &  & 4 & 0.011645 & 0.075714 & 0.264914 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.007704 & 0.070228 & 0.173202 \\
+ &  &  &  & 2 & 0.011121 & 0.077674 & 0.264231 \\
+ &  &  &  & 3 & 0.008248 & 0.070464 & 0.182882 \\
+ &  &  &  & 4 & 0.007478 & 0.068890 & 0.198016 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.005363 & 0.060025 & 0.144206 \\
+ &  &  &  & 2 & 0.003121 & 0.044130 & 0.115551 \\
+ &  &  &  & 3 & 0.005557 & 0.060149 & 0.145335 \\
+ &  &  &  & 4 & 0.005054 & 0.049232 & 0.174854 \\
+\cline{1-8} \cline{2-8} \cline{3-8} \cline{4-8}
+\multirow[t]{32}{*}{QRL} & \multirow[t]{4}{*}{antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0} & \multirow[t]{4}{*}{False} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.001785 & 0.036973 & 0.071926 \\
+ &  &  &  & 2 & 0.000952 & 0.022598 & 0.064552 \\
+ &  &  &  & 3 & 0.001379 & 0.026896 & 0.094096 \\
+ &  &  &  & 4 & 0.001257 & 0.025378 & 0.075297 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.001908 & 0.031651 & 0.093921 \\
+ &  &  &  & 2 & 0.001859 & 0.032784 & 0.093293 \\
+ &  &  &  & 3 & 0.001395 & 0.026312 & 0.090376 \\
+ &  &  &  & 4 & 0.002366 & 0.035469 & 0.095439 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.001019 & 0.024024 & 0.069579 \\
+ &  &  &  & 2 & 0.000774 & 0.020983 & 0.063526 \\
+ &  &  &  & 3 & 0.001394 & 0.026507 & 0.091506 \\
+ &  &  &  & 4 & 0.001498 & 0.029020 & 0.093243 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.001908 & 0.033818 & 0.098934 \\
+ &  &  &  & 2 & 0.001196 & 0.026000 & 0.073446 \\
+ &  &  &  & 3 & 0.001336 & 0.025182 & 0.087020 \\
+ &  &  &  & 4 & 0.001380 & 0.023159 & 0.090846 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0} & \multirow[t]{4}{*}{False} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.001673 & 0.030835 & 0.083479 \\
+ &  &  &  & 2 & 0.002158 & 0.033527 & 0.106807 \\
+ &  &  &  & 3 & 0.002777 & 0.038221 & 0.118200 \\
+ &  &  &  & 4 & 0.001412 & 0.029504 & 0.072614 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.003248 & 0.043839 & 0.118277 \\
+ &  &  &  & 2 & 0.001796 & 0.034292 & 0.090762 \\
+ &  &  &  & 3 & 0.001627 & 0.030242 & 0.090600 \\
+ &  &  &  & 4 & 0.001674 & 0.031843 & 0.082693 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.002615 & 0.040695 & 0.106748 \\
+ &  &  &  & 2 & 0.002190 & 0.035492 & 0.105883 \\
+ &  &  &  & 3 & 0.001915 & 0.033987 & 0.094075 \\
+ &  &  &  & 4 & 0.001686 & 0.031552 & 0.089505 \\
+\cline{2-8} \cline{3-8} \cline{4-8}
+ & \multirow[t]{4}{*}{antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0} & \multirow[t]{4}{*}{True} & \multirow[t]{4}{*}{frozenset({'discount', 'lr'})} & 1 & 0.001868 & 0.033015 & 0.082866 \\
+ &  &  &  & 2 & 0.001205 & 0.027606 & 0.066744 \\
+ &  &  &  & 3 & 0.001682 & 0.029759 & 0.093445 \\
+ &  &  &  & 4 & 0.002154 & 0.031904 & 0.105922 \\
+\cline{1-8} \cline{2-8} \cline{3-8} \cline{4-8}
+\bottomrule
+\end{tabular}

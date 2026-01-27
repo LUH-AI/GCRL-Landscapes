@@ -1,0 +1,11 @@
+dataset,constant_dataset,mean_future_regret_over_phases_firstphase,mean_future_regret_over_phases_secondphase
+"antmaze-large-explore-v0,antmaze-large-explore-v0,antmaze-large-explore-v0,antmaze-large-explore-v0",True,0.20 $\pm$ 0.09,0.10 $\pm$ 0.10
+"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,0.30 $\pm$ 0.04,0.17 $\pm$ 0.18
+"antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-explore40navigate-v0",True,0.10 $\pm$ 0.08,0.11 $\pm$ 0.06
+"antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore80navigate-v0",True,0.19 $\pm$ 0.12,0.04 $\pm$ 0.01
+"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,0.05 $\pm$ 0.05,0.03 $\pm$ 0.02
+"antmaze-medium-explore-v0,antmaze-medium-explore-v0,antmaze-medium-explore-v0,antmaze-medium-explore-v0",True,0.24 $\pm$ 0.02,0.05 $\pm$ 0.02
+"antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0",False,0.37 $\pm$ 0.19,0.05 $\pm$ 0.02
+"antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-explore40navigate-v0",True,0.04 $\pm$ 0.00,0.07 $\pm$ 0.02
+"antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore80navigate-v0",True,0.08 $\pm$ 0.01,0.11 $\pm$ 0.06
+"antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0,antmaze-medium-navigate-v0",True,0.10 $\pm$ 0.08,0.07 $\pm$ 0.01
