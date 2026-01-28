@@ -1,0 +1,26 @@
+\begin{table}
+\caption{Optimum Overlap across Exploration Ratios}
+\label{tab:optimum-overlap-quality}
+\begin{tabular}{llrrr}
+\toprule
+ & transition & 100->80 & 80->40 & 40->0 \\
+env & Algorithm &  &  &  \\
+\midrule
+\multirow[t]{2}{*}{antmaze-large} & HIQL & 0.366 & 0.694 & 0.165 \\
+ & QRL & 0.052 & 0.533 & 0.831 \\
+\cline{1-5}
+\multirow[t]{2}{*}{antmaze-medium} & HIQL & 0.117 & 0.426 & 0.182 \\
+ & QRL & 0.476 & 0.928 & 0.968 \\
+\cline{1-5}
+\multirow[t]{2}{*}{antmaze-teleport} & HIQL & NaN & NaN & NaN \\
+ & QRL & NaN & NaN & NaN \\
+\cline{1-5}
+\multirow[t]{2}{*}{humanoidmaze-medium} & HIQL & NaN & NaN & NaN \\
+ & QRL & NaN & NaN & NaN \\
+\cline{1-5}
+\multirow[t]{2}{*}{pointmaze-medium} & HIQL & NaN & NaN & NaN \\
+ & QRL & NaN & NaN & NaN \\
+\cline{1-5}
+\bottomrule
+\end{tabular}
+\end{table}

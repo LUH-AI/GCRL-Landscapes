@@ -369,6 +369,7 @@ def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
   plt.close()
 
 
+sns.set_theme(context="paper", style="whitegrid")
 plot_swapped_cdf(df_long[df_long["variable"] == "grad/value_cosine_similarity"], "all")
 for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["dataset"]):
   datasets = name[0].split(",")
@@ -464,7 +465,7 @@ There was also a bit of correlation for QRL between eval_step and gradient align
 from scipy.stats import bootstrap, pearsonr
 
 col1, col2 = "grad/value_cosine_similarity_std", "mean_normalized_goal_distance_return_normalized_regret"
-col1, col2 = "grad/value_cosine_similarity_std", "eval_step"
+# col1, col2 = "grad/value_cosine_similarity_std", "eval_step"
 for name, group in merged_training_with_iqm_df.groupby(["hp.agent_name"]):
   # filtered_df = group[[col1, col2]].reset_index()
   #
@@ -473,7 +474,7 @@ for name, group in merged_training_with_iqm_df.groupby(["hp.agent_name"]):
   #
   # bootstrap((filtered_df.index, ), corr_bootstrap)
   numpy_col1 = group[col1].to_numpy()
-  print(f"{name[0]}: {pearsonr(group[col1], group[col2])[0]}")
+  print(f"{name[0]}: {pearsonr(group[col1], group[col2])}")
   print(len(group))
 ```
 
@@ -816,7 +817,9 @@ for name, group in merged_results_df.groupby(["hp.agent_name", "dataset_condense
 merged_results_df_constant_last_phase = merged_results_df[(merged_results_df["constant_dataset"]) & (merged_results_df["phase_num"] == 4)].copy()
 merged_results_df_constant_last_phase["env"] = merged_results_df_constant_last_phase["dataset_condensed"].apply(lambda x: re.match(r"(.*)-(explore|navigate).*", x).group(1)).astype("category")
 merged_results_df_constant_last_phase["Exploration Ratio"] = merged_results_df_constant_last_phase["dataset"].apply(lambda x: datasets_to_exploration_schedule(x).split(",")[0]).astype("category")
+```
 
+```python
 for name, group in merged_results_df_constant_last_phase.groupby(["hp.agent_name", "env"]):
   agent = name[0]
   envs = name[1]
@@ -829,6 +832,151 @@ for name, group in merged_results_df_constant_last_phase.groupby(["hp.agent_name
   mobility_plot(group, agent, f"across-dataquality/{performance_threshold}/mobility-last-phase-{agent}-{envs}", by_col="Exploration Ratio", performance_threshold=performance_threshold/100)
   performance_threshold = 90
   mobility_plot(group, agent, f"across-dataquality/{performance_threshold}/mobility-last-phase-{agent}-{envs}", by_col="Exploration Ratio", performance_threshold=performance_threshold/100)
+```
+
+## Table for across phase/quality
+
+```python
+from src.gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
+import warnings
+from typing import Callable
+def optimum_share_table(df, agent_name, by_col: str = "phase_num", performance_threshold=0.95, sorter: Callable = lambda x: sorted(x), grid_length=100):
+  clipped_merged_results_df = df.copy()
+  clipped_merged_results_df["mean_normalized_goal_distance_return"] = clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
+  data_temp = clipped_merged_results_df
+
+  # This is an example model to correctly set grid
+  model = fit_model(df, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
+  hpname_x = model.hp_names[0].removeprefix("hp.")
+  hpname_y = model.hp_names[1].removeprefix("hp.")
+  model.fit()
+  x_lower, x_upper, x_log = get_bounds(hpname_x, agent_name)
+  y_lower, y_upper, y_log = get_bounds(hpname_y, agent_name)
+  x, y = np.linspace(0, 1, grid_length), np.linspace(0, 1, grid_length)
+  X, Y = np.meshgrid(x, y)
+  points = np.vstack([X.ravel(), Y.ravel()]).transpose()
+
+  def get_optimal_point_selector(group_df):
+    group_copy = group_df.copy().reset_index()
+    model = fit_model(group_copy, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
+    model.fit()
+    assert model.hp_names[0].removeprefix("hp.") == hpname_x and model.hp_names[1].removeprefix("hp.") == hpname_y
+    Z = model.get_middle(points).clip(0, 1)
+    Z_normalized = Z / Z.max()
+    Z_selected = (Z_normalized > performance_threshold).squeeze()
+    return Z_selected
+
+  optimal_points_per_col = data_temp.groupby(by_col).apply(get_optimal_point_selector)
+  col_sorted = sorter(optimal_points_per_col.index.tolist())
+  transition_point_share = {f"{col1}->{col2}": np.sum(optimal_points_per_col.loc[col1] & optimal_points_per_col.loc[col2]) / np.sum(optimal_points_per_col.loc[col1] | optimal_points_per_col.loc[col2])
+                            for col1, col2 in zip(col_sorted[:-1], col_sorted[1:])}
+  return pd.Series(transition_point_share, name="transition")
+```
+
+### Across Phases
+
+```python
+for name, group in merged_results_df.groupby(["hp.agent_name", "dataset"]):
+  print(name)
+
+with warnings.catch_warnings():
+  warnings.simplefilter("ignore")
+  phase_optimum_share_df = merged_results_df.groupby(["hp.agent_name", "dataset"]).apply(lambda group: optimum_share_table(group, group["hp.agent_name"].iloc[0], by_col="phase_num", performance_threshold=0.90, grid_length=100))
+# for name, group in merged_results_df.groupby(["hp.agent_name", "dataset"]):
+#   agent_name = name[0]
+#   datasets = name[1]
+#   optimum_share_table(group, agent_name, f"across-phase-{agent_name}-{datasets}", by_col="phase_num", performance_threshold=0.90, grid_length=100)
+```
+
+```python
+phase_optimum_share_df.columns
+phase_optimum_share_df_long = phase_optimum_share_df.reset_index().melt(id_vars=["hp.agent_name", "dataset"], var_name="transition", value_name="Jaccard Index of Optimum")
+phase_optimum_share_df_long["constant_dataset"] = phase_optimum_share_df_long["dataset"].apply(lambda x: len(set(x.split(","))) == 1)
+phase_optimum_share_df_long["hp.agent_name"] = phase_optimum_share_df_long["hp.agent_name"].str.upper().astype("category")
+```
+
+```python
+fig, ax = plt.subplots(figsize=(3.5, 2.5))
+sns.lineplot(data=phase_optimum_share_df_long, x="transition", y="Jaccard Index of Optimum", hue="hp.agent_name", errorbar=("ci", 95))
+plt.ylim(0, 1)
+plt.xlabel("Phase Transition")
+plt.ylabel(r"Overlap of Optimum")
+plt.legend(title="Algorithm")
+plt.tight_layout()
+plt.savefig("plots/optimum-overlap-phases", dpi=1200)
+plt.close()
+```
+Now lets get tabular data
+
+```python
+def dataset_to_name(dataset):
+  datasets = dataset.split(",")
+  if datasets[0].startswith("antmaze-medium") or datasets[0].startswith("antmaze-large"):
+    exploration_shares = datasets_to_exploration_schedule(dataset).split(",")
+    if len(set(exploration_shares)) == 1:
+      return f"{re.match(r'(antmaze-medium|antmaze-large)', dataset).group(1)}-{exploration_shares[0]}\%explore"
+    else:
+      return f"{re.match(r'(antmaze-medium|antmaze-large)', dataset).group(1)}-scheduled"
+  return dataset if len(set(datasets)) > 1 else datasets[0]
+
+latex_phase_optimum_df = phase_optimum_share_df.swaplevel(0, 1).rename(index=lambda idx: dataset_to_name(idx), level="dataset").rename(index=lambda idx: idx.upper(), level="hp.agent_name").rename_axis(index={"hp.agent_name": "Algorithm", "dataset": "Setting"}).sort_index()
+
+with open("tables/optimum-overlap-phases.tex", "w") as f:
+  f.writelines(latex_phase_optimum_df.to_latex(
+    index=True,
+    caption="Optimum Overlap across Phase Transitions",
+    label="tab:optimum-overlap-phases",
+    float_format="%.3f",
+    bold_rows=False,
+    longtable=False,
+  ))
+```
+
+### Across Data Quality
+
+```python
+merged_results_df_constant_last_phase["Exploration Ratio"] = merged_results_df_constant_last_phase["Exploration Ratio"].astype("int")
+with warnings.catch_warnings():
+  warnings.simplefilter("ignore")
+  quality_optimum_share_df = merged_results_df_constant_last_phase[(merged_results_df_constant_last_phase["env"] == "antmaze-medium") | (merged_results_df_constant_last_phase["env"] == "antmaze-large")].groupby(["hp.agent_name", "env"]).apply(lambda group: optimum_share_table(group.reset_index(), group["hp.agent_name"].reset_index().iloc[0], by_col="Exploration Ratio", sorter=lambda x: list(reversed(sorted(x))), performance_threshold=0.90, grid_length=100))
+```
+```python
+quality_optimum_share_df_long = quality_optimum_share_df.reset_index().melt(id_vars=["hp.agent_name", "env"], var_name="transition", value_name="Jaccard Index of Optimum")
+quality_optimum_share_df_long["hp.agent_name"] = quality_optimum_share_df_long["hp.agent_name"].str.upper().astype("category")
+```
+
+```python
+fig, ax = plt.subplots(figsize=(3.5, 2.5))
+sns.lineplot(data=quality_optimum_share_df_long, x="transition", y="Jaccard Index of Optimum", hue="hp.agent_name", errorbar=("ci", 95))
+plt.ylim(0, 1)
+plt.xlabel("Exploration Ratio")
+plt.ylabel(r"Overlap of Optimum")
+plt.legend(title="Algorithm")
+plt.tight_layout()
+plt.savefig("plots/optimum-overlap-quality.png", dpi=1200)
+plt.close()
+```
+
+```python
+latex_quality_optimum_df = quality_optimum_share_df.swaplevel(0, 1).rename(index=lambda idx: idx.upper(), level="hp.agent_name").rename_axis(index={"hp.agent_name": "Algorithm", "dataset": "Setting"}).sort_index()
+
+with open("tables/optimum-overlap-quality.tex", "w") as f:
+  f.writelines(latex_quality_optimum_df.to_latex(
+    index=True,
+    caption="Optimum Overlap across Exploration Ratios",
+    label="tab:optimum-overlap-quality",
+    float_format="%.3f",
+    bold_rows=False,
+    longtable=False,
+  ))
+```
+
+### Scheduled vs non-Scheduled
+
+```python
+with warnings.catch_warnings():
+  warnings.simplefilter("ignore")
+
 ```
 
 ## Optimum Movement line plot
