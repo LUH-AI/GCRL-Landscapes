@@ -1,3 +1,0 @@
-| constant_dataset   | mean_future_regret_over_phases_firstphase   | mean_future_regret_over_phases_secondphase   |
-|:-------------------|:--------------------------------------------|:---------------------------------------------|
-| False              | 0.65 $\pm$ 0.19                             | 0.29 $\pm$ 0.29                              |

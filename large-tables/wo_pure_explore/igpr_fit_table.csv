@@ -1,9 +1,0 @@
-agent,dataset,constant_dataset,hps,phase_num,mean_squared_error,mean_absolute_error,max_error
-HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",1,0.003255350151488246,0.045304814524827854,0.12041817284230341
-HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",2,0.0017681544607800865,0.030844685399637372,0.08700260709490899
-HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",3,0.0036406873423464104,0.048816103110594325,0.12475864341752925
-HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",4,0.0024326979342547696,0.03658140502702539,0.1183232529836411
-QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",1,0.0017787494595352844,0.037125653339335554,0.07543737965179755
-QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",2,0.000528512703418845,0.018424896276463033,0.044098823824859065
-QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",3,0.0013880789692481159,0.02637612442354475,0.09485630243111398
-QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",4,0.0012290831769818042,0.02549687275883808,0.08503655401801705

@@ -1,4 +1,0 @@
-| constant_dataset   | Goal Distance Score Normalized Regret $< 0.1$ Ratio   | Goal Distance Score Normalized Regret $< 0.2$ Ratio   | Goal Distance Score   | Success         |   Max Goal Distance Score |
-|:-------------------|:------------------------------------------------------|:------------------------------------------------------|:----------------------|:----------------|--------------------------:|
-| False              | 0.35 $\pm$ 0.24                                       | 0.66 $\pm$ 0.17                                       | 0.50 $\pm$ 0.15       | 0.34 $\pm$ 0.26 |                      0.84 |
-| True               | 0.38 $\pm$ 0.18                                       | 0.62 $\pm$ 0.15                                       | 0.51 $\pm$ 0.12       | 0.37 $\pm$ 0.19 |                      0.92 |

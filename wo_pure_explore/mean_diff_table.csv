@@ -1,5 +1,0 @@
-agent,dataset,constant_dataset,hps,phase_num,mean_normalized_goal_distance_return,mean_normalized_goal_distance_return_scaled
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",0 -> 1,,
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",1 -> 2,0.14780821372393183,0.1866331368422126
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",2 -> 3,0.08356685534664914,0.07953436752910209
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",3 -> 4,0.03930373179293559,0.07060413647502596

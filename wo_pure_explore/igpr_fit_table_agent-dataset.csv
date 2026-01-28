@@ -1,2 +1,0 @@
-agent,dataset,mean_squared_error,mean_absolute_error,max_error
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",0.004 $\pm$ 0.001,0.046 $\pm$ 0.006,0.163

@@ -1,3 +1,0 @@
-constant_dataset,mean_squared_error,mean_absolute_error,max_error
-False,0.003 $\pm$ 0.002,0.040 $\pm$ 0.012,0.186
-True,0.003 $\pm$ 0.002,0.040 $\pm$ 0.015,0.265

@@ -1,3 +1,0 @@
-agent,dataset,constant_dataset,hps,phase,regret_phase_1,regret_phase_2,regret_phase_3,regret_phase_4,mean_regret_over_phases,mean_future_regret_over_phases
-HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",2,1.0,6.013708050052931e-17,0.36363636363636376,0.625,0.49715909090909094,0.4943181818181819
-QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",False,"frozenset({'lr', 'discount'})",2,,-3.700743415417188e-17,0.0666666666666666,0.09999999999999996,0.055555555555555504,0.08333333333333329

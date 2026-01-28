@@ -1,6 +1,0 @@
-|                                                                                                                                                            |       hp0_opt |    hp1_opt |   optimum_shift |
-|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|--------------:|-----------:|----------------:|
-| ('CRL', 'antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', True, frozenset({'lr', 'discount'}), 1) | nan           | nan        |      nan        |
-| ('CRL', 'antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', True, frozenset({'lr', 'discount'}), 2) |  -0.000776356 |   0.478522 |        0.478523 |
-| ('CRL', 'antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', True, frozenset({'lr', 'discount'}), 3) |  -0.105805    |   0.195412 |        0.222218 |
-| ('CRL', 'antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', True, frozenset({'lr', 'discount'}), 4) |  -0.0175841   |   0.120492 |        0.121768 |

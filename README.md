@@ -3,7 +3,7 @@
 TODO: introduction to what this project is  
 TODO: recommended way to install  
 
-Convergence data for the algorithms to set proper phases can be found on [Huggingface](https://huggingface.co/datasets/jmtoepperwien/GCRL-Landscapes).
+Convergence data for the algorithms to set proper phases can be found on [Huggingface](https://huggingface.co/datasets/authorgithubhandle/GCRL-Landscapes).
 
 Training is supposed to run on a Slurm cluster.
 
@@ -24,7 +24,7 @@ For non-Slurm usage you'll have to modify the submitter in `src/gcrl-landscapes/
 ## Evaluation
 
 These commands will generate plots in `plots` and tables in `tables`.  
-If you don't want to generate these yourself, logfiles can also be found on [Huggingface](https://huggingface.co/datasets/jmtoepperwien/GCRL-Landscapes).
+If you don't want to generate these yourself, logfiles can also be found on [Huggingface](https://huggingface.co/datasets/authorgithubhandle/GCRL-Landscapes).
 
 ```
 python -m gcrl_landscapes.evaluation.plot --plot_return_distributions --plot_eval_curves --plot_gp_fits --zipfile LOGFILEPATH

@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-#SBATCH --partition=ai,tnt
+#SBATCH --partition=partition
 #SBATCH --job-name=TrainSetup
 #SBATCH --time=01:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=1G
-#SBATCH --mail-user=m.toepperwien@ai.uni-hannover.de
+#SBATCH --mail-user=author@email
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 
@@ -21,7 +21,7 @@ numevalepisodes="1"
 nseeds="5"
 taskspernodetotal="16"
 taskspernodeparallel="4"
-partitions="ai,tnt"
+partitions="partition"
 mempercpu="3G"
 
 # module load Miniforge3

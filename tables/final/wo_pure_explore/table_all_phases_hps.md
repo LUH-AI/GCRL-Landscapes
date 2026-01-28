@@ -1,3 +1,0 @@
-| hps                           | Goal Distance Score Normalized Regret $< 0.1$ Ratio   | Goal Distance Score Normalized Regret $< 0.2$ Ratio   | Goal Distance Score   | Success         |   Max Goal Distance Score |
-|:------------------------------|:------------------------------------------------------|:------------------------------------------------------|:----------------------|:----------------|--------------------------:|
-| frozenset({'discount', 'lr'}) | 0.27 $\pm$ 0.21                                       | 0.47 $\pm$ 0.25                                       | 0.41 $\pm$ 0.16       | 0.26 $\pm$ 0.20 |                      0.92 |

@@ -1,12 +1,12 @@
 #!/bin/bash
 
-#SBATCH --partition=ai,tnt
+#SBATCH --partition=partition
 #SBATCH --job-name=HPO
 #SBATCH --time=5-00:00:00
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --mem-per-cpu=4G
-#SBATCH --mail-user=m.toepperwien@ai.uni-hannover.de
+#SBATCH --mail-user=author@email
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 

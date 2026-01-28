@@ -1,5 +1,0 @@
-hps,phase_num,mean_squared_error,mean_absolute_error,max_error
-"frozenset({'lr', 'discount'})",1,0.003 $\pm$ nan,0.042 $\pm$ nan,0.113
-"frozenset({'lr', 'discount'})",2,0.004 $\pm$ nan,0.048 $\pm$ nan,0.130
-"frozenset({'lr', 'discount'})",3,0.004 $\pm$ nan,0.042 $\pm$ nan,0.163
-"frozenset({'lr', 'discount'})",4,0.006 $\pm$ nan,0.054 $\pm$ nan,0.161

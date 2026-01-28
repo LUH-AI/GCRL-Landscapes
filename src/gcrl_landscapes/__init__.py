@@ -1,3 +1,3 @@
-# SPDX-FileCopyrightText: 2024-present Jan Malte Töpperwien <m.toepperwien@protonmail.com>
+# SPDX-FileCopyrightText: 2024-present Author Name <author@email>
 #
 # SPDX-License-Identifier: MIT

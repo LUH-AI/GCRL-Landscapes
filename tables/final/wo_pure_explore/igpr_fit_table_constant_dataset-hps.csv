@@ -1,3 +1,0 @@
-constant_dataset,hps,mean_squared_error,mean_absolute_error,max_error
-False,"frozenset({'discount', 'lr'})",0.003 $\pm$ 0.002,0.040 $\pm$ 0.012,0.186
-True,"frozenset({'discount', 'lr'})",0.003 $\pm$ 0.002,0.040 $\pm$ 0.015,0.265

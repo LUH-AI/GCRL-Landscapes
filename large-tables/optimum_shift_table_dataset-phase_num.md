@@ -1,6 +1,0 @@
-|                                                                                                                                 | hp0_opt          | hp1_opt          | optimum_shift   |
-|:--------------------------------------------------------------------------------------------------------------------------------|:-----------------|:-----------------|:----------------|
-| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', 1) | nan $\pm$ nan    | nan $\pm$ nan    | nan $\pm$ nan   |
-| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', 2) | 0.27 $\pm$ 0.47  | 0.33 $\pm$ 0.39  | 0.46 $\pm$ 0.54 |
-| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', 3) | -0.20 $\pm$ 0.24 | 0.08 $\pm$ 0.12  | 0.26 $\pm$ 0.14 |
-| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', 4) | -0.07 $\pm$ 0.00 | -0.15 $\pm$ 0.29 | 0.23 $\pm$ 0.19 |

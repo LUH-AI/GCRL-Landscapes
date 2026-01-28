@@ -1,4 +1,0 @@
-|                 | mean_normalized_goal_distance_return   | mean_normalized_goal_distance_return_scaled   |
-|:----------------|:---------------------------------------|:----------------------------------------------|
-| ('HIQL', False) | 0.10 $\pm$ 0.10                        | 0.22 $\pm$ 0.22                               |
-| ('QRL', False)  | 0.13 $\pm$ 0.09                        | 0.17 $\pm$ 0.12                               |

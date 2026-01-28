@@ -1,4 +1,0 @@
-|                                         | mean_future_regret_over_phases_firstphase   | mean_future_regret_over_phases_secondphase   |
-|:----------------------------------------|:--------------------------------------------|:---------------------------------------------|
-| ('HIQL', frozenset({'discount', 'lr'})) | 0.17 $\pm$ 0.27                             | 0.10 $\pm$ 0.17                              |
-| ('QRL', frozenset({'discount', 'lr'}))  | 0.20 $\pm$ 0.17                             | 0.12 $\pm$ 0.06                              |

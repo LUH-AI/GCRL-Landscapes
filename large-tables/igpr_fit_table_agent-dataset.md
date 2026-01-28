@@ -1,4 +1,0 @@
-|                                                                                                                                      | mean_squared_error   | mean_absolute_error   |   max_error |
-|:-------------------------------------------------------------------------------------------------------------------------------------|:---------------------|:----------------------|------------:|
-| ('HIQL', 'antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0') | 0.003 $\pm$ 0.001    | 0.042 $\pm$ 0.006     |       0.119 |
-| ('QRL', 'antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0')  | 0.001 $\pm$ 0.000    | 0.027 $\pm$ 0.007     |       0.072 |

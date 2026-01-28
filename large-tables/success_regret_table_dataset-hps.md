@@ -1,3 +1,0 @@
-|                                                                                                                                                             | mean_future_regret_over_phases_firstphase   | mean_future_regret_over_phases_secondphase   |
-|:------------------------------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------|:---------------------------------------------|
-| ('antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0', frozenset({'lr', 'discount'})) | 0.10 $\pm$ 0.03                             | 0.05 $\pm$ 0.04                              |

@@ -1,5 +1,0 @@
-agent,dataset,constant_dataset,hps,phase_num,hp0_opt,hp1_opt,optimum_shift
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",1,,,
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",2,-0.0007763562404620172,0.4785223943848437,0.47852302416583464
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",3,-0.10580453881130819,0.19541243519498797,0.22221750665037396
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",4,-0.017584116086092283,0.1204918734429189,0.12176819249834316

@@ -1,8 +1,3 @@
-# +-----------------------------------------------------------------------------------------------------------------------------------------------------+
-# | The following code is adapted from https://colab.research.google.com/drive/1VjWng8KeGiW1RnsU6FYriaxAOxkBooXc?usp=sharing#scrollTo=81Mam8kV7ksN |
-# | and was created by Aditya Mohan (https://amsks.github.io/)                                                                                          |
-# +-----------------------------------------------------------------------------------------------------------------------------------------------------+
-
 import numpy as np
 import matplotlib.pyplot as plt
 import gpflow

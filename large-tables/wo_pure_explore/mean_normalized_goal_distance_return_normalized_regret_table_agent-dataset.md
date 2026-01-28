@@ -1,4 +1,0 @@
-|                                                                                                                                      | mean_future_regret_over_phases_firstphase   | mean_future_regret_over_phases_secondphase   |
-|:-------------------------------------------------------------------------------------------------------------------------------------|:--------------------------------------------|:---------------------------------------------|
-| ('HIQL', 'antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0') | 0.27 $\pm$ nan                              | 0.30 $\pm$ nan                               |
-| ('QRL', 'antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0')  | 0.33 $\pm$ nan                              | 0.05 $\pm$ nan                               |

@@ -1,3 +1,0 @@
-|                                                                                                                                            | mean_squared_error   | mean_absolute_error   |   max_error |
-|:-------------------------------------------------------------------------------------------------------------------------------------------|:---------------------|:----------------------|------------:|
-| ('antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', frozenset({'lr', 'discount'})) | 0.004 $\pm$ 0.001    | 0.046 $\pm$ 0.006     |       0.163 |

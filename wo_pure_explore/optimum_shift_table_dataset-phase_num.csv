@@ -1,5 +1,0 @@
-dataset,phase_num,hp0_opt,hp1_opt,optimum_shift
-"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",1,nan $\pm$ nan,nan $\pm$ nan,nan $\pm$ nan
-"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",2,-0.00 $\pm$ nan,0.48 $\pm$ nan,0.48 $\pm$ nan
-"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",3,-0.11 $\pm$ nan,0.20 $\pm$ nan,0.22 $\pm$ nan
-"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",4,-0.02 $\pm$ nan,0.12 $\pm$ nan,0.12 $\pm$ nan

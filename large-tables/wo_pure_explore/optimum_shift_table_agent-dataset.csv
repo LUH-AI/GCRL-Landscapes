@@ -1,3 +1,0 @@
-agent,dataset,hp0_opt,hp1_opt,optimum_shift
-HIQL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",-0.17 $\pm$ 0.17,-0.10 $\pm$ 0.22,0.27 $\pm$ 0.16
-QRL,"antmaze-large-explore-v0,antmaze-large-explore80navigate-v0,antmaze-large-explore40navigate-v0,antmaze-large-navigate-v0",0.17 $\pm$ 0.37,0.28 $\pm$ 0.29,0.37 $\pm$ 0.42

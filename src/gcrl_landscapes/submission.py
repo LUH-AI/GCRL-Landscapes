@@ -506,7 +506,7 @@ def submit(args: argparse.Namespace) -> None:
             slurm_array_parallelism=50,
             slurm_partition=args.partition,
             slurm_job_name=args.jobname,
-            slurm_mail_user="m.toepperwien@ai.uni-hannover.de",
+            slurm_mail_user="author@email",
             slurm_mail_type="END,FAIL",
             slurm_additional_parameters={"dependency": f"afterok:{array_id}"}
             if array_id

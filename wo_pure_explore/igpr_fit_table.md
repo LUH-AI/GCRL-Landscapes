@@ -1,6 +1,0 @@
-|                                                                                                                                                            |   mean_squared_error |   mean_absolute_error |   max_error |
-|:-----------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------:|----------------------:|------------:|
-| ('CRL', 'antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', True, frozenset({'lr', 'discount'}), 1) |           0.00292527 |             0.0415547 |    0.113142 |
-| ('CRL', 'antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', True, frozenset({'lr', 'discount'}), 2) |           0.00428671 |             0.048204  |    0.130485 |
-| ('CRL', 'antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', True, frozenset({'lr', 'discount'}), 3) |           0.00359146 |             0.0415497 |    0.163362 |
-| ('CRL', 'antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0', True, frozenset({'lr', 'discount'}), 4) |           0.00565961 |             0.0535653 |    0.161371 |

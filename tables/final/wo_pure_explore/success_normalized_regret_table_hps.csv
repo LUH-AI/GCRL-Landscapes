@@ -1,2 +1,0 @@
-hps,mean_future_regret_over_phases_firstphase,mean_future_regret_over_phases_secondphase
-"frozenset({'discount', 'lr'})",0.18 $\pm$ 0.22,0.11 $\pm$ 0.12

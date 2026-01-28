@@ -1,2 +1,0 @@
-agent,dataset,constant_dataset,hps,phase_num,Goal Distance Score Normalized Regret $< 0.1$ Ratio,Goal Distance Score Normalized Regret $< 0.2$ Ratio,Goal Distance Score,Max Goal Distance Score,Success
-CRL,"antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0,antmaze-large-navigate-v0",True,"frozenset({'lr', 'discount'})",4,0.171875,0.546875,0.44989445024110625,0.6665530728362388,0.2629166666666667
