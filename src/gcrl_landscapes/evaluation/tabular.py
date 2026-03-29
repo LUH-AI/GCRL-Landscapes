@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from .common import (
     compute_additional_information,
+    resolve_alpha_sync,
     merge_experiments,
     calculate_regret_for_experiment,
 )
@@ -630,7 +631,12 @@ def compute_merged_df(zipfiles: list[Path]) -> pd.DataFrame:
         {
             prefix: (
                 run_info,
-                compute_additional_information(phase_results_to_pandas(phase_results)),
+                compute_additional_information(
+                    resolve_alpha_sync(
+                        phase_results_to_pandas(phase_results),
+                        run_info["arguments"]["hyperparameters"],
+                    )
+                ),
             )
             for result_from_zip in results_from_zips
             for prefix, (run_info, phase_results) in result_from_zip.items()

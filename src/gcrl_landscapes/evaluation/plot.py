@@ -24,6 +24,7 @@ from .common import (
     CVAR_CONFIDENCE_LEVELS,
     map_labels,
     compute_additional_information,
+    resolve_alpha_sync,
     calculate_regret_for_experiment,
 )
 import toml
@@ -291,6 +292,7 @@ def plot(
         output_folder: folder to save plots in
         run_info: info about the run/setup
     """
+    results_pandas = resolve_alpha_sync(results_pandas, run_info["arguments"]["hyperparameters"])
     results_pandas = compute_additional_information(results_pandas)
 
     per_config_folder = output_folder / "per_config"

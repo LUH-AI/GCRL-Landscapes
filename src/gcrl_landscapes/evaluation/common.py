@@ -23,6 +23,23 @@ def map_labels(label: str) -> str:
     return DIM_LABEL_MAPPING[label] if label in DIM_LABEL_MAPPING else label
 
 
+def resolve_alpha_sync(df: pd.DataFrame, hyperparameters: list[str]) -> pd.DataFrame:
+    """Drop hp.low_alpha and hp.high_alpha columns when they were synced from alpha.
+
+    When only 'alpha' is in hyperparameters (not 'low_alpha'/'high_alpha'), the
+    configurations module syncs low_alpha/high_alpha to the same value as alpha.
+    These duplicated columns would be misidentified as independently varied HPs.
+    """
+    if (
+        "alpha" in hyperparameters
+        and "low_alpha" not in hyperparameters
+        and "high_alpha" not in hyperparameters
+    ):
+        cols_to_drop = [c for c in ["hp.low_alpha", "hp.high_alpha"] if c in df.columns]
+        return df.drop(columns=cols_to_drop)
+    return df
+
+
 def compute_additional_information(
     results: pd.DataFrame,
 ) -> pd.DataFrame:
