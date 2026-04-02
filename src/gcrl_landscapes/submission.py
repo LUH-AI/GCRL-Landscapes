@@ -505,6 +505,7 @@ def submit(args: argparse.Namespace) -> None:
             slurm_mem_per_cpu=args.mem_per_cpu,
             slurm_array_parallelism=50,
             slurm_partition=args.partition,
+            slurm_reservation=args.partition,
             slurm_job_name=args.jobname,
             slurm_mail_user="m.toepperwien@ai.uni-hannover.de",
             slurm_mail_type="END,FAIL",
