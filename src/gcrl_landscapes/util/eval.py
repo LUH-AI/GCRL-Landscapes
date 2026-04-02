@@ -77,7 +77,7 @@ def fit_model(
         result_copy[hp_name] = hp_to_sobol_codomain(
             result_copy[hp_name],
             *get_bounds(
-                hp_name.removeprefix("hp."), phase_result["hp.agent_name"].iloc[0]
+                hp_name.removeprefix("hp."), phase_result["hp.agent_name"].tolist()[0]
             ),
         )
 
@@ -91,21 +91,26 @@ def fit_model(
     model.fit()
     return model
 
+
 def gradient_cosine_similarity(grad1, grad2):
     flat_grad1 = grad1.reshape(-1)
     flat_grad2 = grad2.reshape(-1)
-    return jax.numpy.dot(flat_grad1, flat_grad2) / (jax.numpy.linalg.norm(flat_grad1) * jax.numpy.linalg.norm(flat_grad2))
+    return jax.numpy.dot(flat_grad1, flat_grad2) / (
+        jax.numpy.linalg.norm(flat_grad1) * jax.numpy.linalg.norm(flat_grad2)
+    )
 
 
 @jax.jit
 def gradient_magnitude_similarity(grad1, grad2):
     norm_grad1 = jax.numpy.linalg.norm(grad1, axis=-1)
     norm_grad2 = jax.numpy.linalg.norm(grad2, axis=-1)
-    return (2 * norm_grad1 * norm_grad2) / (norm_grad1 ** 2 + norm_grad2 ** 2)
+    return (2 * norm_grad1 * norm_grad2) / (norm_grad1**2 + norm_grad2**2)
 
 
 def fully_flatten_tree(x):
-    return jax.numpy.concatenate(jax.tree.flatten(jax.tree.map(lambda y: jax.numpy.ravel(y), x))[0])
+    return jax.numpy.concatenate(
+        jax.tree.flatten(jax.tree.map(lambda y: jax.numpy.ravel(y), x))[0]
+    )
 
 
 def flatten_tree_batch(x):
