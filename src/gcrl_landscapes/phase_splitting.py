@@ -83,7 +83,7 @@ def calculate_phases(
     )
 
     performance_function = fit_function(performance_xs, performance_ys, interpolation)
-    final_performance = performance_function(TARGET_EVAL_STEP)
+    final_performance = max(performance_ys)
     performance_target = final_performance * (final_performance_percentage / 100)
 
     # Find last bracket which contains performance_target based on data
