@@ -609,7 +609,7 @@ def mobility_plot(df, agent_name, title, by_col: str = "phase_num", performance_
   point_dfs = []
   for name, group in data_temp.groupby([by_col]):
     group_copy = group.copy().reset_index()
-    model = fit_model(group_copy, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
+    model = fit_model(group_copy, "mean_normalized_goal_distance_return", ["hp.lr", "hp.alpha"])
     model.fit()
     create_contour_plot(model, x_dim=0, y_dim=1, z_dim="mean_normalized_goal_distance_return", bounds=[0, 1], filename="test_contour.png", dim_label_mapping=map_labels, agent_name=agent_name, z_transform=lambda x, _: x, discrete_levels=None, last_phase_best_config=None)
     x_lower, x_upper, x_log = get_bounds(model.hp_names[0].removeprefix("hp."), agent_name)
@@ -630,7 +630,7 @@ def mobility_plot(df, agent_name, title, by_col: str = "phase_num", performance_
     # marginalized_group_copy["goal_distance_return_eps"] = marginalized_group_copy["mean_normalized_goal_distance_return"] / marginalized_group_copy["mean_normalized_goal_distance_return"].max()
 
 
-    points_prediction_df = pd.DataFrame({"hp.lr": points_x, "hp.discount": points_y, "mean_normalized_goal_distance_return": Z_normalized.squeeze()})
+    points_prediction_df = pd.DataFrame({"hp.lr": points_x, "hp.alpha": points_y, "mean_normalized_goal_distance_return": Z_normalized.squeeze()})
     # points_prediction_df = marginalized_group_copy[marginalized_group_copy["goal_distance_return_eps"] > 0.8]
     points_prediction_df[by_col] = name[0]
     point_dfs.append(points_prediction_df)
@@ -640,7 +640,7 @@ def mobility_plot(df, agent_name, title, by_col: str = "phase_num", performance_
   print(len(point_df))
   # sns.scatterplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.9], x="hp.lr", y="hp.discount", hue="phase_num")
   x_lower, x_upper, x_log = get_bounds("lr", agent_name)
-  y_lower, y_upper, y_log = get_bounds("discount", agent_name)
+  y_lower, y_upper, y_log = get_bounds("alpha", agent_name)
   # ax = sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=10, bw_adjust=1, fill=True, alpha=0.4, palette="rocket")
   df = point_df[point_df["mean_normalized_goal_distance_return"] > performance_threshold]
 
@@ -697,7 +697,7 @@ def mobility_plot(df, agent_name, title, by_col: str = "phase_num", performance_
       sns.kdeplot(
           data=phase_df,
           x="hp.lr",
-          y="hp.discount",
+          y="hp.alpha",
           log_scale=(x_log, y_log),
           fill=True,
           levels=4,
@@ -712,7 +712,7 @@ def mobility_plot(df, agent_name, title, by_col: str = "phase_num", performance_
       sns.kdeplot(
           data=phase_df,
           x="hp.lr",
-          y="hp.discount",
+          y="hp.alpha",
           log_scale=(x_log, y_log),
           fill=False,
           levels=[0.7],
@@ -726,7 +726,7 @@ def mobility_plot(df, agent_name, title, by_col: str = "phase_num", performance_
       )
 
       centroid_x = phase_df["hp.lr"].median()
-      centroid_y = phase_df["hp.discount"].median()
+      centroid_y = phase_df["hp.alpha"].median()
       ax.scatter(centroid_x, centroid_y, s=750 if by_col == "phase_num" else 1500, c=[color], edgecolors='white',
                  linewidths=1, zorder=100, marker='o', alpha=0.75)
       texts.append(ax.annotate(str(phase), xy=(centroid_x, centroid_y), xytext=(centroid_x, centroid_y), fontsize=20, fontweight='bold',
@@ -737,7 +737,7 @@ def mobility_plot(df, agent_name, title, by_col: str = "phase_num", performance_
   # ax.set_xlabel("")
   # ax.set_ylabel("")
   ax.set_xlabel("Learning Rate")
-  ax.set_ylabel("Discount Factor")
+  ax.set_ylabel("Alpha")
   # ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases",
   #              fontsize=15, fontweight='bold', pad=20)
 
@@ -846,7 +846,7 @@ def optimum_share_table(df, agent_name, by_col: str = "phase_num", performance_t
   data_temp = clipped_merged_results_df
 
   # This is an example model to correctly set grid
-  model = fit_model(df, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
+  model = fit_model(df, "mean_normalized_goal_distance_return", ["hp.lr", "hp.alpha"])
   hpname_x = model.hp_names[0].removeprefix("hp.")
   hpname_y = model.hp_names[1].removeprefix("hp.")
   model.fit()
@@ -858,7 +858,7 @@ def optimum_share_table(df, agent_name, by_col: str = "phase_num", performance_t
 
   def get_optimal_point_selector(group_df):
     group_copy = group_df.copy().reset_index()
-    model = fit_model(group_copy, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
+    model = fit_model(group_copy, "mean_normalized_goal_distance_return", ["hp.lr", "hp.alpha"])
     model.fit()
     assert model.hp_names[0].removeprefix("hp.") == hpname_x and model.hp_names[1].removeprefix("hp.") == hpname_y
     Z = model.get_middle(points).clip(0, 1)
@@ -982,17 +982,17 @@ with warnings.catch_warnings():
 ## Optimum Movement line plot
 
 ```python
-data_temp = merged_results_df[(merged_results_df["dataset"] == "antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0") & (merged_results_df["hps"] == frozenset(set(["lr", "discount"])))]
+data_temp = merged_results_df[(merged_results_df["dataset"] == "antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0") & (merged_results_df["hps"] == frozenset(set(["lr", "alpha"])))]
 optima = []
 for name, group in data_temp.groupby(["hp.agent_name", "phase_num"]):
-  marginalized_group = group.groupby(["hp.lr", "hp.discount"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
-  t = marginalized_group[marginalized_group["mean_normalized_goal_distance_return"] == marginalized_group["mean_normalized_goal_distance_return"].max()].iloc[0][["hp.lr", "hp.discount"]]
+  marginalized_group = group.groupby(["hp.lr", "hp.alpha"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
+  t = marginalized_group[marginalized_group["mean_normalized_goal_distance_return"] == marginalized_group["mean_normalized_goal_distance_return"].max()].iloc[0][["hp.lr", "hp.alpha"]]
   t["Algorithm"] = name[0]
   optima.append(t)
 x_lower, x_upper, x_log = get_bounds("lr", agent_name)
-y_lower, y_upper, y_log = get_bounds("discount", agent_name)
+y_lower, y_upper, y_log = get_bounds("alpha", agent_name)
 fig, ax = plt.subplots()
-sns.lineplot(data=pd.DataFrame(optima), x="hp.lr", y="hp.discount", hue="Algorithm", errorbar=None, marker="o")
+sns.lineplot(data=pd.DataFrame(optima), x="hp.lr", y="hp.alpha", hue="Algorithm", errorbar=None, marker="o")
 ax.set(xscale="log")
 plt.xlim(x_lower, x_upper)
 plt.ylim(y_lower, y_upper)
