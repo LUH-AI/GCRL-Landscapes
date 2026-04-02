@@ -28,6 +28,35 @@ import os
 from itertools import combinations, chain, product
 
 
+def marginalize_seeds(df: pd.DataFrame):
+    return (
+        df.groupby(
+            by=[
+                "agent",
+                "dataset",
+                "constant_dataset",
+                "hps",
+                "phase_num",
+                "config_index",
+            ]
+        )
+        .agg(
+            {
+                "success": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
+                    column_values, proportiontocut=0.25
+                ),
+            }
+        )
+        .reset_index()
+    )
+
+
 def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
     """Main code to generate the tabular data for data grouped by phases
 
@@ -757,10 +786,26 @@ if __name__ == "__main__":
 
     merged_results_df, merged_training_df = None, None
     if not (args.hp_importance_data or args.convergence_data):
-        merged_results_df, merged_training_df = load_or_compute(args.zipfiles, compute_merged_df)  # type: ignore
+        merged_results_df, merged_training_df = load_or_compute(
+            args.zipfiles, compute_merged_df
+        )  # type: ignore
+        to_category_columns = ["dataset", "hps", "agent"] + merged_training_df.columns[
+            merged_training_df.columns.str.startswith("hp.")
+        ].tolist()
+        for col in to_category_columns:
+            merged_training_df[col] = merged_training_df[col].astype("category")
+        float_cols = merged_training_df.select_dtypes(include="float64").columns
+        for col in float_cols:
+            merged_training_df[col] = merged_training_df[col].astype("float16")
+
     if args.start_kernel:
-        from IPython import embed_kernel
-        embed_kernel()
+        from IPython import start_kernel
+        import sys
+
+        del args
+        sys.argv = [sys.argv[0]]
+
+        start_kernel(user_ns=locals())
 
     if args.hp_importance_data:
         create_importance_divergence_table(importance_df, args.output_folder)

@@ -207,7 +207,6 @@ def plot_gp_fit(
             np.linspace(2, len(phase_result.groupby(hp_names)) - 1, n_samples)
         ).astype(int)
     ):
-        print(n)
         model = fit_model(phase_result, y_col, hp_names)
         data = estimate_model_fit(
             X=model.x,
@@ -541,7 +540,7 @@ def plot_parallel_wrapper(
     folder = plots_folder / run_name
     folder.mkdir(exist_ok=True, parents=True)
     print(f"Plotting '{prefix}'")
-    plot(
+    plot_eval_results(
         results_df,
         folder,
         run_info,
