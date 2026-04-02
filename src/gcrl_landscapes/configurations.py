@@ -409,12 +409,28 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
                 "actor_p_trajgoal": actor_p_trajgoal,
                 "actor_p_randomgoal": actor_p_randomgoal,
                 "alpha": ddpgbc_bc_coeff if actor_loss == "ddpgbc" else awr_temperature,
-                **({
-                    "high_alpha": ddpgbc_bc_coeff if actor_loss == "ddpgbc" else awr_temperature
-                } if "alpha" in hyperparameters and "high_alpha" in base_config and "high_alpha" not in hyperparameters else {}),
-                **({
-                    "low_alpha": ddpgbc_bc_coeff if actor_loss == "ddpgbc" else awr_temperature
-                } if "alpha" in hyperparameters and "low_alpha" in base_config and "low_alpha" not in hyperparameters else {}),
+                **(
+                    {
+                        "high_alpha": ddpgbc_bc_coeff
+                        if actor_loss == "ddpgbc"
+                        else awr_temperature
+                    }
+                    if "alpha" in hyperparameters
+                    and "high_alpha" in base_config
+                    and "high_alpha" not in hyperparameters
+                    else {}
+                ),
+                **(
+                    {
+                        "low_alpha": ddpgbc_bc_coeff
+                        if actor_loss == "ddpgbc"
+                        else awr_temperature
+                    }
+                    if "alpha" in hyperparameters
+                    and "low_alpha" in base_config
+                    and "low_alpha" not in hyperparameters
+                    else {}
+                ),
                 **({"eps": eps} if "eps" in hyperparameters else {}),
                 **({"tau": tau} if "tau" in hyperparameters else {}),
                 **({"low_alpha": low_alpha} if "low_alpha" in hyperparameters else {}),
