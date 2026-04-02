@@ -9,6 +9,7 @@
 #SBATCH --mail-user=m.toepperwien@ai.uni-hannover.de
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
+#SBATCH --reservation=ai,tnt
 
 
 logdir="./logs_convergence"

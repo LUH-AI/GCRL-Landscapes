@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 #SBATCH --partition=ai,tnt
+#SBATCH --reservation=ai,tnt
 #SBATCH --job-name=TrainSetup
 #SBATCH --time=01:00:00
 #SBATCH --ntasks=1
