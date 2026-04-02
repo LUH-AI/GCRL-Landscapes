@@ -811,10 +811,9 @@ if __name__ == "__main__":
         from IPython import start_kernel
         import sys
 
-        del args
         sys.argv = [sys.argv[0]]
-
         start_kernel(user_ns=locals())
+        exit(0)
 
     if args.hp_importance_data:
         create_importance_divergence_table(importance_df, args.output_folder)
