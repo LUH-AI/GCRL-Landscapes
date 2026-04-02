@@ -1,8 +1,13 @@
 ```python
 import pandas as pd
 import numpy as np
+from scipy.stats import trim_mean
+
 
 def marginalize_seeds(df: pd.DataFrame):
+    def trim_mean_with_assert(values, proportiontocut=0.25):
+        assert values.nunique() == 5
+        return trim_mean(values, proportiontocut=proportiontocut)
     def agg_constant_col(column_values):
         if column_values.nunique() > 1:
             raise ValueError(f"Not all values are the same:\n{column_values}")
@@ -31,6 +36,7 @@ def marginalize_seeds(df: pd.DataFrame):
                 "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
                     column_values, proportiontocut=0.25
                 ),
+                "seed": trim_mean_with_assert,
                 **{col: agg_constant_col for col in df.columns[df.columns.str.startswith("hp.")]},
             }
         )
@@ -50,14 +56,10 @@ def eps_optimality(df: pd.DataFrame, col: str) -> pd.Series:
 ```
 
 ```python
-
-```
-
-```python
 merged_training_df: pd.DataFrame = merged_training_df
 merged_results_df: pd.DataFrame = merged_results_df
-merged_results_df["mean_normalized_goal_distance_return_eps_optimality"] = eps_optimality(merged_results_df, "mean_normalized_goal_distance_return")
 merged_marginalized_results_df: pd.DataFrame = marginalize_seeds(merged_results_df)
+merged_marginalized_results_df["mean_normalized_goal_distance_return_eps_optimality"] = eps_optimality(merged_marginalized_results_df, "mean_normalized_goal_distance_return")
 merged_training_df.columns.tolist()
 ```
 
@@ -84,10 +86,10 @@ print(datasets_to_exploration_schedule("antmaze-medium-explore-v0,antmaze-medium
 ```python
 import re
 # TODO: generalize this to dfs containing multiple hyperparameter combinations. Does this even have an influence?
-merged_training_df["eval_percent"] = round(merged_training_df["eval_step"] / merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max") * 100)
-merged_training_df["eval_bins10"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 10, labels=False, duplicates="drop"))
-merged_training_df["eval_bins5"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 5, labels=False, duplicates="drop"))
-merged_training_df["exploration_schedule"] = merged_training_df["dataset"].apply(datasets_to_exploration_schedule)
+merged_training_df["eval_percent"] = round(merged_training_df["eval_step"] / merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max") * 100).astype("category")
+merged_training_df["eval_bins10"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 10, labels=False, duplicates="drop")).astype("category")
+merged_training_df["eval_bins5"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 5, labels=False, duplicates="drop")).astype("category")
+merged_training_df["exploration_schedule"] = merged_training_df["dataset"].apply(datasets_to_exploration_schedule).astype("category")
 ```
 
 Get dataframe with only best performing model per experiment.
@@ -122,18 +124,21 @@ Capture this in a boxplot:
 
 ```python
 import seaborn as sns
+sns.set_theme(context="paper", style="whitegrid")
 import matplotlib.pyplot as plt
-merged_training_with_iqm_df["name_dataset_combination"] = merged_training_with_iqm_df["hp.agent_name"] + " - " + merged_training_with_iqm_df["dataset"]
+merged_training_with_iqm_df["name_dataset_combination"] = (merged_training_with_iqm_df["hp.agent_name"].astype("str") + " - " + merged_training_with_iqm_df["dataset"].astype("str")).astype("category")
 end_of_training_df = merged_training_with_iqm_df[merged_training_with_iqm_df["eval_step"] == merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max")]
 fig, ax = plt.subplots()
 sns.boxplot(data=end_of_training_df, x="hp.agent_name", y="feature/embedding_rank")
 plt.savefig("rank_boxplot_agent.png")
+plt.close()
 for dataset in merged_training_with_iqm_df["dataset"].unique():
   fig, ax = plt.subplots()
   sns.boxplot(data=end_of_training_df[end_of_training_df["dataset"] == dataset], x="hp.agent_name", y="feature/embedding_rank")
   print(dataset)
   print(merged_training_with_iqm_df[merged_training_with_iqm_df["dataset"] == dataset].groupby("hp.agent_name")["iqm"].max())
   plt.savefig(f"rank_boxplot_agent_{dataset}.png")
+  plt.close()
 ```
 
 Now for only best config per experiment:
@@ -142,6 +147,55 @@ Now for only best config per experiment:
 print(best_config_df.groupby("hp.agent_name")["feature/embedding_rank"].describe())
 print(best_config_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])["feature/embedding_rank"].describe())
 ```
+
+# Target drift
+
+```python
+def literal_lists_to_numpy(s):
+  import ast  # I do not know why this can't be imported up front
+  try:
+    return np.array(ast.literal_eval(s), dtype=np.float16)
+  except:
+    return None
+try:
+  merged_training_with_iqm_df["target/held_out_val_batch_values_np"] = merged_training_with_iqm_df["target/held_out_val_batch_values"].apply(literal_lists_to_numpy)
+  merged_training_with_iqm_df = merged_training_with_iqm_df.drop(["target/held_out_val_batch_values"], axis=1)
+except KeyError:
+  pass
+```
+```python
+def compute_drift_to(group: pd.DataFrame, target: str = "end"):
+  def target_drift(a, b):
+    if a is None or b is None:
+      return None
+    if not a.shape == b.shape:
+      raise ValueError("Arrays must have the same shape")
+    return np.linalg.norm(a - b)
+
+  start_value = group.loc[group["eval_step"] == group["eval_step"].min(), "target/held_out_val_batch_values_np"].values[0]
+  end_value = group.loc[group["eval_step"] == group["eval_step"].max(), "target/held_out_val_batch_values_np"].values[0]
+  drift_start_end = target_drift(start_value, end_value)
+  if target == "neighbor":
+    values = group["target/held_out_val_batch_values_np"]
+    compare_values = group["target/held_out_val_batch_values_np"].shift(1)
+    return pd.Series([target_drift(a, b) for a, b in zip(values, compare_values)], index=group.index) / drift_start_end
+  elif target == "end":
+    compare_value = end_value
+  elif target == "start":
+    compare_value = start_value
+  else:
+    raise ValueError(f"Unknown target: {target}")
+  return group["target/held_out_val_batch_values_np"].apply(lambda x: target_drift(x, compare_value) / drift_start_end if drift_start_end else None)
+
+merged_training_with_iqm_df["target_drift_end"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="end")
+merged_training_with_iqm_df["target_drift_start"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="start")
+merged_training_with_iqm_df["target_drift_neighbor"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="neighbor")
+print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_end"].agg(["mean", "std"]))
+print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_start"].agg(["mean", "std"]))
+print(merged_training_with_iqm_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])["target_drift_neighbor"].agg(["mean", "std"]))
+```
+
+
 
 # Gradient Interference
 
@@ -162,7 +216,7 @@ print(best_config_df.groupby(["hp.agent_name", "eval_bins5"])["grad/value_cosine
 Keep only configurations that reach a minimal performance and do analysis
 
 ```python
-good_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] > -1.1)]
+good_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] > 0.5)]
 print(good_configs_df.groupby(["dataset", "hp.agent_name"])[["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]].describe())
 print(good_configs_df.groupby(["hp.agent_name"])[["grad/value_cosine_similarity_std", "grad/actor_cosine_similarity_std"]].describe())
 
@@ -180,130 +234,9 @@ print(merged_training_with_iqm_df.groupby(["eval_bins5", "hp.agent_name"])[["gra
 Look at metrics inside of batch
 
 ```python
-bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 0.2)]
+bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 10)]
 bad_configs_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_quant0.25"].mean()
 #(merged_training_with_iqm_df.groupby(["hp.agent_name"])[merged_training_with_iqm_df.columns[merged_training_with_iqm_df.columns.str.contains(r"grad/.*quant\d+")]].mean())
-
-```
-
-```python
-merged_training_with_iqm_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_quant0.05"].describe()
-df_long[(df_long["variable"] == "grad/value_cosine_similarity")].groupby(["hp.agent_name", "quantile"])["value"].describe()
-```
-
-```python
-fig, ax = plt.subplots()
-merged_training_with_iqm_df["id"] = merged_training_with_iqm_df.index
-df = merged_training_with_iqm_df.copy()
-quant_cols = [col for col in df.columns if 'quant' in col]
-id_cols = [col for col in df.columns if 'quant' not in col]
-
-df_long = df.melt(
-    id_vars=id_cols,
-    value_vars=quant_cols,
-    var_name='column',
-    value_name='value'
-)
-df_long['quantile'] = df_long['column'].str.extract(r'quant([\d.]+)')[0].astype(float)
-
-# Extract the base column name (everything before 'quant')
-df_long['variable'] = df_long['column'].str.replace(r'_?quant[\d.]+', '', regex=True)
-
-# Clean up
-df_long = df_long.drop('column', axis=1)
-sns.lineplot(data=df_long[df_long["variable"] == "grad/value_cosine_similarity"], x="quantile", y="value", hue="hp.agent_name", errorbar=None, marker="o")
-
-# Normal distribution
-quantiles = np.linspace(0, 1, 100)
-import scipy.stats
-values = scipy.stats.truncnorm(-1, 1, loc=0, scale=1).ppf(quantiles)
-sns.lineplot(x=quantiles, y=values, color="black")
-
-plt.ylabel("Value-Function Cosine Similarity")
-plt.title("Value-Function Cosine Similarity Quantiles Inside of Batch")
-plt.savefig("grad_cosine_similarity_quantiles.png")
-plt.close()
-
-fig, ax = plt.subplots()
-# Construct PDF from quantiles
-# TODO: all agents
-df_long_filtered = df_long[(df_long["variable"] == "grad/value_cosine_similarity") & (df_long["hp.agent_name"] == "hiql")]
-p = df_long[(df_long["variable"] == "grad/value_cosine_similarity") & (df_long["hp.agent_name"] == "qrl")]["value"].values
-q = df_long[df_long["variable"] == "grad/value_cosine_similarity"]["quantile"].values
-df_q = df_long_filtered.groupby(["quantile"])["value"].mean()
-p = df_q.index
-q = df_q.values
-print(p)
-print(q)
-x_vals = []
-pdf_vals = []
-
-for i in range(len(p) - 1):
-    x_segment = (q[i] + q[i+1]) / 2
-    pdf_segment = (p[i+1] - p[i]) / (q[i+1] - q[i])
-    x_vals.append(x_segment)
-    pdf_vals.append(pdf_segment)
-
-x = np.array(x_vals)
-pdf = np.array(pdf_vals)
-sns.lineplot(x=x, y=pdf)
-plt.xlim(-1, 1)
-plt.ylim(0, 2)
-plt.savefig("test.png")
-
-
-plt.close()
-
-
-# Calculate densities for each interval
-# density = ΔP / Δx
-fig, ax = plt.subplots()
-prob_changes = np.diff(p)
-value_changes = np.diff(q)
-densities = prob_changes / value_changes
-x_points = (q[:-1] + q[1:]) / 2
-
-# For plotting, we need the density at each quantile point
-x_plot = np.linspace(q.min(), q.max(), 1000)
-y_plot = np.interp(x_plot, q, p)
-print(len(x_plot))
-print(len(y_plot))
-fig, ax = plt.subplots()
-print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
-mean_df = df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["hp.agent_name", "quantile"])["value"].mean().reset_index()
-mean_df = mean_df.rename(columns={"hp.agent_name": "Algorithm"})
-mean_df["Algorithm"] = mean_df["Algorithm"].str.upper()
-ax = sns.lineplot(data=mean_df, x="value", y="quantile", hue="Algorithm", errorbar="ci", marker="o")
-
-# # Overlay normal distribution
-# x = np.linspace(-1, 1, 200)  # fine-grained x-values
-# y = scipy.stats.norm(loc=0.075, scale=0.4).cdf(x)  # normal PDF with mean/std from your data
-# plt.plot(x, y, color='red', linestyle='--', label='Normal fit')
-#
-# # Overlay uniform distribution
-# x = np.linspace(-1, 1, 200)  # fine-grained x-values
-# y = scipy.stats.uniform(loc=-1, scale=2).cdf(x)  # uniform PDF with mean/std from your data
-# plt.plot(x, y, color='blue', linestyle='--', label='Uniform fit')
-
-plt.xlim(-1, 1)
-plt.ylim(0, 1)
-plt.title("Inter-Goal Gradient Alignment")
-plt.xlabel("Gradient Cosine Similarity")
-plt.ylabel("Cumulative Probability")
-# Swap axes to get cdf
-plt.savefig("gradient-alignment-cdf.png")
-
-plt.close()
-
-# fig, ax = plt.subplots()
-# quantiles = np.linspace(0, 1, 100)
-# import scipy.stats
-# values = scipy.stats.norm.ppf(quantiles)
-# sns.lineplot(x=np.linspace(-1, 1, 100), y=scipy.stats.norm().cdf(np.linspace(-1, 1, 100)))
-# plt.xlim(-1, 1)
-# plt.ylim(0, 1)
-# plt.savefig("test.png")
-# plt.close()
 
 ```
 
@@ -311,7 +244,142 @@ plt.close()
 fig, ax = plt.subplots()
 sns.displot(data=merged_training_with_iqm_df, x="grad/value_cosine_similarity_mean", hue="hp.agent_name")
 plt.savefig("grad_cosine_similarity_distributions.png")
+plt.close()
 ```
+
+
+```python
+merged_training_with_iqm_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_quant0.05"].describe()
+```
+
+### Intra-Batch Goal Gradient Alignment
+
+```python
+merged_training_with_iqm_df["id"] = merged_training_with_iqm_df.index
+```
+```python
+# df = merged_training_with_iqm_merged_with_iqm_df.copy()
+try:
+  merged_training_with_iqm_df = merged_training_with_iqm_df.drop("target/held_out_val_batch_values", axis=1)
+except:
+  pass
+quant_cols = [col for col in merged_training_with_iqm_df.columns if 'grad/value_cosine_similarity_quant' in col]
+id_cols = [col for col in merged_training_with_iqm_df.columns if 'quant' not in col and "target/held_out_val_batch_values_np" not in col]
+
+def keep_constants(g):
+  out = {}
+  for col in g.columns:
+    if g[col].nunique() == 1:
+      out[col] = g[col].iloc[0]
+    else:
+      print(col)
+      out[col] = g[col].mean()
+  return pd.Series(out)
+
+marginalized_training_df = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "seed"])[quant_cols].mean().reset_index()
+df_long = marginalized_training_df.melt(
+    id_vars=["hp.agent_name", "dataset", "seed"],
+    value_vars=quant_cols,
+    var_name='column',
+    value_name='value'
+)
+# df_long["dataset"] = df_long["dataset"].astype("category")
+
+df_long['quantile'] = df_long['column'].str.extract(r'quant([\d.]+)')[0].astype(float)
+
+# Extract the base column name (everything before 'quant')
+df_long['variable'] = df_long['column'].str.replace(r'_?quant[\d.]+', '', regex=True).astype("category")
+
+# Clean up
+df_long = df_long.drop('column', axis=1).rename(columns={"hp.agent_name": "Algorithm"})
+df_long["Algorithm"] = df_long["Algorithm"].str.upper().astype("category")
+
+mem_usage = df_long.memory_usage(deep=True)
+print(mem_usage.sort_values(ascending=False).sum()/1024/1024/1024)
+print(mem_usage.sort_values(ascending=False)/1024/1024/1024)
+```
+
+```python
+def plot_cdf(df: pd.DataFrame, name: str) -> None:
+  fig, ax = plt.subplots(figsize=(3.5, 2.5))
+  # print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
+  ax = sns.lineplot(data=df, x="value", y="quantile", hue="Algorithm", errorbar=("pi", 95))
+
+  plt.xlim(-1, 1)
+  plt.ylim(0, 1)
+  plt.title("Inter-Goal Gradient Alignment")
+  plt.xlabel("Gradient Cosine Similarity")
+  plt.ylabel("Cumulative Probability")
+  plt.tight_layout()
+  plt.savefig(f"plots/gradient-alignment-cdf-{name}.png", dpi=1200)
+
+  plt.close()
+
+
+plot_cdf(df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["Algorithm", "quantile"])["value"].mean().reset_index(), "antmaze-medium-all")
+for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["dataset"]):
+  plot_cdf(group.groupby(["Algorithm", "quantile"])["value"].mean().reset_index(), name)
+
+```
+
+```python
+def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
+  fig, ax = plt.subplots(figsize=(3.5, 2.5))
+  # print(df_long[["hp.agent_name", "quantile", "value"]].groupby(["hp.agent_name", "quantile"]).describe())
+  ax = sns.lineplot(data=df, x="quantile", y="value", hue="Algorithm", errorbar=("pi", 95), estimator=np.mean)
+
+  for line in ax.lines:
+    # get data from first line of the plot
+    newx = line.get_ydata()
+    newy = line.get_xdata()
+
+    # set new x- and y- data for the line
+    line.set_xdata(newx)
+    line.set_ydata(newy)
+  from matplotlib.collections import PolyCollection
+
+  for coll in ax.collections:
+    if isinstance(coll, PolyCollection):
+      verts = coll.get_paths()[0].vertices  # shape: (npoints, 2)
+      verts[:, [0, 1]] = verts[:, [1, 0]]    # swap columns x<->y
+  plt.xlim(-1, 1)
+  plt.ylim(0, 1)
+  plt.title("Inter-Goal Gradient Alignment")
+  plt.xlabel("Gradient Cosine Similarity")
+  plt.ylabel("Cumulative Probability")
+  plt.tight_layout()
+  plt.savefig(f"plots/cdf_swapped/gradient-alignment-cdf-{name}.png", dpi=1200)
+
+  plt.close()
+
+
+plot_swapped_cdf(df_long[df_long["variable"] == "grad/value_cosine_similarity"], "antmaze-medium-all")
+for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["dataset"]):
+  plot_swapped_cdf(group, name)
+```
+
+**Look at tail statistics**  
+
+Simulate data and test
+
+```python
+
+```
+
+We can not properly do this due to aggregation. Maybe use CVar?
+
+```python
+merged_training_with_iqm_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_cvar0.25"].std()
+```
+
+```python
+quantile_mean_df = df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["Algorithm", "quantile"])["value"].mean().reset_index()
+
+# quantile_mean_df.groupby(["Algorithm"]).apply(lambda group: group[group["value"] < -0.2][["quantile", "value"]])
+```
+
+
+### Magnitude Similarity
 
 Let's take a look at gradient magnitude similarity:
 
@@ -469,45 +537,246 @@ corr_progress_sorted[corr_progress_sorted["eval_bins5"] == 0]
 ```
 
 
-# Target drift
+# Combine Landscape Plots
+
+## Seaborn KDE-like plot
 
 ```python
-def literal_lists_to_numpy(s):
-  import ast  # I do not know why this can't be imported up front
-  try:
-    return np.array(ast.literal_eval(s))
-  except:
-    return None
-merged_training_with_iqm_df["target/held_out_val_batch_values_np"] = merged_training_with_iqm_df["target/held_out_val_batch_values"].apply(literal_lists_to_numpy)
+merged_results_df.groupby(["hp.agent_name", "dataset"])
 ```
+
 ```python
-def compute_drift_to(group: pd.DataFrame, target: str = "end"):
-  def target_drift(a, b):
-    if a is None or b is None:
-      return None
-    if not a.shape == b.shape:
-      raise ValueError("Arrays must have the same shape")
-    return np.linalg.norm(a - b)
+from adjustText import adjust_text
+from src.gcrl_landscapes.util.eval import fit_model
+from src.gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
+from gcrl_landscapes.plots.triple_gp import create_contour_plot
+from gcrl_landscapes.evaluation.common import map_labels
+agent_name = "crl"
+grid_length = 100
 
-  start_value = group.loc[group["eval_step"] == group["eval_step"].min(), "target/held_out_val_batch_values_np"].values[0]
-  end_value = group.loc[group["eval_step"] == group["eval_step"].max(), "target/held_out_val_batch_values_np"].values[0]
-  drift_start_end = target_drift(start_value, end_value)
-  if target == "neighbor":
-    values = group["target/held_out_val_batch_values_np"]
-    compare_values = group["target/held_out_val_batch_values_np"].shift(1)
-    return pd.Series([target_drift(a, b) for a, b in zip(values, compare_values)], index=group.index) / drift_start_end
-  elif target == "end":
-    compare_value = end_value
-  elif target == "start":
-    compare_value = start_value
-  else:
-    raise ValueError(f"Unknown target: {target}")
-  return group["target/held_out_val_batch_values_np"].apply(lambda x: target_drift(x, compare_value) / drift_start_end if drift_start_end else None)
+def mobility_plot(df, title, by_col: str = "phase_num", performance_threshold=0.95):
+  clipped_merged_results_df = df.copy()
+  clipped_merged_results_df["mean_normalized_goal_distance_return"] = clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
+  data_temp = clipped_merged_results_df
+  # for phase_num ...
+  point_dfs = []
+  for name, group in data_temp.groupby([by_col]):
+    group_copy = group.copy().reset_index()
+    model = fit_model(group, "mean_normalized_goal_distance_return", ["hp.lr", "hp.discount"])
+    model.fit()
+    create_contour_plot(model, x_dim=0, y_dim=1, z_dim="mean_normalized_goal_distance_return", bounds=[0, 1], filename="test_contour.png", dim_label_mapping=map_labels, agent_name=agent_name, z_transform=lambda x, _: x, discrete_levels=None, last_phase_best_config=None)
+    x_lower, x_upper, x_log = get_bounds(model.hp_names[0].removeprefix("hp."), agent_name)
+    y_lower, y_upper, y_log = get_bounds(model.hp_names[1].removeprefix("hp."), agent_name)
+    x, y = np.linspace(0, 1, grid_length), np.linspace(0, 1, grid_length)
+    X, Y = np.meshgrid(x, y)
+    points = np.vstack([X.ravel(), Y.ravel()]).transpose()
+    Z = model.get_middle(points).clip(0, 1)
+    Z_normalized = Z / Z.max()
+    Z_selected = (Z_normalized > 0.9).squeeze()
+    points_x, points_y = sobol_codomain_to_hp(points[:, 0], x_lower, x_upper, x_log), sobol_codomain_to_hp(points[:, 1], y_lower, y_upper, y_log)
+    print(np.vstack([points_x, points_y]))
 
-merged_training_with_iqm_df["target_drift_end"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="end")
-merged_training_with_iqm_df["target_drift_start"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="start")
-merged_training_with_iqm_df["target_drift_neighbor"] = merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False).apply(compute_drift_to, target="neighbor")
-print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_end"].agg(["mean", "std"]))
-print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["target_drift_start"].agg(["mean", "std"]))
-print(merged_training_with_iqm_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])["target_drift_neighbor"].agg(["mean", "std"]))
+    # # TODO: decide
+    # group_copy["hp.lr"] = hp_to_sobol_codomain(group_copy["hp.lr"], x_lower, x_upper, x_log)
+    # group_copy["hp.discount"] = hp_to_sobol_codomain(group_copy["hp.discount"], y_lower, y_upper, y_log)
+    # marginalized_group_copy = group_copy.groupby(["hp.lr", "hp.discount"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
+    # marginalized_group_copy["goal_distance_return_eps"] = marginalized_group_copy["mean_normalized_goal_distance_return"] / marginalized_group_copy["mean_normalized_goal_distance_return"].max()
+
+
+    points_prediction_df = pd.DataFrame({"hp.lr": points_x, "hp.discount": points_y, "mean_normalized_goal_distance_return": Z_normalized.squeeze()})
+    # points_prediction_df = marginalized_group_copy[marginalized_group_copy["goal_distance_return_eps"] > 0.8]
+    points_prediction_df[by_col] = name[0]
+    point_dfs.append(points_prediction_df)
+  point_df = pd.concat(point_dfs)
+  print(point_df.describe())
+
+  print(len(point_df))
+  # sns.scatterplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.9], x="hp.lr", y="hp.discount", hue="phase_num")
+  x_lower, x_upper, x_log = get_bounds("lr", agent_name)
+  y_lower, y_upper, y_log = get_bounds("discount", agent_name)
+  # ax = sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=10, bw_adjust=1, fill=True, alpha=0.4, palette="rocket")
+  df = point_df[point_df["mean_normalized_goal_distance_return"] > performance_threshold]
+
+  # ax = sns.kdeplot(
+  #     data=df,
+  #     x="hp.lr", y="hp.discount",
+  #     hue="phase_num",
+  #     log_scale=(x_log, y_log),
+  #     fill=True,
+  #     levels=2,
+  #     thresh=0.15,
+  #     bw_adjust=1.0,
+  #     alpha=0.12,
+  #     palette="magma",
+  #     linewidth=0,
+  # )
+  #
+  # sns.kdeplot(
+  #     data=df,
+  #     x="hp.lr", y="hp.discount",
+  #     hue="phase_num",
+  #     log_scale=(x_log, y_log),
+  #     fill=False,
+  #     levels=[0.5, 0.8],
+  #     thresh=0.15,
+  #     bw_adjust=1.0,
+  #     alpha=0.9,
+  #     palette="magma",
+  #     linewidths=2.0,
+  #     ax=ax,
+  # )
+  fig, ax = plt.subplots(figsize=(6, 4))
+
+  palette = sns.color_palette("viridis", n_colors=df[by_col].nunique())
+
+  sns.set_context(context="paper", font_scale=1.75)
+
+  # plt.rcParams.update({
+  #     "font.size": 20,          # base font size
+  #     "axes.titlesize": 16,
+  #     "axes.labelsize": 20,
+  #     "xtick.labelsize": 20,
+  #     "ytick.labelsize": 20,
+  #     "legend.fontsize": 12,
+  #     "figure.titlesize": 18,
+  # })
+
+  for i, phase in enumerate(sorted(df[by_col].unique())):
+      phase_df = df[df[by_col] == phase]
+      color = palette[i]
+
+      sns.kdeplot(
+          data=phase_df,
+          x="hp.lr",
+          y="hp.discount",
+          log_scale=(x_log, y_log),
+          fill=True,
+          levels=4,
+          thresh=0.05,
+          bw_adjust=0.7,
+          alpha=0.12,
+          color=color,
+          linewidth=0,
+          ax=ax,
+      )
+
+      sns.kdeplot(
+          data=phase_df,
+          x="hp.lr",
+          y="hp.discount",
+          log_scale=(x_log, y_log),
+          fill=False,
+          levels=[0.7],
+          thresh=0.05,
+          bw_adjust=0.7,
+          alpha=0.9,
+          color=color,
+          linewidths=3.5,
+          ax=ax,
+          label=f"Phase {phase}"
+      )
+
+      centroid_x = phase_df["hp.lr"].median()
+      centroid_y = phase_df["hp.discount"].median()
+      ax.scatter(centroid_x, centroid_y, s=750 if by_col == "phase_num" else 1500, c=[color], edgecolors='white',
+                 linewidths=2, zorder=100, marker='o', alpha=1)
+      ax.text(centroid_x, centroid_y, str(phase), fontsize=20, fontweight='bold',
+              ha='center', va='center', color='white', zorder=101, alpha=1)
+
+  # ax.set_xlabel("")
+  # ax.set_ylabel("")
+  ax.set_xlabel("Learning Rate")
+  ax.set_ylabel("Discount Factor")
+  # ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases",
+  #              fontsize=15, fontweight='bold', pad=20)
+
+  # ax.legend(title="Training Phase", title_fontsize=12, fontsize=11,
+  #           loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True,
+  #           fancybox=True, shadow=True)
+  # Replace your current legend section with this:
+
+  # Create the legend
+  # legend = plt.legend(
+  #     handles = [1, 2, 3, 4],
+  #     title="Training Phase",
+  #     title_fontsize=14,
+  #     fontsize=12,
+  #     loc="center left",
+  #     bbox_to_anchor=(1.05, 0.5),  # Position to the right of the plot
+  #     frameon=True,
+  #     fancybox=True,
+  #     shadow=True,
+  #     borderpad=1.2,  # Padding inside legend box
+  #     labelspacing=1.2,  # Space between legend entries
+  #     handlelength=2.5,  # Length of the legend lines
+  #     handleheight=1.5   # Height of the legend lines
+  # )
+
+
+  # ax.grid(True, alpha=0.25, linestyle='--', linewidth=0.6)
+  # ax.set_facecolor('#fafafa')
+  # for i in range(len(centroids)-1):
+  #     ax.annotate('', xy=centroids[i+1], xytext=centroids[i],
+  #                 arrowprops=dict(arrowstyle='->', lw=2.5, color='black', alpha=0.6,
+  #                                connectionstyle="arc3,rad=0.1"))
+  #
+
+  #sns.move_legend(ax, "upper left", bbox_to_anchor=(1.02, 1), frameon=False, title="phase")
+  ax.grid(True, alpha=0.15)
+  print(ax.collections[0].levels)
+  plt.xlim(x_lower, x_upper)
+  plt.ylim(y_lower, y_upper)
+  if x_log:
+    ax.set_xscale("log", base=10)
+  if y_log:
+    ax.set_yscale("log", base=10)
+  plt.tight_layout()
+  plt.savefig(f"plots/{title}.png", dpi=1200)
+  plt.close()
+
+
+merged_results_df["dataset_condensed"] = merged_results_df["dataset"].apply(lambda x: x.split(",")[0] if len(set(x.split(","))) == 1 else x).astype("category")
+for name, group in merged_results_df.groupby(["hp.agent_name", "dataset_condensed"]):
+  agent = name[0]
+  datasets = name[1]
+
+  print(f"mobility-{agent}-{datasets}")
+  mobility_plot(group, f"mobility-{agent}-{datasets}", performance_threshold=0.90)
+
+```
+
+**Now do it across dataset qualities for the last phase**
+
+```python
+merged_results_df_constant_last_phase = merged_results_df[(merged_results_df["constant_dataset"]) & (merged_results_df["phase_num"] == 4)].copy()
+merged_results_df_constant_last_phase["env"] = merged_results_df_constant_last_phase["dataset_condensed"].apply(lambda x: re.match(r"(.*)-(explore|navigate).*", x).group(1)).astype("category")
+merged_results_df_constant_last_phase["Exploration Ratio"] = merged_results_df_constant_last_phase["dataset"].apply(lambda x: datasets_to_exploration_schedule(x).split(",")[0]).astype("category")
+
+for name, group in merged_results_df_constant_last_phase.groupby(["hp.agent_name", "env"]):
+  agent = name[0]
+  envs = name[1]
+
+  print(f"mobility-last-phase-{agent}-{envs}")
+  mobility_plot(group, f"mobility-last-phase-{agent}-{envs}", by_col="Exploration Ratio", performance_threshold=0.95)
+```
+
+## Optimum Movement line plot
+
+```python
+data_temp = merged_results_df[(merged_results_df["dataset"] == "antmaze-medium-explore-v0,antmaze-medium-explore80navigate-v0,antmaze-medium-explore40navigate-v0,antmaze-medium-navigate-v0") & (merged_results_df["hps"] == frozenset(set(["lr", "discount"])))]
+optima = []
+for name, group in data_temp.groupby(["hp.agent_name", "phase_num"]):
+  marginalized_group = group.groupby(["hp.lr", "hp.discount"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
+  t = marginalized_group[marginalized_group["mean_normalized_goal_distance_return"] == marginalized_group["mean_normalized_goal_distance_return"].max()].iloc[0][["hp.lr", "hp.discount"]]
+  t["Algorithm"] = name[0]
+  optima.append(t)
+x_lower, x_upper, x_log = get_bounds("lr", agent_name)
+y_lower, y_upper, y_log = get_bounds("discount", agent_name)
+fig, ax = plt.subplots()
+sns.lineplot(data=pd.DataFrame(optima), x="hp.lr", y="hp.discount", hue="Algorithm", errorbar=None, marker="o")
+ax.set(xscale="log")
+plt.xlim(x_lower, x_upper)
+plt.ylim(y_lower, y_upper)
+plt.savefig("test.png")
+plt.close()
 ```
