@@ -10,6 +10,10 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 
+# Load cluster-specific settings. CLUSTER env var is inherited from the submitting shell.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
+
 phases_str=$(printf '%s,' "${phases[@]}")
 phases_str="[${phases_str%?}]"
 datasets_str=$(printf '%s,' "${datasets[@]}")
@@ -42,8 +46,15 @@ if [ -z "$5" ]
 fi
 
 
-module load Miniforge3
-conda activate gcrl
+cluster_load_env
 
-echo python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5"
-python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5"
+# Build cluster-specific Hydra launcher overrides
+launcher_overrides="hydra.launcher.partition=${CLUSTER_PARTITION}"
+if [ -n "$CLUSTER_GRES" ]; then
+  launcher_overrides="${launcher_overrides} hydra.launcher.gres=${CLUSTER_GRES}"
+else
+  launcher_overrides="${launcher_overrides} hydra.launcher.gpus_per_node=1"
+fi
+
+echo python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5" "$launcher_overrides"
+python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5" $launcher_overrides

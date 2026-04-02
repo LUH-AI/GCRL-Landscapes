@@ -10,11 +10,14 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 
-DATE=`date -u +%Y-%m-%d`
-ZIPNAME="${DATE}-${1/\.\//}.zip"
-/home/nhwptoem/bin/zip -r "$ZIPNAME" "$1" -x 'logs*/**/*.pkl' -x 'logs*/**/submitit/*'
+# Load cluster-specific settings. CLUSTER env var is inherited from the submitting shell.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
 
-module load GCC/12.2.0 OpenMPI/4.1.4 Armadillo
-export LD_LIBRARY_PATH="${LD_LIBRARY_PATH}:${BIGWORK}/usr/lib"
+DATE=$(date -u +%Y-%m-%d)
+ZIPNAME="${DATE}-${1/\.\//}.zip"
+"$CLUSTER_ZIP_CMD" -r "$ZIPNAME" "$1" -x 'logs*/**/*.pkl' -x 'logs*/**/submitit/*'
+
+cluster_load_plot_env
 $2 -m gcrl_landscapes.evaluation.plot --plot_eval_curves --plot_return_distributions --plot_gp_fits --zipfile "$ZIPNAME"
 $2 -m gcrl_landscapes.evaluation.tabular --zipfiles "$ZIPNAME" --output_folder "tables/${ZIPNAME}"

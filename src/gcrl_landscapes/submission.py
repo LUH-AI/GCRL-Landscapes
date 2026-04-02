@@ -491,6 +491,9 @@ def submit(args: argparse.Namespace) -> None:
             else setup["phases"][phase_idx] - already_trained_steps
         )
         executor = submitit.AutoExecutor(folder=str(args.logdir / "submitit" / "%j"))
+        extra_params: dict = {"dependency": f"afterok:{array_id}"} if array_id else {}
+        if args.gres:
+            extra_params["gres"] = args.gres
         executor.update_parameters(
             cpus_per_task=3,
             slurm_time=int(
@@ -500,18 +503,16 @@ def submit(args: argparse.Namespace) -> None:
                 * (steps_to_train / 1_000_000)
                 * args.tasks_per_node_total
             ),  # this overestimates, keep safety margin
-            slurm_gpus_per_node=1,
+            **({} if args.gres else {"slurm_gpus_per_node": 1}),
             tasks_per_node=args.tasks_per_node_parallel,
             slurm_mem_per_cpu=args.mem_per_cpu,
             slurm_array_parallelism=50,
             slurm_partition=args.partition,
-            slurm_reservation=args.partition,
+            **({} if not args.reservation else {"slurm_reservation": args.reservation}),
             slurm_job_name=args.jobname,
             slurm_mail_user="m.toepperwien@ai.uni-hannover.de",
             slurm_mail_type="END,FAIL",
-            slurm_additional_parameters={"dependency": f"afterok:{array_id}"}
-            if array_id
-            else {},
+            slurm_additional_parameters=extra_params,
         )
         jobs = executor.map_array(
             run_config_chunked_arguments_wrapper, chunked_tasks_parallel

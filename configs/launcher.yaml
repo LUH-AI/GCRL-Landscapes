@@ -1,5 +1,7 @@
 hydra:
   launcher:
+    # Cluster-specific settings — override via CLI: hydra.launcher.partition=X hydra.launcher.gres=Y
+    # or set CLUSTER env var and let hpo_single.sh pass the overrides automatically.
     partition: "ai,tnt"
     timeout_min: 600
     nodes: 1
