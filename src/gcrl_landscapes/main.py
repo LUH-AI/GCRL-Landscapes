@@ -135,6 +135,20 @@ if __name__ == "__main__":
         help="On which slurm partition to schedule the jobs",
     )
     slurm_subparser.add_argument(
+        "--reservation",
+        type=str,
+        default="",
+        required=False,
+        help="Slurm reservation name (empty string = no reservation)",
+    )
+    slurm_subparser.add_argument(
+        "--gres",
+        type=str,
+        default="",
+        required=False,
+        help="Slurm GRES spec for GPU (e.g. 'gpu:h100:1'). If empty, uses gpus_per_node=1.",
+    )
+    slurm_subparser.add_argument(
         "--mem_per_cpu",
         type=str,
         default="3G",

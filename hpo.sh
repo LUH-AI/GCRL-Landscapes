@@ -1,5 +1,9 @@
 #!/bin/bash
 
+# Load cluster-specific settings. Override with: CLUSTER=pc2 bash hpo.sh <agent>
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
+
 logdir="./logs_hpo"
 declare -a -r datasets=(
   antmaze-medium-explore-v0
@@ -27,9 +31,18 @@ fi
 for phase in "${phases[@]}"; do
   if [ -z "$job_id" ]
     then
-      output=$(sbatch --parsable --output "${logdir}/hpo_log_$1_${phase}.txt" hpo_single.sh "$1" "$logdir" "$datasets_str" "$phases_str" "$phase")
+      output=$(sbatch --parsable \
+        --partition="$CLUSTER_SETUP_PARTITION" \
+        ${CLUSTER_RESERVATION:+--reservation="$CLUSTER_RESERVATION"} \
+        --output "${logdir}/hpo_log_$1_${phase}.txt" \
+        hpo_single.sh "$1" "$logdir" "$datasets_str" "$phases_str" "$phase")
     else
-      output=$(sbatch --parsable --output "${logdir}/hpo_log_$1_${phase}.txt" --dependency="afterok:${job_id}" hpo_single.sh "$1" "$logdir" "$datasets_str" "$phases_str" "$phase")
+      output=$(sbatch --parsable \
+        --partition="$CLUSTER_SETUP_PARTITION" \
+        ${CLUSTER_RESERVATION:+--reservation="$CLUSTER_RESERVATION"} \
+        --output "${logdir}/hpo_log_$1_${phase}.txt" \
+        --dependency="afterok:${job_id}" \
+        hpo_single.sh "$1" "$logdir" "$datasets_str" "$phases_str" "$phase")
   fi
   if [[ "$output" == *";"* ]]; then
     IFS=';' read -r job_id cluster_name <<< "$output"

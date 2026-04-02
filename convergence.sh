@@ -11,6 +11,9 @@
 #SBATCH --get-user-env
 #SBATCH --reservation=ai,tnt
 
+# Load cluster-specific settings. Override with: CLUSTER=pc2 bash convergence.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
 
 logdir="./logs_convergence"
 actorloss="awr"
@@ -23,11 +26,9 @@ extraevalsteps="1000 2500 5000 7500 10000 20000 30000 40000 50000 75000 100000 1
 nseeds="5"
 taskspernodetotal="5"
 taskspernodeparallel="5"
-partitions="ai,tnt"
 mempercpu="3G"
 
-module load Miniforge3
-conda activate gcrl
+cluster_load_env
 
 declare -a -r agents=(
   "CRL"
@@ -108,7 +109,9 @@ for environment in "${environments[@]}"; do
       --tasks_per_node_parallel "$taskspernodeparallel" \
       --mem_per_cpu "$mempercpu" \
       --jobname "${agent}-${environment}-${actorloss}" \
-      --partition "$partitions" \
+      --partition "$CLUSTER_PARTITION" \
+      ${CLUSTER_RESERVATION:+--reservation "$CLUSTER_RESERVATION"} \
+      ${CLUSTER_GRES:+--gres "$CLUSTER_GRES"} \
       --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}" \
       --basetime 120
   done
@@ -118,5 +121,7 @@ done
 # Currently this waits for all jobs belonging to user and not only the ones submitted here
 dependencies=$(squeue --me -l -r | tail -n +3 | tr -s ' ' | cut -d ' ' -f2 | cut -d '_' -f1 | sort | uniq | paste -s -d':')
 sbatch \
+  --partition="$CLUSTER_SETUP_PARTITION" \
+  ${CLUSTER_RESERVATION:+--reservation="$CLUSTER_RESERVATION"} \
   --output "${logdir}/zip_and_plot_log.txt" \
-  -d "afterok:${dependencies}" ./zip_and_plot.sh "$logdir" $(which python)
+  -d "afterok:${dependencies}" ./zip_and_plot.sh "$logdir" "$(which python)"

@@ -1,0 +1,7 @@
+# Cluster profile for PC2 (Paderborn Center for Parallel Computing)
+# Used by submission.py (via --cluster arg) and launcher.yaml (Hydra/SMAC HPO)
+
+partition: "gpu"
+reservation: null   # null = no reservation
+gres: "gpu:h100:1"
+gpus_per_node: null # null = use gres instead

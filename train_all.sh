@@ -11,6 +11,12 @@
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 
+# Load cluster-specific settings (partition, reservation, GPU spec, module loading).
+# Override the cluster by setting CLUSTER before running, e.g.:
+#   CLUSTER=pc2 bash train_all.sh
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
+
 logdir="./logs"
 hyperparameters="lr alpha"
 actorloss="awr"
@@ -22,11 +28,9 @@ numevalepisodes="10"
 nseeds="5"
 taskspernodetotal="16"
 taskspernodeparallel="4"
-partitions="ai,tnt"
 mempercpu="3G"
 
-module load Miniforge3
-conda activate gcrl
+cluster_load_env
 
 declare -a -r agents=(
   "CRL"
@@ -106,7 +110,9 @@ for environment in "${environments[@]}"; do
       --tasks_per_node_parallel "$taskspernodeparallel" \
       --mem_per_cpu "$mempercpu" \
       --jobname "${agent}-${environment}-${actorloss}" \
-      --partition "$partitions" \
+      --partition "$CLUSTER_PARTITION" \
+      ${CLUSTER_RESERVATION:+--reservation "$CLUSTER_RESERVATION"} \
+      ${CLUSTER_GRES:+--gres "$CLUSTER_GRES"} \
       --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}"
   done
 done
@@ -114,4 +120,9 @@ done
 # Automatically zip and plot after all runs done
 # Currently this waits for all jobs belonging to user and not only the ones submitted here
 dependencies=$(squeue --me -l -r | tail -n +3 | tr -s ' ' | cut -d ' ' -f2 | cut -d '_' -f1 | sort | uniq | paste -s -d':')
-sbatch --output "${logdir}/zip_and_plot_log.txt" -d "afterany:${dependencies}" ./zip_and_plot.sh "$logdir" $(which python)
+sbatch \
+  --partition="$CLUSTER_SETUP_PARTITION" \
+  ${CLUSTER_RESERVATION:+--reservation="$CLUSTER_RESERVATION"} \
+  --output "${logdir}/zip_and_plot_log.txt" \
+  -d "afterany:${dependencies}" \
+  ./zip_and_plot.sh "$logdir" "$(which python)"
