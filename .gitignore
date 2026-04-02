@@ -5,3 +5,7 @@ logs/
 *.zip
 /plots/
 /log_zips/
+*.png
+temp_*/
+tables/
+convergence/

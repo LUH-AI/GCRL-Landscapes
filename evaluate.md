@@ -1,4 +1,27 @@
 ```python
+# %% tags=["parameters"]
+from pathlib import Path
+zipfiles = [Path("path/to/experiment.zip")]  # <- edit this
+```
+
+```python
+from gcrl_landscapes.util.data import load_or_compute
+from gcrl_landscapes.evaluation.tabular import compute_merged_df
+
+merged_results_df, merged_training_df = load_or_compute(zipfiles, compute_merged_df)
+
+# Memory optimization
+to_category_columns = ["dataset", "hps", "agent"] + merged_training_df.columns[
+    merged_training_df.columns.str.startswith("hp.")
+].tolist()
+for col in to_category_columns:
+    merged_training_df[col] = merged_training_df[col].astype("category")
+float_cols = merged_training_df.select_dtypes(include="float64").columns
+for col in float_cols:
+    merged_training_df[col] = merged_training_df[col].astype("float16")
+```
+
+```python
 import pandas as pd
 import numpy as np
 from scipy.stats import trim_mean
