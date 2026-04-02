@@ -1,34 +1,113 @@
 # GCRL-Landscapes
 
-TODO: introduction to what this project is  
-TODO: recommended way to install  
+A hyperparameter landscape exploration framework for offline goal-conditioned RL agents. It generates diverse hyperparameter configurations, trains agents in phases across Slurm clusters, and analyzes how optimality landscapes evolve during training.
 
-Convergence data for the algorithms to set proper phases can be found on [Huggingface](https://huggingface.co/datasets/jmtoepperwien/GCRL-Landscapes).
+Supported agents: **CRL, CMD, GCBC, GCIQL, GCIVL, QRL, HIQL, SAC** (via [OGBench](https://github.com/seohongpark/ogbench)).  
+Environments: antmaze, humanoid, cube, powderworld (via [Gymnasium](https://gymnasium.farama.org/)).
 
-Training is supposed to run on a Slurm cluster.
+Convergence data required for phase splitting can be found on [Huggingface](https://huggingface.co/datasets/jmtoepperwien/GCRL-Landscapes). Precomputed log files are available there as well.
 
-## Training
+## Installation
 
-### Phased HPO
+```bash
+pip install -e ".[dev]"
+pre-commit install
+```
 
-This runs SMAC on a slurm cluster to generate importance data using multiple phases during training. Additionally one gets a tuned hyperparameter-configuration.  
-Look at `hpo.sh` and optionally the configuration files in `configs` to get running. Analyze gathered data with [DeepCAVE](https://github.com/automl/DeepCAVE) to get importance scores and more.  
-For non-Slurm usage you'll have to modify the launcher in `configs/hpo_algorithm.yaml`
+A reproducible [Nix](https://nixos.org/) environment is also provided via `flake.nix`.
 
-### Phased Landscapes
+**Requirements:** Python 3.10, JAX/Flax with CUDA 12.
 
-Look at `train_all.sh` to get running. It offers you almost all options, only hyperparameters are not yet documented here (see `src/gcrl-landscapes/configurations.py`). Comment out the ones you don't want to run. `train_all.sh` is supposed to be submitted using `sbatch train_all.sh`.
+## Workflow
 
-For non-Slurm usage you'll have to modify the submitter in `src/gcrl-landscapes/submission.py` and probably also the `train_all.sh` script.
+Training runs in three steps: **setup → submit → run**. All steps are orchestrated via `main.py`.
+
+### 1. Setup
+
+Generates hyperparameter configurations (Sobol sampling) and computes phase boundaries from convergence data.
+
+```bash
+python -m gcrl_landscapes.main setup \
+  --agent CRL \
+  --datasets antmaze-medium-navigate \
+  --n_configurations 100 \
+  --logdir /path/to/logs
+```
+
+### 2. Submit
+
+Launches Slurm array jobs and chains zip/evaluation jobs as dependencies.
+
+```bash
+python -m gcrl_landscapes.main submit \
+  --logdir /path/to/logs \
+  --n_seeds 5
+```
+
+### 3. Run (called by Slurm)
+
+Executes a single (config, phase, seed) triple.
+
+```bash
+python -m gcrl_landscapes.main run \
+  --logdir /path/to/logs \
+  --phase_idx 0 \
+  --configuration 0 \
+  --seed 0
+```
+
+For non-Slurm usage, modify the submitter in `src/gcrl_landscapes/submission.py`.
+
+## Orchestration Scripts
+
+Higher-level Slurm scripts covering common experiment types:
+
+| Script | Purpose |
+|---|---|
+| `train_all.sh` | Full landscape experiments across all agents/environments |
+| `hpo.sh` | Phase-based Bayesian HPO via SMAC |
+| `convergence.sh` | Convergence testing |
+| `zip_and_plot.sh` | Post-job zip + evaluation |
+
+Submit via `sbatch train_all.sh` (or the relevant script). Comment out agents/environments you don't need.
+
+## Phased HPO
+
+Runs [SMAC](https://github.com/automl/SMAC3) on a Slurm cluster to perform phase-based Bayesian hyperparameter optimization. This yields both a tuned configuration and importance data across training phases.
+
+```bash
+bash hpo.sh
+```
+
+Configuration lives in `configs/hpo_*.yaml` and `configs/hydra/sweeper/search_space/`. For non-Slurm usage, modify the launcher in `configs/hpo_algorithm.yaml`.
+
+Analyze gathered importance data with [DeepCAVE](https://github.com/automl/DeepCAVE).
 
 ## Evaluation
 
-These commands will generate plots in `plots` and tables in `tables`.  
-If you don't want to generate these yourself, logfiles can also be found on [Huggingface](https://huggingface.co/datasets/jmtoepperwien/GCRL-Landscapes).
+Generate plots and tables from a log zip archive:
 
-```
-python -m gcrl_landscapes.evaluation.plot --plot_return_distributions --plot_eval_curves --plot_gp_fits --zipfile LOGFILEPATH
+```bash
+python -m gcrl_landscapes.evaluation.plot \
+  --plot_return_distributions \
+  --plot_eval_curves \
+  --plot_gp_fits \
+  --zipfile LOGFILEPATH
+
 python -m gcrl_landscapes.evaluation.tabular --zipfile LOGFILEPATH
 ```
 
-Inside of the plots subfolder you'll see a `grid_plots` directory, which should help you get a quick overview over all experiments.
+Output goes to `plots/` and `tables/`. The `plots/grid_plots/` subdirectory gives a quick overview across all experiments.
+
+Landscape visualization uses GP-based fitting (IGPR: three independent GPs for lower/IQM/upper confidence bounds via GPFlow).
+
+## Development
+
+```bash
+ruff check src/       # linting
+ruff format src/      # formatting
+hatch run types:check # mypy type checking
+pre-commit run --all-files
+```
+
+Conventional commits are enforced via pre-commit hook. There are no formal test files; `ruff` and `mypy` are the main quality gates.
