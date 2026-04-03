@@ -494,6 +494,8 @@ def submit(args: argparse.Namespace) -> None:
         extra_params: dict = {"dependency": f"afterok:{array_id}"} if array_id else {}
         if args.gres:
             extra_params["gres"] = args.gres
+        if args.reservation:
+            extra_params["reservation"] = args.reservation
         executor.update_parameters(
             cpus_per_task=3,
             slurm_time=int(
@@ -508,7 +510,6 @@ def submit(args: argparse.Namespace) -> None:
             slurm_mem_per_cpu=args.mem_per_cpu,
             slurm_array_parallelism=50,
             slurm_partition=args.partition,
-            **({} if not args.reservation else {"slurm_reservation": args.reservation}),
             slurm_job_name=args.jobname,
             slurm_mail_user="m.toepperwien@ai.uni-hannover.de",
             slurm_mail_type="END,FAIL",
