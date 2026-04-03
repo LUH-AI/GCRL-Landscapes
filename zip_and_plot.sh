@@ -11,7 +11,7 @@
 #SBATCH --get-user-env
 
 # Load cluster-specific settings. CLUSTER env var is inherited from the submitting shell.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
 
 DATE=$(date -u +%Y-%m-%d)

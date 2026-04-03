@@ -14,7 +14,7 @@
 # Load cluster-specific settings (partition, reservation, GPU spec, module loading).
 # Override the cluster by setting CLUSTER before running, e.g.:
 #   CLUSTER=pc2 bash train_all.sh
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
 
 logdir="./logs"

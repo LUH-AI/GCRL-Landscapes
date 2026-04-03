@@ -12,7 +12,7 @@
 #SBATCH --reservation=ai,tnt
 
 # Load cluster-specific settings. Override with: CLUSTER=pc2 bash convergence.sh
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
 
 logdir="./logs_convergence"
