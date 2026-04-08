@@ -1,10 +1,14 @@
 ```python
 # %% tags=["parameters"]
 from pathlib import Path
-zipfiles = [Path("path/to/experiment.zip")]  # <- edit this
+zipfiles = [Path("/home/mtoepperwien/Documents/gcrl/log_zips/2026-04-07-logs_antmaze-medium-all-algs.zip")]  # <- edit this
 ```
 
 ```python
+import types
+import gcrl_landscapes.evaluation.tabular as _tabular
+_tabular.args = types.SimpleNamespace(no_multiprocessing=True)
+
 from gcrl_landscapes.util.data import load_or_compute
 from gcrl_landscapes.evaluation.tabular import compute_merged_df
 
@@ -103,6 +107,8 @@ Let's convert `eval_step` to a percentage of training and bin that, so that we c
 Also extract exploration schedule from dataset names
 
 ```python
+import re
+
 def datasets_to_exploration_schedule(dataset_str: str) -> str:
   def dataset_to_exploration_percentage(dataset: str) -> int:
     try:
@@ -120,7 +126,6 @@ print(datasets_to_exploration_schedule("antmaze-medium-explore-v0,antmaze-medium
 ```
 
 ```python
-import re
 # TODO: generalize this to dfs containing multiple hyperparameter combinations. Does this even have an influence?
 merged_training_df["eval_percent"] = round(merged_training_df["eval_step"] / merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max") * 100).astype("category")
 merged_training_df["eval_bins10"] = merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_percent"].transform(lambda x: pd.qcut(x, 10, labels=False, duplicates="drop")).astype("category")
@@ -905,6 +910,8 @@ for name, group in merged_results_df.groupby(["hp.agent_name", "dataset"]):
 with warnings.catch_warnings():
   warnings.simplefilter("ignore")
   phase_optimum_share_df = merged_results_df.groupby(["hp.agent_name", "dataset"]).apply(lambda group: optimum_share_table(group, group["hp.agent_name"].iloc[0], by_col="phase_num", performance_threshold=0.90, grid_length=100))
+  if isinstance(phase_optimum_share_df, pd.Series):
+    phase_optimum_share_df = phase_optimum_share_df.unstack()
 # for name, group in merged_results_df.groupby(["hp.agent_name", "dataset"]):
 #   agent_name = name[0]
 #   datasets = name[1]
@@ -1012,6 +1019,7 @@ for name, group in data_temp.groupby(["hp.agent_name", "phase_num"]):
   t = marginalized_group[marginalized_group["mean_normalized_goal_distance_return"] == marginalized_group["mean_normalized_goal_distance_return"].max()].iloc[0][["hp.lr", "hp.alpha"]]
   t["Algorithm"] = name[0]
   optima.append(t)
+agent_name = ""
 x_lower, x_upper, x_log = get_bounds("lr", agent_name)
 y_lower, y_upper, y_log = get_bounds("alpha", agent_name)
 fig, ax = plt.subplots()

@@ -9,3 +9,4 @@ logs/
 temp_*/
 tables/
 convergence/
+.worktrees/

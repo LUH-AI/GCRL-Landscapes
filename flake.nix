@@ -20,6 +20,16 @@
 
       devShells.default = let
         pythonPackages = pkgs.python310Packages;
+        makeNixLDWrapper = program: (pkgs.runCommand "${program.pname}-nix-ld-wrapped" { } ''
+          mkdir -p $out/bin
+          for file in ${program}/bin/*; do
+            new_file=$out/bin/$(basename $file)
+            echo "#! ${pkgs.bash}/bin/bash -e" >> $new_file
+            echo 'export LD_LIBRARY_PATH="$LD_LIBRARY_PATH:$NIX_LD_LIBRARY_PATH"' >> $new_file
+            echo 'exec -a "$0" '$file' "$@"' >> $new_file
+            chmod +x $new_file
+          done
+        '');
       in pkgs.mkShell rec {
         venvDir = "./.venv";
         NIX_LD_LIBRARY_PATH = lib.makeLibraryPath [
@@ -48,9 +58,11 @@
           swig
           zlib
           redis
-        ]) ++ (with pythonPackages; [
-          python
-          venvShellHook
+        ]) ++ ([
+          pythonPackages.venvShellHook
+          (makeNixLDWrapper pythonPackages.python)
+          # (makeNixLDWrapper pkgs.uv)
+          pkgs.uv
         ]);
         nativeBuildInputs = (with pkgs; [
             ruff
