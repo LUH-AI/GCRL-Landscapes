@@ -41,6 +41,7 @@ dependencies = [
   "autorl_landscape @ git+https://github.com/automl/AutoRL-Landscape.git",
   "gymnasium",
   "seaborn",
+  "adjustText",
   "pandas",
   "scikit-learn >= 1.7.0",
   "submitit",
