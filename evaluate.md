@@ -1,7 +1,14 @@
 ```python
-# %% tags=["parameters"]
+
+```
+```python tags=["parameters"]
 from pathlib import Path
 zipfiles = [Path("/home/mtoepperwien/Documents/gcrl/log_zips/2026-04-07-logs_antmaze-medium-all-algs.zip")]  # <- edit this
+```
+
+```python
+import os
+os.makedirs("plots/cdf_swapped", exist_ok=True)
 ```
 
 ```python
@@ -281,8 +288,8 @@ Look at metrics inside of batch
 bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 0.1)]
 bad_configs_df.groupby(["hp.agent_name"])["grad/value_cosine_similarity_cvar0.25"].mean()
 #(merged_training_with_iqm_df.groupby(["hp.agent_name"])[merged_training_with_iqm_df.columns[merged_training_with_iqm_df.columns.str.contains(r"grad/.*quant\d+")]].mean())
-
 ```
+
 
 ```python
 fig, ax = plt.subplots()
@@ -363,7 +370,6 @@ def plot_cdf(df: pd.DataFrame, name: str) -> None:
 plot_cdf(df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["Algorithm", "quantile"])["value"].mean().reset_index(), "antmaze-medium-all")
 for name, group in df_long[df_long["variable"] == "grad/value_cosine_similarity"].groupby(["dataset"]):
   plot_cdf(group.groupby(["Algorithm", "quantile"])["value"].mean().reset_index(), name)
-
 ```
 
 ```python
@@ -438,8 +444,8 @@ print(best_config_df.groupby(["hp.agent_name"])["grad/value_magnitude_similarity
 print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["grad/value_magnitude_similarity_mean"].mean())
 print("Only best configuration per landscape for next print")
 print(best_config_df.groupby(["hp.agent_name", "eval_bins5"])["grad/value_magnitude_similarity_mean"].mean())
-
 ```
+
 
 To validate that nothing strange is going on, take a look at the size of gradients in general:
 
@@ -567,8 +573,8 @@ print(best_config_df.groupby(["hp.agent_name"])["update/value_magnitude_similari
 print(merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])["update/value_magnitude_similarity_mean"].mean())
 print("Only best configuration per landscape for next print")
 print(best_config_df.groupby(["hp.agent_name", "eval_bins5"])["update/value_magnitude_similarity_mean"].mean())
-
 ```
+
 
 To validate that nothing strange is going on, take a look at the size of gradients in general:
 
@@ -836,8 +842,8 @@ for name, group in merged_results_df.groupby(["hp.agent_name", "dataset_condense
   mobility_plot(group, agent, f"{performance_threshold}/mobility-{agent}-{datasets}", performance_threshold=performance_threshold/100)
   performance_threshold = 90
   mobility_plot(group, agent, f"{performance_threshold}/mobility-{agent}-{datasets}", performance_threshold=performance_threshold/100)
-
 ```
+
 
 **Now do it across dataset qualities for the last phase**
 
@@ -1006,8 +1012,8 @@ with open("tables/optimum-overlap-quality.tex", "w") as f:
 ```python
 with warnings.catch_warnings():
   warnings.simplefilter("ignore")
-
 ```
+
 
 ## Optimum Movement line plot
 
