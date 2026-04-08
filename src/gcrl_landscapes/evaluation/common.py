@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import trim_mean
-from copy import deepcopy
 from gcrl_landscapes.util.eval import cvar, iqr
 
 
@@ -51,7 +50,7 @@ def compute_additional_information(
     Returns:
         new object with additional information with same layout as original one
     """
-    results_copy = deepcopy(results)
+    results_copy = results.copy()
     # enumerate phases
     results_copy["phase_num"] = results_copy["phase"].rank(method="dense").astype(int)
     # Normalize goal end distances by start distance to get a distance in [1, inf)

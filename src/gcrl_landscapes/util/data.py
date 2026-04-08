@@ -4,6 +4,10 @@ import pickle
 from ml_collections import FrozenConfigDict
 from typing import Generic, TypeVar, Any, Callable
 import json
+import csv
+import multiprocessing
+import os
+from concurrent.futures import ProcessPoolExecutor
 import pandas as pd
 import zipfile
 import re
@@ -335,6 +339,27 @@ def training_logs_to_pandas(results: ResultsPerStep[TrainResult]) -> pd.DataFram
     return pd.DataFrame(rows)
 
 
+def _csv_to_train_trajectory(file_content: str) -> "TrainTrajectory":
+    reader = csv.DictReader(io.StringIO(file_content), delimiter=";")
+    rows: dict[int, dict] = {}
+    for row in reader:
+        step = int(row["step"])
+        rows[step] = {k: float(v) for k, v in row.items() if k != "step"}
+    return TrainTrajectory(ResultsPerStep(rows))
+
+
+def _parse_csv_batch(
+    args: tuple[Path, list[tuple[str, int, int, int]]],
+) -> list[tuple[int, int, int, "TrainTrajectory"]]:
+    zippath, batch = args
+    output = []
+    with zipfile.ZipFile(zippath, "r") as zf:
+        for filename, config_num, phase, seed in batch:
+            content = zf.read(filename).decode("utf-8")
+            output.append((config_num, phase, seed, _csv_to_train_trajectory(content)))
+    return output
+
+
 def read_results_from_zip(
     zippath: Path,
 ) -> dict[str, tuple[dict, ResultsPerStep[PhaseResult], ResultsPerStep[PhaseResult]]]:
@@ -416,33 +441,52 @@ def read_results_from_zip(
     def extract_training_log(
         filenames: list[str],
         configurations: dict[int, FrozenConfigDict],
-        zip_file: zipfile.ZipFile,
+        zippath: Path,
     ) -> ResultsPerStep[PhaseResult]:
         def parse_filename(filename: str) -> tuple[int, int, int]:
             """Return (configuration_number, phase, seed)"""
             match = re.search(
                 r".*configuration_(\d+)/phase_(\d+)/seed_(\d+).*", filename
             )
+            assert match is not None
             return int(match.group(1)), int(match.group(2)), int(match.group(3))
 
-        results: ResultsPerStep[PhaseResult] = ResultsPerStep({})
-        for filename in [
+        train_log_files = [
             filename
             for filename in filenames
             if re.search(r".*train_log.csv$", filename)
-        ]:
-            with zip_file.open(filename) as f:
-                file_content = f.read().decode(encoding="utf-8")
-                config_num, phase, seed = parse_filename(filename)
-                if phase not in results:
-                    results[phase] = PhaseResult({})
-                if configurations[config_num] not in results[phase]:
-                    results[phase][configurations[config_num]] = {}
-                results[phase][configurations[config_num]][seed] = (
-                    TrainTrajectory.from_csv(
-                        pd.read_csv(io.StringIO(file_content), sep=";")
-                    )
-                )
+        ]
+        work_items: list[tuple[str, int, int, int]] = [
+            (filename, *parse_filename(filename)) for filename in train_log_files
+        ]
+
+        slurm_cpus = os.environ.get("SLURM_CPUS_ON_NODE")
+        n_workers = (
+            max(1, int(slurm_cpus) // 2)
+            if slurm_cpus
+            else max(1, multiprocessing.cpu_count() // 2)
+        )
+
+        batch_size = max(1, len(work_items) // n_workers)
+        batches = [
+            work_items[i : i + batch_size]
+            for i in range(0, len(work_items), batch_size)
+        ]
+
+        all_parsed: list[tuple[int, int, int, TrainTrajectory]] = []
+        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+            for batch_results in executor.map(
+                _parse_csv_batch, [(zippath, b) for b in batches]
+            ):
+                all_parsed.extend(batch_results)
+
+        results: ResultsPerStep[PhaseResult] = ResultsPerStep({})
+        for config_num, phase, seed, train_trajectory in all_parsed:
+            if phase not in results:
+                results[phase] = PhaseResult({})
+            if configurations[config_num] not in results[phase]:
+                results[phase][configurations[config_num]] = {}
+            results[phase][configurations[config_num]][seed] = train_trajectory
 
         return results
 
@@ -471,7 +515,7 @@ def read_results_from_zip(
             prefix: extract_training_log(
                 prefix_filenames_mapping[prefix],
                 prefix_configuration_mapping[prefix],
-                zip_file,
+                zippath,
             )
             for prefix in prefix_run_mapping.keys()
         }
