@@ -344,7 +344,15 @@ def _csv_to_train_trajectory(file_content: str) -> "TrainTrajectory":
     rows: dict[int, dict] = {}
     for row in reader:
         step = int(row["step"])
-        rows[step] = {k: float(v) for k, v in row.items() if k != "step"}
+        parsed: dict[str, Any] = {}
+        for k, v in row.items():
+            if k == "step":
+                continue
+            try:
+                parsed[k] = float(v)
+            except ValueError:
+                parsed[k] = v
+        rows[step] = parsed
     return TrainTrajectory(ResultsPerStep(rows))
 
 
