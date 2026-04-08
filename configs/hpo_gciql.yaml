@@ -1,21 +1,19 @@
 defaults:
   - defaults
-  - hydra/sweeper/search_space/hiql
+  - hydra/sweeper/search_space/gciql
   - smac
   - launcher
   - _self_
   - override hydra/sweeper: HyperSMAC
   - override hydra/launcher: submitit_slurm
 
-agent_name: "hiql"
+agent_name: "gciql"
 lr: 3e-4
 batch_size: 1024
 discount: 0.99
 tau: 0.005
-expectile: 0.7
-low_alpha: 3.0
-high_alpha: 3.0
-subgoal_steps: 25
+expectile: 0.9
+alpha: 3.0
 const_std: true
 value_p_trajgoal: 0.5
 value_p_curgoalshare: 0.4
@@ -24,7 +22,5 @@ actor_p_trajgoal: 1.0
 actor_p_curgoalshare: 0.0
 actor_geom_sample: false
 actor_loss: "awr"
-# dummy alpha
-alpha: 0
 
 seed: 0
