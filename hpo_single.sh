@@ -49,9 +49,9 @@ fi
 cluster_load_env
 
 # Build cluster-specific Hydra launcher overrides
-launcher_overrides="hydra.launcher.partition=${CLUSTER_PARTITION}"
+launcher_overrides="hydra.launcher.partition='${CLUSTER_PARTITION}'"
 if [ -n "$CLUSTER_GRES" ]; then
-  launcher_overrides="${launcher_overrides} hydra.launcher.gres=${CLUSTER_GRES}"
+  launcher_overrides="${launcher_overrides} hydra.launcher.gres='${CLUSTER_GRES}'"
 else
   launcher_overrides="${launcher_overrides} hydra.launcher.gpus_per_node=1"
 fi
