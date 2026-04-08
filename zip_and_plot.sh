@@ -21,3 +21,4 @@ ZIPNAME="${DATE}-${1/\.\//}.zip"
 cluster_load_plot_env
 $2 -m gcrl_landscapes.evaluation.plot --plot_eval_curves --plot_return_distributions --plot_gp_fits --zipfile "$ZIPNAME"
 $2 -m gcrl_landscapes.evaluation.tabular --zipfiles "$ZIPNAME" --output_folder "tables/${ZIPNAME}"
+$2 "${SCRIPT_DIR}/evaluate.py" --zipfiles "$ZIPNAME"
