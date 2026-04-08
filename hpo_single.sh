@@ -55,6 +55,9 @@ if [ -n "$CLUSTER_GRES" ]; then
 else
   launcher_overrides="${launcher_overrides} hydra.launcher.gpus_per_node=1"
 fi
+if [ -n "$CLUSTER_RESERVATION" ]; then
+  launcher_overrides="${launcher_overrides} ++hydra.launcher.additional_parameters.reservation='${CLUSTER_RESERVATION}'"
+fi
 
 echo python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5" "$launcher_overrides"
 python -m gcrl_landscapes.hpo --multirun --config-name "hpo_$1" +logdir="$2" +datasets="$3" +phases="$4" +phase="$5" $launcher_overrides
