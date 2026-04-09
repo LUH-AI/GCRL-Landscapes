@@ -34,10 +34,12 @@ python -m gcrl_landscapes.evaluation.tabular --zipfile LOGFILEPATH
 
 ### Orchestration scripts (Slurm)
 ```bash
-bash train_all.sh      # Full landscape experiments across all agents/environments
-bash hpo.sh            # Phase-based Bayesian HPO via SMAC
-bash convergence.sh    # Convergence testing
-bash zip_and_plot.sh   # Post-job zip + evaluation
+bash submit_train_all.sh                    # Submit train_all.sh to Slurm (auto-selects partition/reservation for cluster)
+CLUSTER=pc2 bash submit_train_all.sh        # Override cluster (default: luh)
+bash hpo.sh                                 # Phase-based Bayesian HPO via SMAC
+CLUSTER=pc2 bash hpo.sh <agent>             # HPO on PC2 cluster
+bash convergence.sh                         # Convergence testing
+bash zip_and_plot.sh                        # Post-job zip + evaluation
 ```
 
 ## Architecture
