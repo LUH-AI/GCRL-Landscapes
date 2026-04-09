@@ -341,6 +341,8 @@ def training_logs_to_pandas(results: ResultsPerStep[TrainResult]) -> pd.DataFram
 
 def _csv_to_train_trajectory(file_content: str) -> "TrainTrajectory":
     reader = csv.DictReader(io.StringIO(file_content), delimiter=";")
+    if not reader.fieldnames or "step" not in reader.fieldnames:
+        return TrainTrajectory(ResultsPerStep({}))
     rows: dict[int, dict] = {}
     for row in reader:
         step = int(row["step"])
