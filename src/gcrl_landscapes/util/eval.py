@@ -73,11 +73,12 @@ def fit_model(
 
     # Scale all variables
     # Also reverts logarithmic scaling to uniform
+    actor_loss = phase_result["hp.actor_loss"].tolist()[0] if "hp.actor_loss" in phase_result.columns else None
     for hp_name in hp_names:
         result_copy[hp_name] = hp_to_sobol_codomain(
             result_copy[hp_name],
             *get_bounds(
-                hp_name.removeprefix("hp."), phase_result["hp.agent_name"].tolist()[0]
+                hp_name.removeprefix("hp."), phase_result["hp.agent_name"].tolist()[0], actor_loss
             ),
         )
 

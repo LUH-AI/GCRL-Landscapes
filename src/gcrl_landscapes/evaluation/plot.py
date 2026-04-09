@@ -51,6 +51,7 @@ def plot_landscape(
     y_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda y_pred, y: y_pred,
     discrete_levels: np.ndarray | None = None,
     last_phase_best_config: pd.DataFrame | None = None,
+    actor_loss: str | None = None,
 ):
     """IGPR plot of given data. Fits gaussian process itself
 
@@ -77,6 +78,7 @@ def plot_landscape(
         z_transform=y_transform,
         discrete_levels=discrete_levels,
         last_phase_best_config=last_phase_best_config,
+        actor_loss=actor_loss,
     )
 
     # Create plot without using gaussian processes
@@ -410,6 +412,7 @@ def plot_eval_results(
                     output_folder,
                     title,
                     last_phase_best_config=last_phase_best_config,
+                    actor_loss=phase_result["hp.actor_loss"].iloc[0] if "hp.actor_loss" in phase_result.columns else None,
                     **kwargs
                 )
 

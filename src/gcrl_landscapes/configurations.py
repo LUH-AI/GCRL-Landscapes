@@ -28,7 +28,7 @@ AWR_TEMPERATURE_LOWER = 0.0
 AWR_TEMPERATURE_UPPER = 30.0
 
 DDPGBC_BC_COEFF_LOWER = 0.0
-DDPGBC_BC_COEFF_UPPER = 0.5
+DDPGBC_BC_COEFF_UPPER = 1.0
 
 EPS_QRL_LOWER = 0.0
 EPS_QRL_UPPER = 1.0
@@ -50,12 +50,13 @@ SUPPORTED_HPS = set(
 )
 
 
-def get_bounds(hp_name: str, agent: str) -> tuple[float, float, bool]:
+def get_bounds(hp_name: str, agent: str, actor_loss: str | None = None) -> tuple[float, float, bool]:
     """Get boundaries for hyperparameter-name and agent
 
     Args:
         hp_name: hyperparameter name as in ogbench
         agent: agent name
+        actor_loss: actor loss type ('awr', 'ddpgbc', or None); affects alpha bounds
 
     Returns:
         tuple[float, float, bool]: lower bound, upper bound, boolean if logarithmic
@@ -70,6 +71,8 @@ def get_bounds(hp_name: str, agent: str) -> tuple[float, float, bool]:
     elif hp_name.lower() == "actor_p_trajgoal":
         return 0.0, 1.0, False
     elif hp_name.lower() == "alpha":
+        if actor_loss == "ddpgbc":
+            return DDPGBC_BC_COEFF_LOWER, DDPGBC_BC_COEFF_UPPER, False
         return AWR_TEMPERATURE_LOWER, AWR_TEMPERATURE_UPPER, False
     elif hp_name.lower() == "low_alpha":
         return AWR_TEMPERATURE_LOWER, AWR_TEMPERATURE_UPPER, False
@@ -489,14 +492,16 @@ def _adapt_base_config(config: dict, env: str, actor_loss: str | None) -> dict:
     discrete = "powderworld" in env
     # [TODO: name GCBCs loss properly. For now it says AWR]
     awr = config["agent_name"].lower() in ["gciql", "gcivl", "hiql", "gcbc"] or (
-        discrete or config["actor_loss"] == "awr" or actor_loss == "awr"
+        discrete or config.get("actor_loss", "") == "awr" or actor_loss == "awr"
     )
+    ddpgbc = not awr and actor_loss == "ddpgbc"
     hiql_grad_propagation = "low_actor_rep_grad" in config.keys() and visual
     key_value_pairs = [
         ("encoder", "impala_small", visual),
         ("discrete", True, discrete),
         ("actor_loss", "awr", awr),
         ("alpha", 3.0, awr),
+        ("actor_loss", "ddpgbc", ddpgbc),
         ("low_actor_rep_grad", True, hiql_grad_propagation),
     ]
     return config | {

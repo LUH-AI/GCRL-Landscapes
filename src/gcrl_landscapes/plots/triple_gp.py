@@ -271,9 +271,9 @@ class TripleGPModel(BaseEstimator):
         plt.legend()
         plt.show()
 
-def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str],  agent_name:str, z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, discrete_levels: np.ndarray | None = None, last_phase_best_config: pd.DataFrame | None = None, grid_length=100):
-    x_lower, x_upper, x_log = get_bounds(model.hp_names[x_dim].removeprefix("hp."), agent_name)
-    y_lower, y_upper, y_log = get_bounds(model.hp_names[y_dim].removeprefix("hp."), agent_name)
+def create_contour_plot(model, x_dim, y_dim, z_dim, bounds, filename, dim_label_mapping: Callable[[str], str],  agent_name:str, z_transform: Callable[[np.ndarray, np.ndarray], np.ndarray] = lambda z_pred, z: z_pred, discrete_levels: np.ndarray | None = None, last_phase_best_config: pd.DataFrame | None = None, grid_length=100, actor_loss: str | None = None):
+    x_lower, x_upper, x_log = get_bounds(model.hp_names[x_dim].removeprefix("hp."), agent_name, actor_loss)
+    y_lower, y_upper, y_log = get_bounds(model.hp_names[y_dim].removeprefix("hp."), agent_name, actor_loss)
     # Generate a finer grid for contour plot
     x = np.linspace(0, 1, grid_length)
     y = np.linspace(0, 1, grid_length)

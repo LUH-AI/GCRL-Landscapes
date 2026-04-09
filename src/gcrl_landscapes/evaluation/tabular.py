@@ -351,10 +351,11 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
         optimum_per_phase_df = temp_df.groupby(by=["phase_num"]).apply(
             lambda df: df.sort_values(["success"]).iloc[-1],
         )
+        actor_loss = df["hp.actor_loss"].iloc[0] if "hp.actor_loss" in df.columns else None
         for hp_name in [hp_name for hp_name in df["hps"].iloc[0]]:
             optimum_per_phase_df[f"hp.{hp_name}_sobol_codomain"] = hp_to_sobol_codomain(
                 optimum_per_phase_df[f"hp.{hp_name}"],
-                *get_bounds(hp_name, df["hp.agent_name"].iloc[0]),
+                *get_bounds(hp_name, df["hp.agent_name"].iloc[0], actor_loss),
             )
 
         # Train IGPR model
