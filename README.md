@@ -64,12 +64,13 @@ Higher-level Slurm scripts covering common experiment types:
 
 | Script | Purpose |
 |---|---|
-| `train_all.sh` | Full landscape experiments across all agents/environments |
+| `submit_train_all.sh` | Submit full landscape experiments across all agents/environments (auto-selects cluster partition) |
+| `train_all.sh` | Main training orchestration (called by submit_train_all.sh) |
 | `hpo.sh` | Phase-based Bayesian HPO via SMAC |
 | `convergence.sh` | Convergence testing |
 | `zip_and_plot.sh` | Post-job zip + evaluation |
 
-Submit via `sbatch train_all.sh` (or the relevant script). Comment out agents/environments you don't need.
+Submit training via `bash submit_train_all.sh` (default: LUH cluster) or `CLUSTER=pc2 bash submit_train_all.sh` (PC2 cluster). This wrapper automatically selects the correct Slurm partition and reservation. Comment out agents/environments in `train_all.sh` you don't need.
 
 ## Phased HPO
 
