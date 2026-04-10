@@ -285,20 +285,25 @@ def calc_feature_embedding_rank(agent, batch):
 
 def get_metrics(agent, batch):
     total_grads = get_grads(agent, batch)
-    value_grads, actor_grads = total_grads["modules_value"], total_grads["modules_actor"]
-
-    value_grad_cosine_similarities, actor_grad_cosine_similarities = calc_cossim(value_grads), calc_cossim(actor_grads)
-    value_grad_magnitude_similarity, actor_grad_magnitude_similarity = calc_magsim(value_grads), calc_magsim(actor_grads)
-    value_grads_cale, actor_grad_scale = calc_scale(value_grads), calc_scale(actor_grads)
-    del total_grads, value_grads, actor_grads
-
     total_updates = get_updates(agent, batch)
-    value_updates, actor_updates = total_updates["modules_value"], total_updates["modules_actor"]
 
-    value_update_cosine_similarities, actor_update_cosine_similarities = calc_cossim(value_updates), calc_cossim(actor_updates)
-    value_update_magnitude_similarity, actor_update_magnitude_similarity = calc_magsim(value_updates), calc_magsim(actor_updates)
-    value_updates_scale, actor_updates_scale = calc_scale(value_updates), calc_scale(actor_updates)
-    del total_updates, value_updates, actor_updates
+    available = set(total_grads.keys())
+
+    # Build conditional groups: single-module groups and the critic+value concatenation
+    grad_groups: dict = {}
+    update_groups: dict = {}
+    for module_key, name in [
+        ("modules_value", "value"),
+        ("modules_actor", "actor"),
+        ("modules_critic", "critic"),
+    ]:
+        if module_key in available:
+            grad_groups[name] = total_grads[module_key]
+            update_groups[name] = total_updates[module_key]
+    if "modules_critic" in available and "modules_value" in available:
+        # Wrap under distinct keys so jax.tree.flatten sees non-overlapping leaves
+        grad_groups["critic_value"] = {"critic": total_grads["modules_critic"], "value": total_grads["modules_value"]}
+        update_groups["critic_value"] = {"critic": total_updates["modules_critic"], "value": total_updates["modules_value"]}
 
     embedding_rank = calc_feature_embedding_rank(agent, batch)
 
@@ -315,45 +320,47 @@ def get_metrics(agent, batch):
 
     # We use trajectories as the notion of a task for pairwise metrics. If a sample is from the same trajectory -> filter it
     same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (CONST_VAL_BATCH_SIZE // 2 + 1))]), CONST_VAL_BATCH_SIZE, True)
-    return {
-        # Cosine similarities
-        "grad/value_cosine_similarity_mean": jax.numpy.mean(value_grad_cosine_similarities[~same_task]),
-        "grad/actor_cosine_similarity_mean": jax.numpy.mean(actor_grad_cosine_similarities[~same_task]),
-        "grad/value_cosine_similarity_std": jax.numpy.std(value_grad_cosine_similarities[~same_task]),
-        "grad/actor_cosine_similarity_std": jax.numpy.std(actor_grad_cosine_similarities[~same_task]),
-        **get_quantile_dict(value_grad_cosine_similarities[~same_task], "grad/value_cosine_similarity", target_quantiles),
-        **get_quantile_dict(actor_grad_cosine_similarities[~same_task], "grad/actor_cosine_similarity", target_quantiles),
-        "grad/value_cosine_similarity_cvar0.25": jax.numpy.mean(value_grad_cosine_similarities[~same_task][value_grad_cosine_similarities[~same_task] < jax.numpy.quantile(value_grad_cosine_similarities[~same_task], 0.25)]),
-        "grad/actor_cosine_similarity_cvar0.25": jax.numpy.mean(actor_grad_cosine_similarities[~same_task][actor_grad_cosine_similarities[~same_task] < jax.numpy.quantile(actor_grad_cosine_similarities[~same_task], 0.25)]),
-        # Magnitude similarities
-        "grad/value_magnitude_similarity_mean": jax.numpy.mean(value_grad_magnitude_similarity[~same_task]),
-        "grad/actor_magnitude_similarity_mean": jax.numpy.mean(actor_grad_magnitude_similarity[~same_task]),
-        "grad/value_magnitude_similarity_std": jax.numpy.std(value_grad_magnitude_similarity[~same_task]),
-        "grad/actor_magnitude_similarity_std": jax.numpy.std(actor_grad_magnitude_similarity[~same_task]),
-        **get_quantile_dict(value_grad_magnitude_similarity[~same_task], "grad/value_magnitude_similarity", target_quantiles),
-        **get_quantile_dict(actor_grad_magnitude_similarity[~same_task], "grad/actor_magnitude_similarity", target_quantiles),
-        # Gradient scale
-        "grad/value_scale_mean": jax.numpy.mean(value_grads_cale),
-        "grad/actor_scale_mean": jax.numpy.mean(actor_grad_scale),
-        "grad/value_scale_std": jax.numpy.std(value_grads_cale),
-        "grad/actor_scale_std": jax.numpy.std(actor_grad_scale),
-        # --- Same metrics for updates
-        "update/value_cosine_similarity_mean": jax.numpy.mean(value_update_cosine_similarities[~same_task]),
-        "update/actor_cosine_similarity_mean": jax.numpy.mean(actor_update_cosine_similarities[~same_task]),
-        "update/value_cosine_similarity_std": jax.numpy.std(value_update_cosine_similarities[~same_task]),
-        "update/actor_cosine_similarity_std": jax.numpy.std(actor_update_cosine_similarities[~same_task]),
-        **get_quantile_dict(value_update_cosine_similarities[~same_task], "update/value_cosine_similarity", target_quantiles),
-        **get_quantile_dict(actor_update_cosine_similarities[~same_task], "update/actor_cosine_similarity", target_quantiles),
-        "update/value_magnitude_similarity_mean": jax.numpy.mean(value_update_magnitude_similarity[~same_task]),
-        "update/actor_magnitude_similarity_mean": jax.numpy.mean(actor_update_magnitude_similarity[~same_task]),
-        "update/value_magnitude_similarity_std": jax.numpy.std(value_update_magnitude_similarity[~same_task]),
-        "update/actor_magnitude_similarity_std": jax.numpy.std(actor_update_magnitude_similarity[~same_task]),
-        **get_quantile_dict(value_update_magnitude_similarity[~same_task], "update/value_magnitude_similarity", target_quantiles),
-        **get_quantile_dict(actor_update_magnitude_similarity[~same_task], "update/actor_magnitude_similarity", target_quantiles),
-        "update/value_scale_mean": jax.numpy.mean(value_updates_scale),
-        "update/actor_scale_mean": jax.numpy.mean(actor_updates_scale),
-        "update/value_scale_std": jax.numpy.std(value_updates_scale),
-        # Feature embedding ranks
-        "feature/embedding_rank": embedding_rank,
-        **({"target/held_out_val_batch_values": held_out_val_batch_values.tolist()} if held_out_val_batch_values is not None else {}),
-    }
+    filtered = ~same_task
+
+    def group_metrics(prefix, grads, updates):
+        cossim = calc_cossim(grads)
+        magsim = calc_magsim(grads)
+        scale = calc_scale(grads)
+        u_cossim = calc_cossim(updates)
+        u_magsim = calc_magsim(updates)
+        u_scale = calc_scale(updates)
+        return {
+            # Gradient cosine similarity
+            f"grad/{prefix}_cosine_similarity_mean": jax.numpy.mean(cossim[filtered]),
+            f"grad/{prefix}_cosine_similarity_std": jax.numpy.std(cossim[filtered]),
+            **get_quantile_dict(cossim[filtered], f"grad/{prefix}_cosine_similarity", target_quantiles),
+            f"grad/{prefix}_cosine_similarity_cvar0.25": jax.numpy.mean(cossim[filtered][cossim[filtered] < jax.numpy.quantile(cossim[filtered], 0.25)]),
+            # Gradient magnitude similarity
+            f"grad/{prefix}_magnitude_similarity_mean": jax.numpy.mean(magsim[filtered]),
+            f"grad/{prefix}_magnitude_similarity_std": jax.numpy.std(magsim[filtered]),
+            **get_quantile_dict(magsim[filtered], f"grad/{prefix}_magnitude_similarity", target_quantiles),
+            # Gradient scale
+            f"grad/{prefix}_scale_mean": jax.numpy.mean(scale),
+            f"grad/{prefix}_scale_std": jax.numpy.std(scale),
+            # Update cosine similarity
+            f"update/{prefix}_cosine_similarity_mean": jax.numpy.mean(u_cossim[filtered]),
+            f"update/{prefix}_cosine_similarity_std": jax.numpy.std(u_cossim[filtered]),
+            **get_quantile_dict(u_cossim[filtered], f"update/{prefix}_cosine_similarity", target_quantiles),
+            # Update magnitude similarity
+            f"update/{prefix}_magnitude_similarity_mean": jax.numpy.mean(u_magsim[filtered]),
+            f"update/{prefix}_magnitude_similarity_std": jax.numpy.std(u_magsim[filtered]),
+            **get_quantile_dict(u_magsim[filtered], f"update/{prefix}_magnitude_similarity", target_quantiles),
+            # Update scale
+            f"update/{prefix}_scale_mean": jax.numpy.mean(u_scale),
+            f"update/{prefix}_scale_std": jax.numpy.std(u_scale),
+        }
+
+    result: dict = {}
+    for name in grad_groups:
+        result.update(group_metrics(name, grad_groups[name], update_groups[name]))
+
+    result["feature/embedding_rank"] = embedding_rank
+    if held_out_val_batch_values is not None:
+        result["target/held_out_val_batch_values"] = held_out_val_batch_values.tolist()
+
+    return result
