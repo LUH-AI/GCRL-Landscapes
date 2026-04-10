@@ -491,10 +491,14 @@ def _adapt_base_config(config: dict, env: str, actor_loss: str | None) -> dict:
     visual = "visual" in env or "powderworld" in env
     discrete = "powderworld" in env
     # [TODO: name GCBCs loss properly. For now it says AWR]
-    awr = config["agent_name"].lower() in ["gciql", "gcivl", "hiql", "gcbc"] or (
-        discrete or config.get("actor_loss", "") == "awr" or actor_loss == "awr"
-    )
-    ddpgbc = not awr and actor_loss == "ddpgbc"
+    if not actor_loss:
+        awr = config["agent_name"].lower() in ["gciql", "gcivl", "hiql", "gcbc"] or (
+            discrete or config.get("actor_loss", "") == "awr" or actor_loss == "awr"
+        )
+        ddpgbc = not awr
+    else:
+        awr = actor_loss.lower() == "awr"
+        ddpgbc = actor_loss.lower() == "ddpgbc"
     hiql_grad_propagation = "low_actor_rep_grad" in config.keys() and visual
     key_value_pairs = [
         ("encoder", "impala_small", visual),
