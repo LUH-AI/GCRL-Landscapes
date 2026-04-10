@@ -305,9 +305,10 @@ def get_metrics(agent, batch):
         grad_groups["critic_value"] = {"critic": total_grads["modules_critic"], "value": total_grads["modules_value"]}
         update_groups["critic_value"] = {"critic": total_updates["modules_critic"], "value": total_updates["modules_value"]}
 
-    embedding_rank = calc_feature_embedding_rank(agent, batch)
+    agent_modules = agent.network.model_def.modules.keys()
+    embedding_rank = calc_feature_embedding_rank(agent, batch) if "value" in agent_modules else None
 
-    if "target_value" in agent.network.model_def.modules.keys():
+    if "target_value" in agent_modules:
         held_out_val_batch_values = agent.network.select("target_value")(batch["observations"], batch["value_goals"], params=agent.network.params)
         if len(held_out_val_batch_values.shape) == 3 and held_out_val_batch_values.shape[0] == 2:
             held_out_val_batch_values = held_out_val_batch_values.mean(axis=0).reshape(-1)
@@ -359,7 +360,8 @@ def get_metrics(agent, batch):
     for name in grad_groups:
         result.update(group_metrics(name, grad_groups[name], update_groups[name]))
 
-    result["feature/embedding_rank"] = embedding_rank
+    if embedding_rank is not None:
+        result["feature/embedding_rank"] = embedding_rank
     if held_out_val_batch_values is not None:
         result["target/held_out_val_batch_values"] = held_out_val_batch_values.tolist()
 
