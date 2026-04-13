@@ -256,21 +256,6 @@ best_config_df = merged_training_with_iqm_df.merge(
 # Let's evaluate the rank of the model:
 
 # %%
-print(
-    merged_training_with_iqm_df.groupby("hp.agent_name")[
-        "feature/embedding_rank"
-    ].describe()
-)
-print(
-    merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "eval_bins5"])[
-        "feature/embedding_rank"
-    ].describe()
-)
-
-# %% [markdown]
-# Capture this in a boxplot:
-
-# %%
 import seaborn as sns
 
 sns.set_theme(context="paper", style="whitegrid")
@@ -287,36 +272,54 @@ end_of_training_df = merged_training_with_iqm_df[
         "eval_step"
     ].transform("max")
 ]
-fig, ax = plt.subplots()
-sns.boxplot(data=end_of_training_df, x="hp.agent_name", y="feature/embedding_rank")
-plt.savefig("rank_boxplot_agent.png")
-plt.close()
-for dataset in merged_training_with_iqm_df["dataset"].unique():
-    fig, ax = plt.subplots()
-    sns.boxplot(
-        data=end_of_training_df[end_of_training_df["dataset"] == dataset],
-        x="hp.agent_name",
-        y="feature/embedding_rank",
-    )
-    print(dataset)
+if "feature/embedding_rank" in merged_training_with_iqm_df.columns:
     print(
-        merged_training_with_iqm_df[merged_training_with_iqm_df["dataset"] == dataset]
-        .groupby("hp.agent_name")["iqm"]
-        .max()
+        merged_training_with_iqm_df.groupby("hp.agent_name")[
+            "feature/embedding_rank"
+        ].describe()
     )
-    plt.savefig(f"rank_boxplot_agent_{dataset}.png")
+    print(
+        merged_training_with_iqm_df.groupby(
+            ["hp.agent_name", "dataset", "eval_bins5"]
+        )["feature/embedding_rank"].describe()
+    )
+
+    # %% [markdown]
+    # Capture this in a boxplot:
+
+    # %%
+    fig, ax = plt.subplots()
+    sns.boxplot(data=end_of_training_df, x="hp.agent_name", y="feature/embedding_rank")
+    plt.savefig("rank_boxplot_agent.png")
     plt.close()
+    for dataset in merged_training_with_iqm_df["dataset"].unique():
+        fig, ax = plt.subplots()
+        sns.boxplot(
+            data=end_of_training_df[end_of_training_df["dataset"] == dataset],
+            x="hp.agent_name",
+            y="feature/embedding_rank",
+        )
+        print(dataset)
+        print(
+            merged_training_with_iqm_df[
+                merged_training_with_iqm_df["dataset"] == dataset
+            ]
+            .groupby("hp.agent_name")["iqm"]
+            .max()
+        )
+        plt.savefig(f"rank_boxplot_agent_{dataset}.png")
+        plt.close()
 
-# %% [markdown]
-# Now for only best config per experiment:
+    # %% [markdown]
+    # Now for only best config per experiment:
 
-# %%
-print(best_config_df.groupby("hp.agent_name")["feature/embedding_rank"].describe())
-print(
-    best_config_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])[
-        "feature/embedding_rank"
-    ].describe()
-)
+    # %%
+    print(best_config_df.groupby("hp.agent_name")["feature/embedding_rank"].describe())
+    print(
+        best_config_df.groupby(["hp.agent_name", "exploration_schedule", "eval_bins5"])[
+            "feature/embedding_rank"
+        ].describe()
+    )
 
 
 # %% [markdown]
@@ -387,32 +390,33 @@ def compute_drift_to(group: pd.DataFrame, target: str = "end"):
     )
 
 
-merged_training_with_iqm_df["target_drift_end"] = merged_training_with_iqm_df.groupby(
-    ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
-).apply(compute_drift_to, target="end")
-merged_training_with_iqm_df["target_drift_start"] = merged_training_with_iqm_df.groupby(
-    ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
-).apply(compute_drift_to, target="start")
-merged_training_with_iqm_df["target_drift_neighbor"] = (
-    merged_training_with_iqm_df.groupby(
+if "target/held_out_val_batch_values_np" in merged_training_with_iqm_df.columns:
+    merged_training_with_iqm_df["target_drift_end"] = merged_training_with_iqm_df.groupby(
         ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
-    ).apply(compute_drift_to, target="neighbor")
-)
-print(
-    merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])[
-        "target_drift_end"
-    ].agg(["mean", "std"])
-)
-print(
-    merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])[
-        "target_drift_start"
-    ].agg(["mean", "std"])
-)
-print(
-    merged_training_with_iqm_df.groupby(
-        ["hp.agent_name", "exploration_schedule", "eval_bins5"]
-    )["target_drift_neighbor"].agg(["mean", "std"])
-)
+    ).apply(compute_drift_to, target="end")
+    merged_training_with_iqm_df["target_drift_start"] = merged_training_with_iqm_df.groupby(
+        ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
+    ).apply(compute_drift_to, target="start")
+    merged_training_with_iqm_df["target_drift_neighbor"] = (
+        merged_training_with_iqm_df.groupby(
+            ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
+        ).apply(compute_drift_to, target="neighbor")
+    )
+    print(
+        merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])[
+            "target_drift_end"
+        ].agg(["mean", "std"])
+    )
+    print(
+        merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])[
+            "target_drift_start"
+        ].agg(["mean", "std"])
+    )
+    print(
+        merged_training_with_iqm_df.groupby(
+            ["hp.agent_name", "exploration_schedule", "eval_bins5"]
+        )["target_drift_neighbor"].agg(["mean", "std"])
+    )
 # %% [markdown]
 #
 
@@ -424,103 +428,98 @@ print(
 # Let's look at gradient interference data. We start with **cosine similarity**:
 
 # %%
-print(
-    merged_training_with_iqm_df.groupby(["hp.agent_name"])[
-        ["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]
-    ].mean()
-)
-print("Only best configuration per landscape for next print")
-print(
-    best_config_df.groupby(["exploration_schedule", "hp.agent_name"])[
-        ["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]
-    ].mean()
-)
+good_configs_df = merged_training_with_iqm_df[merged_training_with_iqm_df["iqm"] > 0.5]
+if "grad/value_cosine_similarity_mean" in merged_training_with_iqm_df.columns:
+    print(
+        merged_training_with_iqm_df.groupby(["hp.agent_name"])[
+            ["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]
+        ].mean()
+    )
+    print("Only best configuration per landscape for next print")
+    print(
+        best_config_df.groupby(["exploration_schedule", "hp.agent_name"])[
+            ["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]
+        ].mean()
+    )
 
-print(
-    merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])[
-        "grad/value_cosine_similarity_mean"
-    ].mean()
-)
-print("Only best configuration per landscape for next print")
-print(
-    best_config_df.groupby(["hp.agent_name", "eval_bins5"])[
-        "grad/value_cosine_similarity_mean"
-    ].mean()
-)
+    print(
+        merged_training_with_iqm_df.groupby(["hp.agent_name", "eval_bins5"])[
+            "grad/value_cosine_similarity_mean"
+        ].mean()
+    )
+    print("Only best configuration per landscape for next print")
+    print(
+        best_config_df.groupby(["hp.agent_name", "eval_bins5"])[
+            "grad/value_cosine_similarity_mean"
+        ].mean()
+    )
 
-# %% [markdown]
-# Keep only configurations that reach a minimal performance and do analysis
+    # %% [markdown]
+    # Keep only configurations that reach a minimal performance and do analysis
 
-# %%
-good_configs_df = merged_training_with_iqm_df[
-    (merged_training_with_iqm_df["iqm"] > 0.5)
-]
-print(
-    good_configs_df.groupby(["dataset", "hp.agent_name"])[
-        ["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]
-    ].describe()
-)
-print(
-    good_configs_df.groupby(["hp.agent_name"])[
-        ["grad/value_cosine_similarity_std", "grad/actor_cosine_similarity_std"]
-    ].describe()
-)
+    # %%
+    print(
+        good_configs_df.groupby(["dataset", "hp.agent_name"])[
+            ["grad/value_cosine_similarity_mean", "grad/actor_cosine_similarity_mean"]
+        ].describe()
+    )
+    print(
+        good_configs_df.groupby(["hp.agent_name"])[
+            ["grad/value_cosine_similarity_std", "grad/actor_cosine_similarity_std"]
+        ].describe()
+    )
 
-print("-------------------")
+    print("-------------------")
 
+    def cvar(x, alpha=0.05):
+        var = np.quantile(x, alpha)
+        return x[x <= var].mean()
 
-def cvar(x, alpha=0.05):
-    var = np.quantile(x, alpha)
-    return x[x <= var].mean()
+    print(
+        good_configs_df.groupby(["eval_bins5", "dataset", "hp.agent_name"])[
+            ["grad/value_cosine_similarity_mean"]
+        ].describe()
+    )
+    print(
+        good_configs_df.groupby(["eval_bins5", "hp.agent_name"])[
+            ["grad/value_cosine_similarity_std"]
+        ].describe()
+    )
 
-
-print(
-    good_configs_df.groupby(["eval_bins5", "dataset", "hp.agent_name"])[
-        ["grad/value_cosine_similarity_mean"]
-    ].describe()
-)
-print(
-    good_configs_df.groupby(["eval_bins5", "hp.agent_name"])[
-        ["grad/value_cosine_similarity_std"]
-    ].describe()
-)
-
-print(
-    merged_training_with_iqm_df.groupby(["eval_bins5", "hp.agent_name"])[
-        ["grad/value_cosine_similarity_mean"]
-    ].apply(
-        lambda x: (
-            x[x <= np.quantile(x, 0.25)].mean(),
-            x[x >= np.quantile(x, 0.75)].mean(),
+    print(
+        merged_training_with_iqm_df.groupby(["eval_bins5", "hp.agent_name"])[
+            ["grad/value_cosine_similarity_mean"]
+        ].apply(
+            lambda x: (
+                x[x <= np.quantile(x, 0.25)].mean(),
+                x[x >= np.quantile(x, 0.75)].mean(),
+            )
         )
     )
-)
-# %% [markdown]
-# Look at metrics inside of batch
+    # %% [markdown]
+    # Look at metrics inside of batch
 
-# %%
-bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 0.1)]
-bad_configs_df.groupby(["hp.agent_name"])[
-    "grad/value_cosine_similarity_cvar0.25"
-].mean()
-# (merged_training_with_iqm_df.groupby(["hp.agent_name"])[merged_training_with_iqm_df.columns[merged_training_with_iqm_df.columns.str.contains(r"grad/.*quant\d+")]].mean())
+    # %%
+    bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 0.1)]
+    bad_configs_df.groupby(["hp.agent_name"])[
+        "grad/value_cosine_similarity_cvar0.25"
+    ].mean()
+    # (merged_training_with_iqm_df.groupby(["hp.agent_name"])[merged_training_with_iqm_df.columns[merged_training_with_iqm_df.columns.str.contains(r"grad/.*quant\d+")]].mean())
 
+    # %%
+    fig, ax = plt.subplots()
+    sns.displot(
+        data=merged_training_with_iqm_df,
+        x="grad/value_cosine_similarity_mean",
+        hue="hp.agent_name",
+    )
+    plt.savefig("grad_cosine_similarity_distributions.png")
+    plt.close()
 
-# %%
-fig, ax = plt.subplots()
-sns.displot(
-    data=merged_training_with_iqm_df,
-    x="grad/value_cosine_similarity_mean",
-    hue="hp.agent_name",
-)
-plt.savefig("grad_cosine_similarity_distributions.png")
-plt.close()
-
-
-# %%
-merged_training_with_iqm_df.groupby(["hp.agent_name"])[
-    "grad/value_cosine_similarity_quant0.05"
-].describe()
+    # %%
+    merged_training_with_iqm_df.groupby(["hp.agent_name"])[
+        "grad/value_cosine_similarity_quant0.05"
+    ].describe()
 
 # %% [markdown]
 # ### Intra-Batch Goal Gradient Alignment
