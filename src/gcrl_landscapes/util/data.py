@@ -7,7 +7,7 @@ import json
 import csv
 import multiprocessing
 import os
-from concurrent.futures import ProcessPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import pandas as pd
 import zipfile
 import re
@@ -484,7 +484,7 @@ def read_results_from_zip(
         ]
 
         all_parsed: list[tuple[int, int, int, TrainTrajectory]] = []
-        with ProcessPoolExecutor(max_workers=n_workers) as executor:
+        with ThreadPoolExecutor(max_workers=n_workers) as executor:
             for batch_results in executor.map(
                 _parse_csv_batch, [(zippath, b) for b in batches]
             ):
