@@ -6,6 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
 
 sbatch \
+  "$@" \
   --partition="${CLUSTER_SETUP_PARTITION}" \
   ${CLUSTER_RESERVATION:+--reservation="${CLUSTER_RESERVATION}"} \
   --export=ALL,CLUSTER="${CLUSTER:-luh}" \
