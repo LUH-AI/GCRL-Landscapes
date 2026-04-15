@@ -283,6 +283,53 @@ def calc_feature_embedding_rank(agent, batch):
     return get_embedding_rank(phi)
 
 
+def _qv_advantage(agent, batch):
+    """adv = min(Q1, Q2) - V  — used by GCIQL and CRL-AWR."""
+    v = agent.network.select('value')(batch['observations'], batch['actor_goals'])
+    q1, q2 = agent.network.select('critic')(batch['observations'], batch['actor_goals'], batch['actions'])
+    return jax.numpy.minimum(q1, q2) - v
+
+
+def _ensemble_td_advantage(agent, obs, next_obs, goals):
+    """adv = mean(nV1,nV2) - mean(V1,V2)  — used by GCIVL and HIQL."""
+    v1, v2 = agent.network.select('value')(obs, goals)
+    nv1, nv2 = agent.network.select('value')(next_obs, goals)
+    return (nv1 + nv2) / 2 - (v1 + v2) / 2
+
+
+def get_advantage_metrics(agent, batch) -> dict:
+    """Compute per-sample advantage values on a fixed batch for logging."""
+    if agent.config.get('actor_loss') != 'awr':
+        return {}
+
+    agent_name = agent.config.get('agent_name', '').lower()
+    result = {}
+
+    if agent_name in ('gciql', 'crl'):
+        result['advantage/actor'] = _qv_advantage(agent, batch).tolist()
+
+    elif agent_name == 'gcivl':
+        result['advantage/actor'] = _ensemble_td_advantage(
+            agent, batch['observations'], batch['next_observations'], batch['actor_goals']
+        ).tolist()
+
+    elif agent_name == 'qrl':
+        v = -agent.network.select('value')(batch['observations'], batch['actor_goals'])
+        nv = -agent.network.select('value')(batch['next_observations'], batch['actor_goals'])
+        result['advantage/actor'] = (nv - v).tolist()
+
+    elif agent_name == 'hiql':
+        result['advantage/low_actor'] = _ensemble_td_advantage(
+            agent, batch['observations'], batch['next_observations'], batch['low_actor_goals']
+        ).tolist()
+        result['advantage/high_actor'] = _ensemble_td_advantage(
+            agent, batch['observations'], batch['high_actor_targets'], batch['high_actor_goals']
+        ).tolist()
+
+    # GCBC / SAC / CMD / CRL-ddpgbc: no advantage → empty dict
+    return result
+
+
 def get_metrics(agent, batch):
     total_grads = get_grads(agent, batch)
     total_updates = get_updates(agent, batch)
@@ -364,5 +411,7 @@ def get_metrics(agent, batch):
         result["feature/embedding_rank"] = embedding_rank
     if held_out_val_batch_values is not None:
         result["target/held_out_val_batch_values"] = held_out_val_batch_values.tolist()
+
+    result.update(get_advantage_metrics(agent, batch))
 
     return result
