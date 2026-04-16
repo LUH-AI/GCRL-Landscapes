@@ -220,7 +220,7 @@ if ADV_COLS:
 # Ratio of weights > 100 per config, then statistics across configs
 if ADV_COLS:
     high_ratio = (
-        adv_long_df.groupby(["hp.agent_name", "actor", "config_index"])["weight"]
+        adv_long_df.groupby(["hp.agent_name", "actor", "config_index", "seed"])["weight"]
         .apply(lambda w: (w > 100).sum() / len(w))  # type: ignore[arg-type]
         .reset_index(name="high_ratio")
     )
@@ -235,9 +235,9 @@ if ADV_COLS and merged_results_df is not None:
     end_perf = merged_results_df[
         merged_results_df["eval_step"]
         == merged_results_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max")
-    ][["hp.agent_name", "dataset", "config_index", "mean_normalized_goal_distance_return"]].copy()
+    ][["hp.agent_name", "dataset", "config_index", "seed", "mean_normalized_goal_distance_return"]].copy()
 
-    corr_df = high_ratio.merge(end_perf, on=["hp.agent_name", "config_index"], how="inner")
+    corr_df = high_ratio.merge(end_perf, on=["hp.agent_name", "config_index", "seed"], how="inner")
 
     def _pearson_r(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
         if len(g) < 3:
@@ -255,6 +255,11 @@ if ADV_COLS and merged_results_df is not None:
 
 # %%
 # Build long-format dataframe over ALL phases (not just end of training)
+# NOTE: merged_results_df only contains return data at phase-boundary eval_steps
+# (one per phase, e.g. 205069, 410138, 615208, 820277), even though merged_training_df
+# logs advantages at ~10x more intermediate steps. Any join with return data is therefore
+# limited to those phase-boundary steps — this is a structural property of the zip format,
+# not a filtering bug.
 if ADV_COLS and merged_results_df is not None:
     phase_map = merged_results_df[
         ["hp.agent_name", "dataset", "config_index", "eval_step", "phase_num"]
@@ -294,13 +299,13 @@ if ADV_COLS and merged_results_df is not None:
 # High-weight ratio and correlation with performance, per phase
 if ADV_COLS and merged_results_df is not None:
     high_ratio_phased = (
-        adv_all_df.groupby(["hp.agent_name", "actor", "config_index", "phase_num"])["weight"]
+        adv_all_df.groupby(["hp.agent_name", "actor", "config_index", "seed", "phase_num"])["weight"]
         .apply(lambda w: (w > 100).sum() / len(w))  # type: ignore[arg-type]
         .reset_index(name="high_ratio")
     )
 
     perf_per_phase = merged_results_df[
-        ["hp.agent_name", "dataset", "config_index", "phase_num", "mean_normalized_goal_distance_return"]
+        ["hp.agent_name", "dataset", "config_index", "seed", "phase_num", "mean_normalized_goal_distance_return"]
     ].copy()
     # Normalize return to [0, 1] per (agent, phase, env) using max scaling
     grp_keys = ["hp.agent_name", "phase_num", "dataset"]
@@ -308,7 +313,7 @@ if ADV_COLS and merged_results_df is not None:
     perf_per_phase["return_normalized"] = perf_per_phase["mean_normalized_goal_distance_return"] / _max.replace(0, float("nan"))
 
     corr_phased_df = high_ratio_phased.merge(
-        perf_per_phase, on=["hp.agent_name", "config_index", "phase_num"], how="inner"
+        perf_per_phase, on=["hp.agent_name", "config_index", "seed", "phase_num"], how="inner"
     )
 
     def _pearson_r_phase(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
@@ -340,7 +345,7 @@ def _ess(w: pd.Series) -> float:
 
 if ADV_COLS:
     ess_df = (
-        adv_long_df.groupby(["hp.agent_name", "actor", "config_index"])["weight"]
+        adv_long_df.groupby(["hp.agent_name", "actor", "config_index", "seed"])["weight"]
         .apply(_ess)  # type: ignore[arg-type]
         .reset_index(name="ess")
     )
@@ -348,7 +353,7 @@ if ADV_COLS:
     print(ess_df.groupby(["hp.agent_name", "actor"])["ess"].describe())
 
 if ADV_COLS and merged_results_df is not None:
-    corr_ess_df = ess_df.merge(end_perf, on=["hp.agent_name", "config_index"], how="inner")
+    corr_ess_df = ess_df.merge(end_perf, on=["hp.agent_name", "config_index", "seed"], how="inner")
 
     def _pearson_r_ess(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
         if len(g) < 3:
@@ -368,13 +373,13 @@ if ADV_COLS and merged_results_df is not None:
 # ESS per phase + correlation with normalized performance
 if ADV_COLS and merged_results_df is not None:
     ess_phased = (
-        adv_all_df.groupby(["hp.agent_name", "actor", "config_index", "phase_num"])["weight"]
+        adv_all_df.groupby(["hp.agent_name", "actor", "config_index", "seed", "phase_num"])["weight"]
         .apply(_ess)  # type: ignore[arg-type]
         .reset_index(name="ess")
     )
 
     corr_ess_phased_df = ess_phased.merge(
-        perf_per_phase, on=["hp.agent_name", "config_index", "phase_num"], how="inner"
+        perf_per_phase, on=["hp.agent_name", "config_index", "seed", "phase_num"], how="inner"
     )
 
     def _pearson_r_ess_phase(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
