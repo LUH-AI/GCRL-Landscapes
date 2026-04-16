@@ -12,6 +12,7 @@ zipfiles = _args.zipfiles or [
         "/home/mtoepperwien/Documents/gcrl/log_zips/2026-04-07-logs_antmaze-medium-all-algs.zip"
     )
 ]  # <- edit this
+plot_dir = Path("plots") / zipfiles[0].name / "advantages"
 
 # %%
 import os
@@ -19,7 +20,7 @@ import os
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-os.makedirs("plots/advantages", exist_ok=True)
+os.makedirs(plot_dir, exist_ok=True)
 
 # %%
 import types
@@ -122,7 +123,7 @@ if ADV_COLS:
         ax.set_xlabel("Advantage")
         ax.set_ylabel("Density")
         plt.tight_layout()
-        fname = f"plots/advantages/adv_dist_{agent_name}_{actor.replace('/', '_')}.png"
+        fname = plot_dir / f"adv_dist_{agent_name}_{actor.replace('/', '_')}.png"
         plt.savefig(fname, dpi=300)
         print(f"Saved {fname}")
         plt.close()
@@ -173,7 +174,7 @@ if ADV_COLS:
         ax.set_xlabel("AWR Weight  exp(α · adv)")
         ax.set_ylabel("Density")
         plt.tight_layout()
-        fname = f"plots/advantages/weight_dist_{agent_name}_{actor.replace('/', '_')}.png"
+        fname = plot_dir / f"weight_dist_{agent_name}_{actor.replace('/', '_')}.png"
         plt.savefig(fname, dpi=300)
         print(f"Saved {fname}")
         plt.close()
@@ -211,7 +212,7 @@ if ADV_COLS:
         ax.set_xlabel("AWR Weight  exp(α · adv), clipped at 100")
         ax.set_ylabel("Density")
         plt.tight_layout()
-        fname = f"plots/advantages/weight_dist_clipped_{agent_name}_{actor.replace('/', '_')}.png"
+        fname = plot_dir / f"weight_dist_clipped_{agent_name}_{actor.replace('/', '_')}.png"
         plt.savefig(fname, dpi=300)
         print(f"Saved {fname}")
         plt.close()
