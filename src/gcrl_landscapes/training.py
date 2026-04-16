@@ -339,15 +339,18 @@ def get_metrics(agent, batch):
     # Build conditional groups: single-module groups and the critic+value concatenation
     grad_groups: dict = {}
     update_groups: dict = {}
+    agent_name = agent.config.get('agent_name', '').lower()
     for module_key, name in [
         ("modules_value", "value"),
         ("modules_actor", "actor"),
         ("modules_critic", "critic"),
     ]:
+        if module_key in ("modules_value", "modules_critic") and agent_name == 'crl':
+            continue
         if module_key in available:
             grad_groups[name] = total_grads[module_key]
             update_groups[name] = total_updates[module_key]
-    if "modules_critic" in available and "modules_value" in available:
+    if agent_name != 'crl' and "modules_critic" in available and "modules_value" in available:
         # Wrap under distinct keys so jax.tree.flatten sees non-overlapping leaves
         grad_groups["critic_value"] = {"critic": total_grads["modules_critic"], "value": total_grads["modules_value"]}
         update_groups["critic_value"] = {"critic": total_updates["modules_critic"], "value": total_updates["modules_value"]}
