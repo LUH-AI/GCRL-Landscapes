@@ -12,11 +12,14 @@ zipfiles = _args.zipfiles or [
         "/home/mtoepperwien/Documents/gcrl/log_zips/2026-04-07-logs_antmaze-medium-all-algs.zip"
     )
 ]  # <- edit this
+plot_dir = Path("plots") / zipfiles[0].name
+tables_dir = Path("tables") / zipfiles[0].name
 
 # %%
 import os
 
-os.makedirs("plots/cdf_swapped", exist_ok=True)
+os.makedirs(plot_dir / "cdf_swapped", exist_ok=True)
+os.makedirs(tables_dir, exist_ok=True)
 
 # %%
 import types
@@ -290,7 +293,7 @@ if "feature/embedding_rank" in merged_training_with_iqm_df.columns:
     # %%
     fig, ax = plt.subplots()
     sns.boxplot(data=end_of_training_df, x="hp.agent_name", y="feature/embedding_rank")
-    plt.savefig("rank_boxplot_agent.png")
+    plt.savefig(plot_dir / "rank_boxplot_agent.png")
     plt.close()
     for dataset in merged_training_with_iqm_df["dataset"].unique():
         fig, ax = plt.subplots()
@@ -307,7 +310,7 @@ if "feature/embedding_rank" in merged_training_with_iqm_df.columns:
             .groupby("hp.agent_name")["iqm"]
             .max()
         )
-        plt.savefig(f"rank_boxplot_agent_{dataset}.png")
+        plt.savefig(plot_dir / f"rank_boxplot_agent_{dataset}.png")
         plt.close()
 
     # %% [markdown]
@@ -513,7 +516,7 @@ if "grad/value_cosine_similarity_mean" in merged_training_with_iqm_df.columns:
         x="grad/value_cosine_similarity_mean",
         hue="hp.agent_name",
     )
-    plt.savefig("grad_cosine_similarity_distributions.png")
+    plt.savefig(plot_dir / "grad_cosine_similarity_distributions.png")
     plt.close()
 
     # %%
@@ -602,7 +605,7 @@ def plot_cdf(df: pd.DataFrame, name: str) -> None:
     plt.xlabel("Gradient Cosine Similarity")
     plt.ylabel("Cumulative Probability")
     plt.tight_layout()
-    plt.savefig(f"plots/gradient-alignment-cdf-{name}.png", dpi=1200)
+    plt.savefig(plot_dir / f"gradient-alignment-cdf-{name}.png", dpi=1200)
 
     plt.close()
 
@@ -650,7 +653,7 @@ def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
     plt.xlabel("Gradient Cosine Similarity")
     plt.ylabel("Cumulative Probability")
     plt.tight_layout()
-    plt.savefig(f"plots/cdf_swapped/gradient-alignment-cdf-{name}.png", dpi=1200)
+    plt.savefig(plot_dir / "cdf_swapped" / f"gradient-alignment-cdf-{name}.png", dpi=1200)
 
     plt.close()
 
@@ -1286,7 +1289,7 @@ def mobility_plot(
 
     from pathlib import Path
 
-    path = Path(f"plots/mobility/{title}.png")
+    path = plot_dir / "mobility" / f"{title}.png"
     path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(path, dpi=1200)
     plt.close()
@@ -1482,7 +1485,7 @@ plt.xlabel("Phase Transition")
 plt.ylabel(r"Overlap of Optimum")
 plt.legend(title="Algorithm")
 plt.tight_layout()
-plt.savefig("plots/optimum-overlap-phases", dpi=1200)
+plt.savefig(plot_dir / "optimum-overlap-phases.png", dpi=1200)
 plt.close()
 # %% [markdown]
 # Now lets get tabular data
@@ -1510,7 +1513,7 @@ latex_phase_optimum_df = (
     .sort_index()
 )
 
-with open("tables/optimum-overlap-phases.tex", "w") as f:
+with open(tables_dir / "optimum-overlap-phases.tex", "w") as f:
     f.writelines(
         latex_phase_optimum_df.to_latex(
             index=True,
@@ -1572,7 +1575,7 @@ plt.xlabel("Exploration Ratio")
 plt.ylabel(r"Overlap of Optimum")
 plt.legend(title="Algorithm")
 plt.tight_layout()
-plt.savefig("plots/optimum-overlap-quality.png", dpi=1200)
+plt.savefig(plot_dir / "optimum-overlap-quality.png", dpi=1200)
 plt.close()
 
 # %%
@@ -1583,7 +1586,7 @@ latex_quality_optimum_df = (
     .sort_index()
 )
 
-with open("tables/optimum-overlap-quality.tex", "w") as f:
+with open(tables_dir / "optimum-overlap-quality.tex", "w") as f:
     f.writelines(
         latex_quality_optimum_df.to_latex(
             index=True,
@@ -1642,5 +1645,5 @@ sns.lineplot(
 ax.set(xscale="log")
 plt.xlim(x_lower, x_upper)
 plt.ylim(y_lower, y_upper)
-plt.savefig("test.png")
+plt.savefig(plot_dir / "test.png")
 plt.close()
