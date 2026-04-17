@@ -180,6 +180,8 @@ if __name__ == "__main__":
         trajectories = sample_trajectories([(args.num_trajectories, train_dataset_raw)])
 
     assert len(trajectories) == args.num_trajectories
+    if not hasattr(env.unwrapped, "maze_map"):
+        raise SystemExit(f"Dataset '{args.dataset}' is not a maze environment; maze visualization is not supported.")
     # move goal and ant out of picture
     env.unwrapped.set_goal(goal_xy=(-10, -10))  # type: ignore
     env.unwrapped.set_xy((-10, -10))  # type: ignore
