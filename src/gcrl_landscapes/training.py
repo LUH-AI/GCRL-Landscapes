@@ -265,6 +265,19 @@ def get_updates(agent, batch):
 
 
 @jax.jit
+def get_updates_from_grads_raw(agent, raw_grads):
+    """Apply optimizer to pre-computed per-sample gradients using the shared optimizer state.
+
+    Avoids recomputing gradients inside vmap, halving peak memory vs get_updates_standard.
+    """
+    return chunked_vmap(
+        lambda g: agent.network.tx.update(g, agent.network.opt_state, agent.network.params)[0],
+        raw_grads,
+        GRAD_CHUNK_SIZE,
+    )
+
+
+@jax.jit
 def calc_cossim(grads):
     return remove_duplicates(pairwise_seq_map(optax.losses.cosine_similarity, CONST_VAL_BATCH_SIZE, True, grads, grads), CONST_VAL_BATCH_SIZE, True)
 
@@ -358,8 +371,15 @@ def get_advantage_metrics(agent, batch) -> dict:
 
 
 def get_metrics(agent, batch):
-    total_grads = get_grads(agent, batch)
-    total_updates = get_updates(agent, batch)
+    raw_grads = get_grads_standard(agent, batch)
+    raw_updates = get_updates_from_grads_raw(agent, raw_grads)
+    agent_name = agent.config.get('agent_name', '').lower()
+    if agent_name == 'hiql':
+        total_grads = hiql_combine(raw_grads)
+        total_updates = hiql_combine(raw_updates)
+    else:
+        total_grads = raw_grads
+        total_updates = raw_updates
 
     available = set(total_grads.keys())
 
