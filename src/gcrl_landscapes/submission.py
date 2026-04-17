@@ -40,6 +40,13 @@ SUPPORTED_DATASETS = [
     "antmaze-medium-explore80navigate-v0",
     "antmaze-medium-explore40navigate-v0",
     "antmaze-medium-explore-v0",
+    "scene-v0",
+    "scene-singletask-v0",
+    "scene-singletask-task1-v0",
+    "scene-singletask-task2-v0",
+    "scene-singletask-task3-v0",
+    "scene-singletask-task4-v0",
+    "scene-singletask-task5-v0",
 ]
 
 

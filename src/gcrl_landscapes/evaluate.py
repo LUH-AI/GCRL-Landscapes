@@ -4,6 +4,7 @@ from ogbench.locomaze.ant import AntEnv
 from ogbench.locomaze.humanoid import HumanoidEnv
 from ogbench.locomaze.point import PointEnv
 from ogbench.manipspace.envs.cube_env import CubeEnv
+from ogbench.manipspace.envs.scene_env import SceneEnv
 from ogbench.powderworld.powderworld_env import PowderworldEnv
 import numpy as np
 from ml_collections import ConfigDict
@@ -102,6 +103,57 @@ def calc_goal_distances(
         ]
         goal_end_distances = [
             [float(traj["info"][-1]["error"]) for traj in trajs_task]
+            for trajs_task in trajectories
+        ]
+    elif isinstance(env.unwrapped, SceneEnv):
+        n_cubes = env.unwrapped._num_cubes
+        n_buttons = env.unwrapped._num_buttons
+        xyz_center = np.array([0.425, 0.0, 0.0])
+        robot_dims = 19
+        btn_start = robot_dims + n_cubes * 9
+
+        def decode_goal(goal_list: list) -> dict:
+            g = np.array(goal_list)
+            return {
+                "block_pos": [
+                    g[robot_dims + i * 9 : robot_dims + i * 9 + 3] / 10.0 + xyz_center
+                    for i in range(n_cubes)
+                ],
+                "button_states": [
+                    int(np.argmax(g[btn_start + j * 4 : btn_start + j * 4 + 2]))
+                    for j in range(n_buttons)
+                ],
+                "drawer_pos": float(g[btn_start + n_buttons * 4] / 18.0),
+                "window_pos": float(g[btn_start + n_buttons * 4 + 2] / 15.0),
+            }
+
+        def scene_distance(info: dict, goal: dict) -> float:
+            cube_dist = sum(
+                float(np.linalg.norm(info[f"privileged/block_{i}_pos"] - goal["block_pos"][i]))
+                for i in range(n_cubes)
+            )
+            drawer_dist = float(abs(info["privileged/drawer_pos"][0] - goal["drawer_pos"]))
+            window_dist = float(abs(info["privileged/window_pos"][0] - goal["window_pos"]))
+            button_dist = float(
+                sum(
+                    int(info[f"privileged/button_{i}_state"] != goal["button_states"][i])
+                    for i in range(n_buttons)
+                )
+            )
+            return cube_dist + drawer_dist + window_dist + button_dist
+
+        goal_start_distances = [
+            [
+                scene_distance(traj["info"][0], decode_goal(traj["info"][0]["goal"]))
+                for traj in trajs_task
+            ]
+            for trajs_task in trajectories
+        ]
+        goal_end_distances = [
+            [
+                scene_distance(traj["info"][-1], decode_goal(traj["info"][0]["goal"]))
+                for traj in trajs_task
+            ]
             for trajs_task in trajectories
         ]
     else:
