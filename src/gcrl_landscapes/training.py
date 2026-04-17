@@ -199,7 +199,7 @@ def chunked_vmap(f, xs, chunk_size):
     n_chunks = batch_size // chunk_size
     chunks = jax.tree.map(lambda x: x.reshape(n_chunks, chunk_size, *x.shape[1:]), xs)
     results = jax.lax.map(lambda chunk: jax.vmap(f)(chunk), chunks)
-    return jax.tree.map(lambda x: x.reshape(batch_size, *x.shape[1:]), results)
+    return jax.tree.map(lambda x: x.reshape(batch_size, *x.shape[2:]), results)
 
 
 @jax.jit
