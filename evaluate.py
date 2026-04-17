@@ -156,7 +156,7 @@ def datasets_to_exploration_schedule(dataset_str: str) -> str:
             elif re.match(r".*navigate-.*", dataset):
                 return 0
             else:
-                raise ValueError(f"Unknown dataset: {dataset}")
+                return 0  # non-antmaze datasets (e.g. cube) treated as fully expert
 
     datasets = dataset_str.split(",")
     return ",".join(
