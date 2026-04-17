@@ -23,6 +23,7 @@ import os
 from functools import partial
 
 CONST_VAL_BATCH_SIZE = 256
+GRAD_CHUNK_SIZE = 32  # chunk size for chunked_vmap in per-sample grad/update computation
 
 def train(
     agent_class: Callable[[Any, gym.Env, int], Any],
@@ -189,12 +190,32 @@ def remove_duplicates(pairwise_similarities, batch_size, symmetric):
     return pairwise_similarities.flatten()[:(batch_size ** 2 - batch_size) // 2] if symmetric else pairwise_similarities
 
 
+def chunked_vmap(f, xs, chunk_size):
+    """Like jax.vmap but processes xs in sequential chunks to reduce peak memory.
+
+    chunk_size must divide the leading axis size of xs.
+    """
+    batch_size = jax.tree.leaves(xs)[0].shape[0]
+    n_chunks = batch_size // chunk_size
+    chunks = jax.tree.map(lambda x: x.reshape(n_chunks, chunk_size, *x.shape[1:]), xs)
+    results = jax.lax.map(lambda chunk: jax.vmap(f)(chunk), chunks)
+    return jax.tree.map(lambda x: x.reshape(batch_size, *x.shape[1:]), results)
+
+
 @jax.jit
 def get_grads_standard(agent, batch):
     """Get gradients for QRL/CRL with single actor."""
     if agent.config.get('agent_name', '').lower() == 'crl':
-        return jax.vmap(lambda index: jax.grad(lambda grad_params: crl_total_loss_individual(agent, batch, index, grad_params), has_aux=True)(agent.network.params)[0], in_axes=0, out_axes=0)(jax.numpy.arange(jax.tree_util.tree_leaves(batch)[0].shape[0]))
-    return jax.vmap(lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0], in_axes=0, out_axes=0)(batch)
+        return chunked_vmap(
+            lambda index: jax.grad(lambda grad_params: crl_total_loss_individual(agent, batch, index, grad_params), has_aux=True)(agent.network.params)[0],
+            jax.numpy.arange(jax.tree_util.tree_leaves(batch)[0].shape[0]),
+            GRAD_CHUNK_SIZE,
+        )
+    return chunked_vmap(
+        lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0],
+        batch,
+        GRAD_CHUNK_SIZE,
+    )
 
 
 @jax.jit
@@ -220,11 +241,17 @@ def get_grads(agent, batch):
 @jax.jit
 def get_updates_standard(agent, batch):
     if agent.config.get('agent_name', '').lower() == 'crl':
-        get_grad = lambda index: jax.grad(lambda grad_params: crl_total_loss_individual(agent, batch, index, grad_params), has_aux=True)(agent.network.params)[0]
-        return jax.vmap(lambda index: agent.network.tx.update(get_grad(index), agent.network.opt_state, agent.network.params)[0], in_axes=0, out_axes=0)(jax.numpy.arange(jax.tree_util.tree_leaves(batch)[0].shape[0]))
+        return chunked_vmap(
+            lambda index: agent.network.tx.update(jax.grad(lambda grad_params: crl_total_loss_individual(agent, batch, index, grad_params), has_aux=True)(agent.network.params)[0], agent.network.opt_state, agent.network.params)[0],
+            jax.numpy.arange(jax.tree_util.tree_leaves(batch)[0].shape[0]),
+            GRAD_CHUNK_SIZE,
+        )
     else:
-        get_grad = lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0]
-        return jax.vmap(lambda sample: agent.network.tx.update(get_grad(sample), agent.network.opt_state, agent.network.params)[0], in_axes=0, out_axes=0)(batch)
+        return chunked_vmap(
+            lambda sample: agent.network.tx.update(jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0], agent.network.opt_state, agent.network.params)[0],
+            batch,
+            GRAD_CHUNK_SIZE,
+        )
 
 
 @jax.jit
@@ -339,18 +366,15 @@ def get_metrics(agent, batch):
     # Build conditional groups: single-module groups and the critic+value concatenation
     grad_groups: dict = {}
     update_groups: dict = {}
-    agent_name = agent.config.get('agent_name', '').lower()
     for module_key, name in [
         ("modules_value", "value"),
         ("modules_actor", "actor"),
         ("modules_critic", "critic"),
     ]:
-        if module_key in ("modules_value", "modules_critic") and agent_name == 'crl':
-            continue
         if module_key in available:
             grad_groups[name] = total_grads[module_key]
             update_groups[name] = total_updates[module_key]
-    if agent_name != 'crl' and "modules_critic" in available and "modules_value" in available:
+    if "modules_critic" in available and "modules_value" in available:
         # Wrap under distinct keys so jax.tree.flatten sees non-overlapping leaves
         grad_groups["critic_value"] = {"critic": total_grads["modules_critic"], "value": total_grads["modules_value"]}
         update_groups["critic_value"] = {"critic": total_updates["modules_critic"], "value": total_updates["modules_value"]}
