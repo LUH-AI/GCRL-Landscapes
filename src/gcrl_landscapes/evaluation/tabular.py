@@ -351,7 +351,9 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
         optimum_per_phase_df = temp_df.groupby(by=["phase_num"]).apply(
             lambda df: df.sort_values(["success"]).iloc[-1],
         )
-        actor_loss = df["hp.actor_loss"].iloc[0] if "hp.actor_loss" in df.columns else None
+        actor_loss = (
+            df["hp.actor_loss"].iloc[0] if "hp.actor_loss" in df.columns else None
+        )
         for hp_name in [hp_name for hp_name in df["hps"].iloc[0]]:
             optimum_per_phase_df[f"hp.{hp_name}_sobol_codomain"] = hp_to_sobol_codomain(
                 optimum_per_phase_df[f"hp.{hp_name}"],
@@ -799,6 +801,12 @@ if __name__ == "__main__":
         merged_results_df, merged_training_df = load_or_compute(
             args.zipfiles, compute_merged_df
         )  # type: ignore
+        heavy_cols = [
+            c
+            for c in merged_training_df.columns
+            if c.startswith("advantage/") or c == "target/held_out_val_batch_values"
+        ]
+        merged_training_df = merged_training_df.drop(columns=heavy_cols)
         to_category_columns = ["dataset", "hps", "agent"] + merged_training_df.columns[
             merged_training_df.columns.str.startswith("hp.")
         ].tolist()

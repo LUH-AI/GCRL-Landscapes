@@ -41,6 +41,10 @@ for col in to_category_columns:
 float_cols = merged_training_df.select_dtypes(include="float64").columns
 for col in float_cols:
     merged_training_df[col] = merged_training_df[col].astype("float16")
+merged_training_df = merged_training_df.drop(
+    columns=[c for c in merged_training_df.columns if c.startswith("advantage/")],
+    errors="ignore",
+)
 
 # %%
 import pandas as pd
@@ -282,9 +286,9 @@ if "feature/embedding_rank" in merged_training_with_iqm_df.columns:
         ].describe()
     )
     print(
-        merged_training_with_iqm_df.groupby(
-            ["hp.agent_name", "dataset", "eval_bins5"]
-        )["feature/embedding_rank"].describe()
+        merged_training_with_iqm_df.groupby(["hp.agent_name", "dataset", "eval_bins5"])[
+            "feature/embedding_rank"
+        ].describe()
     )
 
     # %% [markdown]
@@ -394,12 +398,16 @@ def compute_drift_to(group: pd.DataFrame, target: str = "end"):
 
 
 if "target/held_out_val_batch_values_np" in merged_training_with_iqm_df.columns:
-    merged_training_with_iqm_df["target_drift_end"] = merged_training_with_iqm_df.groupby(
-        ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
-    ).apply(compute_drift_to, target="end")
-    merged_training_with_iqm_df["target_drift_start"] = merged_training_with_iqm_df.groupby(
-        ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
-    ).apply(compute_drift_to, target="start")
+    merged_training_with_iqm_df["target_drift_end"] = (
+        merged_training_with_iqm_df.groupby(
+            ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
+        ).apply(compute_drift_to, target="end")
+    )
+    merged_training_with_iqm_df["target_drift_start"] = (
+        merged_training_with_iqm_df.groupby(
+            ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
+        ).apply(compute_drift_to, target="start")
+    )
     merged_training_with_iqm_df["target_drift_neighbor"] = (
         merged_training_with_iqm_df.groupby(
             ["hp.agent_name", "dataset", "config_index", "seed"], group_keys=False
@@ -503,7 +511,9 @@ if "grad/value_cosine_similarity_mean" in merged_training_with_iqm_df.columns:
     # Look at metrics inside of batch
 
     # %%
-    bad_configs_df = merged_training_with_iqm_df[(merged_training_with_iqm_df["iqm"] < 0.1)]
+    bad_configs_df = merged_training_with_iqm_df[
+        (merged_training_with_iqm_df["iqm"] < 0.1)
+    ]
     bad_configs_df.groupby(["hp.agent_name"])[
         "grad/value_cosine_similarity_cvar0.25"
     ].mean()
@@ -653,7 +663,9 @@ def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
     plt.xlabel("Gradient Cosine Similarity")
     plt.ylabel("Cumulative Probability")
     plt.tight_layout()
-    plt.savefig(plot_dir / "cdf_swapped" / f"gradient-alignment-cdf-{name}.png", dpi=1200)
+    plt.savefig(
+        plot_dir / "cdf_swapped" / f"gradient-alignment-cdf-{name}.png", dpi=1200
+    )
 
     plt.close()
 
