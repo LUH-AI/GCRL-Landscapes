@@ -578,7 +578,7 @@ if __name__ == "__main__":
     # Parse results
     plots_folder = Path("plots") / os.path.basename(args.zipfile)
     results: dict[str, tuple[dict, ResultsPerStep[PhaseResult], ResultsPerStep[PhaseResult]]] = (
-        read_results_from_zip(args.zipfile)
+        read_results_from_zip(args.zipfile, load_training_logs=False)
     )
     results_pandas = {
         identifier: (run_info, phase_results_to_pandas(phase_results), training_logs_to_pandas(training_results))

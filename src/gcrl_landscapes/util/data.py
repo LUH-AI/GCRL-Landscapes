@@ -7,7 +7,7 @@ import json
 import csv
 import multiprocessing
 import os
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor
 import pandas as pd
 import zipfile
 import re
@@ -372,12 +372,14 @@ def _parse_csv_batch(
 
 def read_results_from_zip(
     zippath: Path,
+    load_training_logs: bool = True,
 ) -> dict[str, tuple[dict, ResultsPerStep[PhaseResult], ResultsPerStep[PhaseResult]]]:
     """read results from zip that mirrors file structure as constructed by training scripts.
     This function heavily relies on regex and therefore proper file naming.
 
     Args:
         zippath: path to zip from experiment results. Root contains only folder "logs/"
+        load_training_logs: if False, skip loading train_log.csv files (saves memory when training data is not needed)
 
     Returns:
         All experiment results inside of logs folder. Mapped by name
@@ -521,14 +523,18 @@ def read_results_from_zip(
             )
             for prefix in prefix_run_mapping.keys()
         }
-        prefix_training_results_mapping = {
-            prefix: extract_training_log(
-                prefix_filenames_mapping[prefix],
-                prefix_configuration_mapping[prefix],
-                zippath,
-            )
-            for prefix in prefix_run_mapping.keys()
-        }
+        prefix_training_results_mapping = (
+            {
+                prefix: extract_training_log(
+                    prefix_filenames_mapping[prefix],
+                    prefix_configuration_mapping[prefix],
+                    zippath,
+                )
+                for prefix in prefix_run_mapping.keys()
+            }
+            if load_training_logs
+            else {prefix: ResultsPerStep({}) for prefix in prefix_run_mapping.keys()}
+        )
 
     return {
         prefix: (
