@@ -30,6 +30,7 @@ from .common import (
     calculate_regret_for_experiment,
 )
 import toml
+import traceback
 import zipfile
 import multiprocessing
 from functools import partial
@@ -545,16 +546,20 @@ def plot_parallel_wrapper(
     folder = plots_folder / run_name
     folder.mkdir(exist_ok=True, parents=True)
     print(f"Plotting '{prefix}'")
-    plot_eval_results(
-        results_df,
-        folder,
-        run_info,
-        plot_return_distributions=plot_return_distributions,
-        plot_eval_curves=plot_eval_curves,
-        plot_gp_fits=plot_gp_fits,
-        plot_regret=plot_regret,
-        plot_landscapes=plot_landscapes,
-    )
+    try:
+        plot_eval_results(
+            results_df,
+            folder,
+            run_info,
+            plot_return_distributions=plot_return_distributions,
+            plot_eval_curves=plot_eval_curves,
+            plot_gp_fits=plot_gp_fits,
+            plot_regret=plot_regret,
+            plot_landscapes=plot_landscapes,
+        )
+    except Exception:
+        print(f"ERROR while plotting '{prefix}':\n{traceback.format_exc()}", flush=True)
+        raise
 
 
 if __name__ == "__main__":
@@ -592,9 +597,9 @@ if __name__ == "__main__":
 
     if not args.no_multiprocessing:
         try:
-            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 3
+            thread_count = int(os.environ["SLURM_CPUS_ON_NODE"]) // 4
         except Exception as _:
-            thread_count = multiprocessing.cpu_count() // 3
+            thread_count = multiprocessing.cpu_count() // 4
         with multiprocessing.get_context("spawn").Pool(thread_count) as pool:
             pool.map(
                 plot_results,
