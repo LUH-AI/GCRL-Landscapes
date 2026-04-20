@@ -97,26 +97,7 @@ def marginalize_seeds(df: pd.DataFrame):
     )
 
 
-def eps_optimality(df: pd.DataFrame, col: str) -> pd.Series:
-    grouping = [
-        "agent",
-        "dataset",
-        "constant_dataset",
-        "hps",
-        "phase_num",
-    ]
-
-    return df[col] / df.groupby(grouping)[col].transform("max")
-
-
-def regret(df: pd.DataFrame, col: str) -> pd.Series:
-    grouping = [
-        "agent",
-        "dataset",
-        "constant_dataset",
-        "phase_num",
-    ]
-    return df.groupby(grouping)[col].transform("max") - df[col]
+from gcrl_landscapes.evaluation.common import eps_optimality, regret_from_df as regret
 
 
 # %%
@@ -150,22 +131,7 @@ merged_training_df.columns.tolist()
 import re
 
 
-def datasets_to_exploration_schedule(dataset_str: str) -> str:
-    def dataset_to_exploration_percentage(dataset: str) -> int:
-        try:
-            return int(re.search(r"explore(\d+)\w+", dataset).group(1))
-        except:
-            if re.match(r".*explore-.*", dataset):
-                return 100
-            elif re.match(r".*navigate-.*", dataset):
-                return 0
-            else:
-                return 0  # non-antmaze datasets (e.g. cube) treated as fully expert
-
-    datasets = dataset_str.split(",")
-    return ",".join(
-        [str(dataset_to_exploration_percentage(dataset)) for dataset in datasets]
-    )
+from gcrl_landscapes.evaluation.landscapes import datasets_to_exploration_schedule
 
 
 print(
@@ -1048,269 +1014,10 @@ corr_progress_sorted[corr_progress_sorted["eval_bins5"] == 0]
 merged_results_df.groupby(["hp.agent_name", "dataset"])
 
 # %%
-from adjustText import adjust_text
-from src.gcrl_landscapes.util.eval import fit_model
-from src.gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
-from gcrl_landscapes.plots.triple_gp import create_contour_plot
-from gcrl_landscapes.evaluation.common import map_labels
+from src.gcrl_landscapes.configurations import get_bounds
+from gcrl_landscapes.evaluation.landscapes import mobility_plot, optimum_share_table
 
-grid_length = 100
-
-
-def mobility_plot(
-    df, agent_name, title, by_col: str = "phase_num", performance_threshold=0.95
-):
-    clipped_merged_results_df = df.copy()
-    clipped_merged_results_df["mean_normalized_goal_distance_return"] = (
-        clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
-    )
-    data_temp = clipped_merged_results_df
-    # for phase_num ...
-    point_dfs = []
-    for name, group in data_temp.groupby([by_col]):
-        group_copy = group.copy().reset_index()
-        model = fit_model(
-            group_copy, "mean_normalized_goal_distance_return", ["hp.lr", "hp.alpha"]
-        )
-        model.fit()
-        create_contour_plot(
-            model,
-            x_dim=0,
-            y_dim=1,
-            z_dim="mean_normalized_goal_distance_return",
-            bounds=[0, 1],
-            filename="test_contour.pdf",
-            dim_label_mapping=map_labels,
-            agent_name=agent_name,
-            z_transform=lambda x, _: x,
-            discrete_levels=None,
-            last_phase_best_config=None,
-        )
-        x_lower, x_upper, x_log = get_bounds(
-            model.hp_names[0].removeprefix("hp."), agent_name
-        )
-        y_lower, y_upper, y_log = get_bounds(
-            model.hp_names[1].removeprefix("hp."), agent_name
-        )
-        x, y = np.linspace(0, 1, grid_length), np.linspace(0, 1, grid_length)
-        X, Y = np.meshgrid(x, y)
-        points = np.vstack([X.ravel(), Y.ravel()]).transpose()
-        Z = model.get_middle(points).clip(0, 1)
-        Z_normalized = Z / Z.max()
-        Z_selected = (Z_normalized > 0.9).squeeze()
-        points_x, points_y = (
-            sobol_codomain_to_hp(points[:, 0], x_lower, x_upper, x_log),
-            sobol_codomain_to_hp(points[:, 1], y_lower, y_upper, y_log),
-        )
-        print(np.vstack([points_x, points_y]))
-
-        # # TODO: decide
-        # group_copy["hp.lr"] = hp_to_sobol_codomain(group_copy["hp.lr"], x_lower, x_upper, x_log)
-        # group_copy["hp.discount"] = hp_to_sobol_codomain(group_copy["hp.discount"], y_lower, y_upper, y_log)
-        # marginalized_group_copy = group_copy.groupby(["hp.lr", "hp.discount"])["mean_normalized_goal_distance_return"].apply(lambda values: trim_mean(values, proportiontocut=0.25)).reset_index()
-        # marginalized_group_copy["goal_distance_return_eps"] = marginalized_group_copy["mean_normalized_goal_distance_return"] / marginalized_group_copy["mean_normalized_goal_distance_return"].max()
-
-        points_prediction_df = pd.DataFrame(
-            {
-                "hp.lr": points_x,
-                "hp.alpha": points_y,
-                "mean_normalized_goal_distance_return": Z_normalized.squeeze(),
-            }
-        )
-        # points_prediction_df = marginalized_group_copy[marginalized_group_copy["goal_distance_return_eps"] > 0.8]
-        points_prediction_df[by_col] = name[0]
-        point_dfs.append(points_prediction_df)
-    point_df = pd.concat(point_dfs)
-    print(point_df.describe())
-
-    print(len(point_df))
-    # sns.scatterplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.9], x="hp.lr", y="hp.discount", hue="phase_num")
-    x_lower, x_upper, x_log = get_bounds("lr", agent_name)
-    y_lower, y_upper, y_log = get_bounds("alpha", agent_name)
-    # ax = sns.kdeplot(data=point_df[point_df["mean_normalized_goal_distance_return"] > 0.95], x="hp.lr", y="hp.discount", hue="phase_num", log_scale=(x_log, y_log), levels=10, bw_adjust=1, fill=True, alpha=0.4, palette="rocket")
-    df = point_df[
-        point_df["mean_normalized_goal_distance_return"] > performance_threshold
-    ]
-
-    # ax = sns.kdeplot(
-    #     data=df,
-    #     x="hp.lr", y="hp.discount",
-    #     hue="phase_num",
-    #     log_scale=(x_log, y_log),
-    #     fill=True,
-    #     levels=2,
-    #     thresh=0.15,
-    #     bw_adjust=1.0,
-    #     alpha=0.12,
-    #     palette="magma",
-    #     linewidth=0,
-    # )
-    #
-    # sns.kdeplot(
-    #     data=df,
-    #     x="hp.lr", y="hp.discount",
-    #     hue="phase_num",
-    #     log_scale=(x_log, y_log),
-    #     fill=False,
-    #     levels=[0.5, 0.8],
-    #     thresh=0.15,
-    #     bw_adjust=1.0,
-    #     alpha=0.9,
-    #     palette="magma",
-    #     linewidths=2.0,
-    #     ax=ax,
-    # )
-    fig, ax = plt.subplots(figsize=(6, 4))
-
-    palette = sns.color_palette("viridis", n_colors=df[by_col].nunique())
-
-    sns.set_context(context="paper", font_scale=1.75)
-
-    # plt.rcParams.update({
-    #     "font.size": 20,          # base font size
-    #     "axes.titlesize": 16,
-    #     "axes.labelsize": 20,
-    #     "xtick.labelsize": 20,
-    #     "ytick.labelsize": 20,
-    #     "legend.fontsize": 12,
-    #     "figure.titlesize": 18,
-    # })
-
-    texts = []
-    centroids = []
-    for i, phase in enumerate(sorted(df[by_col].unique())):
-        phase_df = df[df[by_col] == phase]
-        color = palette[i]
-
-        sns.kdeplot(
-            data=phase_df,
-            x="hp.lr",
-            y="hp.alpha",
-            log_scale=(x_log, y_log),
-            fill=True,
-            levels=4,
-            thresh=0.05,
-            bw_adjust=0.7,
-            alpha=0.12,
-            color=color,
-            linewidth=0,
-            ax=ax,
-        )
-
-        sns.kdeplot(
-            data=phase_df,
-            x="hp.lr",
-            y="hp.alpha",
-            log_scale=(x_log, y_log),
-            fill=False,
-            levels=[0.7],
-            thresh=0.05,
-            bw_adjust=0.7,
-            alpha=0.9,
-            color=color,
-            linewidths=3.5,
-            ax=ax,
-            label=f"Phase {phase}",
-        )
-
-        centroid_x = phase_df["hp.lr"].median()
-        centroid_y = phase_df["hp.alpha"].median()
-        ax.scatter(
-            centroid_x,
-            centroid_y,
-            s=750 if by_col == "phase_num" else 1500,
-            c=[color],
-            edgecolors="white",
-            linewidths=1,
-            zorder=100,
-            marker="o",
-            alpha=0.75,
-        )
-        texts.append(
-            ax.annotate(
-                str(phase),
-                xy=(centroid_x, centroid_y),
-                xytext=(centroid_x, centroid_y),
-                fontsize=20,
-                fontweight="bold",
-                ha="center",
-                va="center",
-                color="white",
-                zorder=101,
-                alpha=1,
-            )
-        )
-        # texts.append(ax.text(centroid_x, centroid_y, str(phase), fontsize=20, fontweight='bold',
-        # ha='center', va='center', color='black', zorder=101, alpha=1))
-        centroids.append((centroid_x, centroid_y))
-    # ax.set_xlabel("")
-    # ax.set_ylabel("")
-    ax.set_xlabel("Learning Rate")
-    ax.set_ylabel("Alpha")
-    # ax.set_title("Evolution of Optimal Hyperparameter Regions Across Training Phases",
-    #              fontsize=15, fontweight='bold', pad=20)
-
-    # ax.legend(title="Training Phase", title_fontsize=12, fontsize=11,
-    #           loc="upper left", bbox_to_anchor=(1.02, 1), frameon=True,
-    #           fancybox=True, shadow=True)
-    # Replace your current legend section with this:
-
-    # Create the legend
-    # legend = plt.legend(
-    #     handles = [1, 2, 3, 4],
-    #     title="Training Phase",
-    #     title_fontsize=14,
-    #     fontsize=12,
-    #     loc="center left",
-    #     bbox_to_anchor=(1.05, 0.5),  # Position to the right of the plot
-    #     frameon=True,
-    #     fancybox=True,
-    #     shadow=True,
-    #     borderpad=1.2,  # Padding inside legend box
-    #     labelspacing=1.2,  # Space between legend entries
-    #     handlelength=2.5,  # Length of the legend lines
-    #     handleheight=1.5   # Height of the legend lines
-    # )
-
-    # ax.grid(True, alpha=0.25, linestyle='--', linewidth=0.6)
-    # ax.set_facecolor('#fafafa')
-    # for i in range(len(centroids)-1):
-    #     ax.annotate('', xy=centroids[i+1], xytext=centroids[i],
-    #                 arrowprops=dict(arrowstyle='->', lw=2.5, color='black', alpha=0.6,
-    #                                connectionstyle="arc3,rad=0.1"))
-    #
-
-    # sns.move_legend(ax, "upper left", bbox_to_anchor=(1.02, 1), frameon=False, title="phase")
-    ax.grid(True, alpha=0.15)
-    print(ax.collections[0].levels)
-    plt.xlim(x_lower, x_upper)
-    plt.ylim(y_lower, y_upper)
-    if x_log:
-        ax.set_xscale("log", base=10)
-    if y_log:
-        ax.set_yscale("log", base=10)
-    x, y = zip(*centroids)
-    texts, patches = adjust_text(
-        texts,
-        avoid_self=False,
-        pull_threshold=0.000001,
-        pull_force=0.1,
-        force_static=0.001,
-        force_explode=0.5,
-        arrowprops=dict(arrowstyle="-", color="white"),
-    )
-    for item in texts:
-        item.set_zorder(102)
-    for item in patches:
-        item.set_zorder(101)
-    plt.tight_layout()
-
-    from pathlib import Path
-
-    path = plot_dir / "mobility" / f"{title}.pdf"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(path)
-    plt.close()
+_hp_list = ["hp.lr", "hp.alpha"]
 
 
 # %%
@@ -1325,20 +1032,14 @@ for name, group in merged_results_df.groupby(["hp.agent_name", "dataset_condense
     datasets = name[1]
 
     print(f"mobility-{agent}-{datasets}")
-    performance_threshold = 95
-    mobility_plot(
-        group,
-        agent,
-        f"{performance_threshold}/mobility-{agent}-{datasets}",
-        performance_threshold=performance_threshold / 100,
-    )
-    performance_threshold = 90
-    mobility_plot(
-        group,
-        agent,
-        f"{performance_threshold}/mobility-{agent}-{datasets}",
-        performance_threshold=performance_threshold / 100,
-    )
+    for performance_threshold in [95, 90]:
+        mobility_plot(
+            group,
+            agent,
+            _hp_list,
+            output_path=plot_dir / "mobility" / str(performance_threshold) / f"mobility-{agent}-{datasets}.png",
+            performance_threshold=performance_threshold / 100,
+        )
 
 
 # %% [markdown]
@@ -1370,82 +1071,21 @@ for name, group in merged_results_df_constant_last_phase.groupby(
         continue
 
     print(f"mobility-last-phase-{agent}-{envs}")
-    performance_threshold = 95
-    mobility_plot(
-        group,
-        agent,
-        f"across-dataquality/{performance_threshold}/mobility-last-phase-{agent}-{envs}",
-        by_col="Exploration Ratio",
-        performance_threshold=performance_threshold / 100,
-    )
-    performance_threshold = 90
-    mobility_plot(
-        group,
-        agent,
-        f"across-dataquality/{performance_threshold}/mobility-last-phase-{agent}-{envs}",
-        by_col="Exploration Ratio",
-        performance_threshold=performance_threshold / 100,
-    )
+    for performance_threshold in [95, 90]:
+        mobility_plot(
+            group,
+            agent,
+            _hp_list,
+            output_path=plot_dir / "mobility" / "across-dataquality" / str(performance_threshold) / f"mobility-last-phase-{agent}-{envs}.png",
+            by_col="Exploration Ratio",
+            performance_threshold=performance_threshold / 100,
+        )
 
 # %% [markdown]
 # ## Table for across phase/quality
 
 # %%
-from src.gcrl_landscapes.configurations import get_bounds, sobol_codomain_to_hp
 import warnings
-from typing import Callable
-
-
-def optimum_share_table(
-    df,
-    agent_name,
-    by_col: str = "phase_num",
-    performance_threshold=0.95,
-    sorter: Callable = lambda x: sorted(x),
-    grid_length=100,
-):
-    clipped_merged_results_df = df.copy()
-    clipped_merged_results_df["mean_normalized_goal_distance_return"] = (
-        clipped_merged_results_df["mean_normalized_goal_distance_return"].clip(0, 1)
-    )
-    data_temp = clipped_merged_results_df
-
-    # This is an example model to correctly set grid
-    model = fit_model(df, "mean_normalized_goal_distance_return", ["hp.lr", "hp.alpha"])
-    hpname_x = model.hp_names[0].removeprefix("hp.")
-    hpname_y = model.hp_names[1].removeprefix("hp.")
-    model.fit()
-    x_lower, x_upper, x_log = get_bounds(hpname_x, agent_name)
-    y_lower, y_upper, y_log = get_bounds(hpname_y, agent_name)
-    x, y = np.linspace(0, 1, grid_length), np.linspace(0, 1, grid_length)
-    X, Y = np.meshgrid(x, y)
-    points = np.vstack([X.ravel(), Y.ravel()]).transpose()
-
-    def get_optimal_point_selector(group_df):
-        group_copy = group_df.copy().reset_index()
-        model = fit_model(
-            group_copy, "mean_normalized_goal_distance_return", ["hp.lr", "hp.alpha"]
-        )
-        model.fit()
-        assert (
-            model.hp_names[0].removeprefix("hp.") == hpname_x
-            and model.hp_names[1].removeprefix("hp.") == hpname_y
-        )
-        Z = model.get_middle(points).clip(0, 1)
-        Z_normalized = Z / Z.max()
-        Z_selected = (Z_normalized > performance_threshold).squeeze()
-        return Z_selected
-
-    optimal_points_per_col = data_temp.groupby(by_col).apply(get_optimal_point_selector)
-    col_sorted = sorter(optimal_points_per_col.index.tolist())
-    transition_point_share = {
-        f"{col1}->{col2}": np.sum(
-            optimal_points_per_col.loc[col1] & optimal_points_per_col.loc[col2]
-        )
-        / np.sum(optimal_points_per_col.loc[col1] | optimal_points_per_col.loc[col2])
-        for col1, col2 in zip(col_sorted[:-1], col_sorted[1:])
-    }
-    return pd.Series(transition_point_share, name="transition")
 
 
 # %% [markdown]
@@ -1463,6 +1103,7 @@ with warnings.catch_warnings():
         lambda group: optimum_share_table(
             group,
             group["hp.agent_name"].iloc[0],
+            hp_list=_hp_list,
             by_col="phase_num",
             performance_threshold=0.90,
             grid_length=100,
@@ -1562,6 +1203,7 @@ with warnings.catch_warnings():
             lambda group: optimum_share_table(
                 group.reset_index(),
                 group["hp.agent_name"].reset_index().iloc[0],
+                hp_list=_hp_list,
                 by_col="Exploration Ratio",
                 sorter=lambda x: list(reversed(sorted(x))),
                 performance_threshold=0.90,
