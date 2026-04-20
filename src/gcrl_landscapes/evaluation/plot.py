@@ -73,7 +73,7 @@ def plot_landscape(
         y_dim=1,
         z_dim=y_label if y_label else y_col,
         bounds=[0, 1],
-        filename=output_folder / f"igpr-{plot_filename_base}.png",
+        filename=output_folder / f"igpr-{plot_filename_base}.pdf",
         dim_label_mapping=map_labels,
         agent_name=agent_name,
         z_transform=y_transform,
@@ -111,7 +111,7 @@ def plot_landscape(
     )
     plt.colorbar(c, label=y_label if y_label else y_col)
     plt.savefig(
-        output_folder / f"nearest-{plot_filename_base}.png",
+        output_folder / f"nearest-{plot_filename_base}.pdf",
         bbox_inches="tight",
     )
     plt.close()
@@ -139,7 +139,7 @@ def plot_eval_curve(
     plt.xlabel("Training Step")
     ax.set_ylim(0, 1)
     plt.savefig(
-        output_folder / f"eval-{y_col}.png",
+        output_folder / f"eval-{y_col}.pdf",
         bbox_inches="tight",
     )
     plt.close()
@@ -172,7 +172,7 @@ def plot_return_distribution(
         # plt.title(f"{y_label if y_label else y_col}", fontsize=18)
         plt.savefig(
             output_per_config_folder
-            / f"returndistribution-{y_col}-config_{config_index}-{phase}.png",
+            / f"returndistribution-{y_col}-config_{config_index}-{phase}.pdf",
             bbox_inches="tight",
         )
         plt.close()
@@ -188,7 +188,7 @@ def plot_return_distribution(
     ax.set_ylim(0, 1)
     # plt.title(f"{y_label if y_label else y_col}", fontsize=18)
     plt.savefig(
-        output_folder / f"returndistribution-{y_col}-{phase}.png",
+        output_folder / f"returndistribution-{y_col}-{phase}.pdf",
         bbox_inches="tight",
     )
     plt.close()
@@ -233,7 +233,7 @@ def plot_gp_fit(
     ax.set_xlabel("Number of Configurations")
     ax.set_ylabel("Error")
     fig.savefig(
-        output_folder / f"gp_fit-({'_'.join(hp_names)})-{y_col}-{phase}.png",
+        output_folder / f"gp_fit-({'_'.join(hp_names)})-{y_col}-{phase}.pdf",
         bbox_inches="tight",
     )
     plt.close()
@@ -261,7 +261,7 @@ def plot_regret_curve(
     sns.lineplot(data=regret_df_long, x="phase", y="regret", hue="pick_phase", ax=ax)
     ax.set_ylim(0, 1)
     plt.tight_layout()
-    fig.savefig(output_folder / f"regret_({'_'.join(hp_names)})-{regret_label.lower().replace(' ', '_').replace(')', '').replace('(', '') if regret_label else regret_col}.png")
+    fig.savefig(output_folder / f"regret_({'_'.join(hp_names)})-{regret_label.lower().replace(' ', '_').replace(')', '').replace('(', '') if regret_label else regret_col}.pdf")
     plt.close()
 
 
@@ -523,7 +523,7 @@ def grid_plot(
         ax.axis("off")
         ax.set_title(f"{dataset}-{phase}")
         ax.title.set_size(7)
-    fig.savefig(output_folder / f"{title}.png", bbox_inches="tight")
+    fig.savefig(output_folder / f"{title}.pdf", bbox_inches="tight")
     plt.close()
     return
 
@@ -655,10 +655,10 @@ if __name__ == "__main__":
         for unscaled_plotpath in [
             plots_folder / experiment_name / filename
             for filename in os.listdir(plots_folder / experiment_name)
-            if re.match(r"^.*-.*-\d+.png$", filename)
+            if re.match(r"^.*-.*-\d+.pdf$", filename)
         ]:
             plot_name_matches = re.match(
-                r".*/(?P<plot_type>[^-/]*)-(?:\((?P<hps>[^\)]*)\)-)?(?P<y_col>[^-/]*)-(?P<phase>\d+).png$",
+                r".*/(?P<plot_type>[^-/]*)-(?:\((?P<hps>[^\)]*)\)-)?(?P<y_col>[^-/]*)-(?P<phase>\d+).pdf$",
                 str(unscaled_plotpath),
             )
             if not plot_name_matches:

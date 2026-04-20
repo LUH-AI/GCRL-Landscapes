@@ -32,7 +32,7 @@ ax.set_ylabel("Perplexity")
 ax.legend(title="Algorithm", loc="center left", bbox_to_anchor=(1, 0.5), frameon=False)
 plt.ylim(1, 9)
 plt.tight_layout()
-plt.savefig("perplexity-scheduled.png", dpi=1200)
+plt.savefig("perplexity-scheduled.pdf")
 ```
 
 ## Entropy Plot
@@ -46,7 +46,7 @@ import seaborn as sns
 fig, ax = plt.subplots()
 sns.lineplot(data=entropy_df[entropy_df["setting"] == "scheduled_exploration"], x="trainingprogress", y="mean_normalized", hue="agent", ax=ax)
 plt.title("Entropy")
-plt.savefig("entropy-scheduled.png")
+plt.savefig("entropy-scheduled.pdf")
 ```
 
 ## Importance Mass
@@ -60,7 +60,7 @@ import seaborn as sns
 fig, ax = plt.subplots()
 sns.lineplot(data=importance_mass_df[importance_mass_df["setting"] == "scheduled_exploration"], x="trainingprogress", y="mean_normalized", hue="Algorithm", ax=ax)
 plt.title("Importance Mass")
-plt.savefig("importance_mass-scheduled.png")
+plt.savefig("importance_mass-scheduled.pdf")
 
 ```
 
@@ -98,6 +98,6 @@ ax.set_xlabel("Phase Transition")
 ax.set_ylabel(r"Weighted Kendall's $\tau$")
 # ax.legend(title="Algorithm")
 plt.tight_layout()
-plt.savefig("kendalltau-scheduled.png", dpi=1200)
+plt.savefig("kendalltau-scheduled.pdf")
 plt.close()
 ```
