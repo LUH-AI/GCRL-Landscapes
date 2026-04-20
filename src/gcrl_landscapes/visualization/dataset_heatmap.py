@@ -99,7 +99,7 @@ def plot_dataset_heatmap(dataset: str, output_folder: Path) -> None:
     buf.seek(0)
     overlay = Image.open(buf).convert("RGBA")
 
-    fig_on_maze(overlay, maze).save(output_folder / f"heatmap_{dataset}.png")
+    fig_on_maze(overlay, maze).save(output_folder / f"heatmap_{dataset}.pdf")
 
 
 if __name__ == "__main__":

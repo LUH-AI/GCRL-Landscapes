@@ -147,8 +147,8 @@ if ADV_COLS:
         ax.set_xlabel("Advantage")
         ax.set_ylabel("Density")
         plt.tight_layout()
-        fname = plot_dir / f"adv_dist_{agent_name}_{actor.replace('/', '_')}.png"
-        plt.savefig(fname, dpi=300)
+        fname = plot_dir / f"adv_dist_{agent_name}_{actor.replace('/', '_')}.pdf"
+        plt.savefig(fname)
         print(f"Saved {fname}")
         plt.close()
 
@@ -211,9 +211,9 @@ if ADV_COLS:
         plt.tight_layout()
         fname = (
             plot_dir
-            / f"weight_dist_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
+            / f"weight_dist_{agent_name}_{dataset}_{actor.replace('/', '_')}.pdf"
         )
-        plt.savefig(fname, dpi=300)
+        plt.savefig(fname)
         print(f"Saved {fname}")
         plt.close()
 
@@ -253,9 +253,9 @@ if ADV_COLS:
         plt.tight_layout()
         fname = (
             plot_dir
-            / f"weight_dist_clipped_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
+            / f"weight_dist_clipped_{agent_name}_{dataset}_{actor.replace('/', '_')}.pdf"
         )
-        plt.savefig(fname, dpi=300)
+        plt.savefig(fname)
         print(f"Saved {fname}")
         plt.close()
 

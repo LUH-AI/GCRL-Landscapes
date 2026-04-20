@@ -203,4 +203,4 @@ if __name__ == "__main__":
         visualized_trajs,
         (MAX_IMAGE_SIZE, MAX_IMAGE_SIZE),
         method=Image.Resampling.LANCZOS,
-    ).save(output_folder / f"trajvisualization_{args.dataset}.png")
+    ).save(output_folder / f"trajvisualization_{args.dataset}.pdf")
