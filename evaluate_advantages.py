@@ -102,7 +102,7 @@ if ADV_COLS:
     adv_long_df = pd.concat(rows, ignore_index=True)
     print(f"Long-format dataframe: {len(adv_long_df)} rows")
     print(
-        adv_long_df.groupby(["hp.agent_name", "actor"])[
+        adv_long_df.groupby(["hp.agent_name", "dataset", "actor"])[
             ["advantage", "weight"]
         ].describe()
     )
@@ -118,7 +118,9 @@ if ADV_COLS:
     _adv_vals = adv_long_df["advantage"].dropna()
     _adv_xlim = (float(_adv_vals.quantile(0.01)), float(_adv_vals.quantile(0.99)))
 
-    for (agent_name, actor), grp in adv_long_df.groupby(["hp.agent_name", "actor"]):
+    for (agent_name, dataset, actor), grp in adv_long_df.groupby(
+        ["hp.agent_name", "dataset", "actor"]
+    ):
         fig, ax = plt.subplots(figsize=(5, 3))
         for config_id, cfg_grp in grp.groupby("config_index"):
             sns.kdeplot(
@@ -163,7 +165,9 @@ if ADV_COLS:
     if not np.isfinite(_w_xlim[1]):
         _w_xlim = (_w_xlim[0], 1e30)
 
-    for (agent_name, actor), grp in adv_long_df.groupby(["hp.agent_name", "actor"]):
+    for (agent_name, dataset, actor), grp in adv_long_df.groupby(
+        ["hp.agent_name", "dataset", "actor"]
+    ):
         # Drop non-finite weights (can occur if alpha * adv overflows float32)
         finite_mask: pd.Series = grp["weight"].apply(np.isfinite)  # type: ignore[arg-type]
         grp_valid: pd.DataFrame = grp[finite_mask]
@@ -205,7 +209,10 @@ if ADV_COLS:
         ax.set_ylabel("Density")
         ax.set_xlim(_w_xlim)
         plt.tight_layout()
-        fname = plot_dir / f"weight_dist_{agent_name}_{actor.replace('/', '_')}.png"
+        fname = (
+            plot_dir
+            / f"weight_dist_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
+        )
         plt.savefig(fname, dpi=300)
         print(f"Saved {fname}")
         plt.close()
@@ -245,7 +252,8 @@ if ADV_COLS:
         ax.set_ylabel("Density")
         plt.tight_layout()
         fname = (
-            plot_dir / f"weight_dist_clipped_{agent_name}_{actor.replace('/', '_')}.png"
+            plot_dir
+            / f"weight_dist_clipped_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
         )
         plt.savefig(fname, dpi=300)
         print(f"Saved {fname}")
@@ -255,9 +263,9 @@ if ADV_COLS:
 # Ratio of weights > 100 per config, then statistics across configs
 if ADV_COLS:
     high_ratio = (
-        adv_long_df.groupby(["hp.agent_name", "actor", "config_index", "seed"])[
-            "weight"
-        ]
+        adv_long_df.groupby(
+            ["hp.agent_name", "dataset", "actor", "config_index", "seed"]
+        )["weight"]
         .apply(lambda w: (w > 100).sum() / len(w))  # type: ignore[arg-type]
         .reset_index(name="high_ratio")
     )
@@ -285,7 +293,7 @@ if ADV_COLS and merged_results_df is not None:
     ].copy()
 
     corr_df = high_ratio.merge(
-        end_perf, on=["hp.agent_name", "config_index", "seed"], how="inner"
+        end_perf, on=["hp.agent_name", "dataset", "config_index", "seed"], how="inner"
     )
 
     def _pearson_r(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
@@ -353,7 +361,7 @@ if ADV_COLS and merged_results_df is not None:
 if ADV_COLS and merged_results_df is not None:
     high_ratio_phased = (
         adv_all_df.groupby(
-            ["hp.agent_name", "actor", "config_index", "seed", "phase_num"]
+            ["hp.agent_name", "dataset", "actor", "config_index", "seed", "phase_num"]
         )["weight"]
         .apply(lambda w: (w > 100).sum() / len(w))  # type: ignore[arg-type]
         .reset_index(name="high_ratio")
@@ -370,7 +378,7 @@ if ADV_COLS and merged_results_df is not None:
         ]
     ].copy()
     # Normalize return to [0, 1] per (agent, phase, env) using max scaling
-    grp_keys = ["hp.agent_name", "phase_num", "dataset"]
+    grp_keys = ["hp.agent_name", "dataset", "phase_num", "dataset"]
     _max = perf_per_phase.groupby(grp_keys)[
         "mean_normalized_goal_distance_return"
     ].transform("max")
@@ -417,9 +425,9 @@ def _ess(w: pd.Series) -> float:
 
 if ADV_COLS:
     ess_df = (
-        adv_long_df.groupby(["hp.agent_name", "actor", "config_index", "seed"])[
-            "weight"
-        ]
+        adv_long_df.groupby(
+            ["hp.agent_name", "dataset", "actor", "config_index", "seed"]
+        )["weight"]
         .apply(_ess)  # type: ignore[arg-type]
         .reset_index(name="ess")
     )
@@ -428,7 +436,7 @@ if ADV_COLS:
 
 if ADV_COLS and merged_results_df is not None:
     corr_ess_df = ess_df.merge(
-        end_perf, on=["hp.agent_name", "config_index", "seed"], how="inner"
+        end_perf, on=["hp.agent_name", "dataset", "config_index", "seed"], how="inner"
     )
 
     def _pearson_r_ess(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
@@ -452,7 +460,7 @@ if ADV_COLS and merged_results_df is not None:
 if ADV_COLS and merged_results_df is not None:
     ess_phased = (
         adv_all_df.groupby(
-            ["hp.agent_name", "actor", "config_index", "seed", "phase_num"]
+            ["hp.agent_name", "dataset", "actor", "config_index", "seed", "phase_num"]
         )["weight"]
         .apply(_ess)  # type: ignore[arg-type]
         .reset_index(name="ess")
