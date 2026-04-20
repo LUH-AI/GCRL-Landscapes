@@ -190,6 +190,8 @@ if ADV_COLS:
         )
         ax.set_xlabel("AWR Weight  exp(α · adv)")
         ax.set_ylabel("Density")
+        lo, hi = ax.get_xlim()
+        ax.set_xlim(lo if np.isfinite(lo) else 1e-10, hi if np.isfinite(hi) else 1e30)
         plt.tight_layout()
         fname = plot_dir / f"weight_dist_{agent_name}_{actor.replace('/', '_')}.png"
         plt.savefig(fname, dpi=300)
