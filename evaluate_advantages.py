@@ -1,3 +1,4 @@
+# %%
 # ruff: noqa
 # %%
 # %% tags=["parameters"]
@@ -9,7 +10,7 @@ _p.add_argument("--zipfiles", nargs="+", type=Path)
 _args, _ = _p.parse_known_args()
 zipfiles = _args.zipfiles or [
     Path(
-        "/home/mtoepperwien/Documents/gcrl/log_zips/2026-04-07-logs_antmaze-medium-all-algs.zip"
+        "../gcrl_results/2026-04-19-logs-antmaze.zip"
     )
 ]  # <- edit this
 plot_dir = Path("plots") / zipfiles[0].name / "advantages"
@@ -64,51 +65,15 @@ print(f"Advantage columns found: {ADV_COLS}")
 
 for col in ADV_COLS:
     merged_training_df[col] = merged_training_df[col].apply(literal_lists_to_numpy)
-
-# %%
-# Filter to end of training only
-end_of_training_df = merged_training_df[
-    merged_training_df["eval_step"]
-    == merged_training_df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform(
-        "max"
-    )
-].copy()
-
-# %%
-# Build long-format dataframe: one row per (config, seed, batch sample)
-adv_long_df = pd.DataFrame()
-if ADV_COLS:
-    rows = []
-    for _, row in end_of_training_df.iterrows():
-        for adv_col in ADV_COLS:
-            adv_arr = row.get(adv_col)
-            if adv_arr is None or not isinstance(adv_arr, np.ndarray):
-                continue
-            alpha = row.get("hp.alpha", np.nan)
-            df_tmp = pd.DataFrame(
-                {
-                    "hp.agent_name": row["hp.agent_name"],
-                    "dataset": row["dataset"],
-                    "config_index": row["config_index"],
-                    "seed": row["seed"],
-                    "actor": adv_col,
-                    "advantage": adv_arr,
-                    "alpha": alpha,
-                }
-            )
-            df_tmp["weight"] = np.exp(alpha * adv_arr.astype(np.float64))
-            rows.append(df_tmp)
-
-    adv_long_df = pd.concat(rows, ignore_index=True)
-    print(f"Long-format dataframe: {len(adv_long_df)} rows")
-    print(
-        adv_long_df.groupby(["hp.agent_name", "dataset", "actor"])[
-            ["advantage", "weight"]
-        ].describe()
-    )
+# %% [markdown]
+#
+#
 
 # %% [markdown]
 # # Advantage Distribution Across Configurations
+
+# %%
+adv_long_df.groupby(["hp.agent_name", "dataset", "actor"])["advantage"].describe()
 
 # %%
 sns.set_theme(context="paper", style="whitegrid")
@@ -116,7 +81,7 @@ sns.set_theme(context="paper", style="whitegrid")
 if ADV_COLS:
     # Compute global x-limits for advantage plots (1st/99th percentile to avoid extreme outliers)
     _adv_vals = adv_long_df["advantage"].dropna()
-    _adv_xlim = (float(_adv_vals.quantile(0.01)), float(_adv_vals.quantile(0.99)))
+    _adv_xlim = (float(_adv_vals.quantile(0.25)), float(_adv_vals.quantile(0.75)))
 
     for (agent_name, dataset, actor), grp in adv_long_df.groupby(
         ["hp.agent_name", "dataset", "actor"]
@@ -141,13 +106,14 @@ if ADV_COLS:
             linewidth=2,
             label="overall",
         )
+        ax.set_ylim(0, 1)
         ax.axvline(0, color="red", linestyle="--", alpha=0.6, linewidth=1)
-        ax.set_xlim(_adv_xlim)
+        ax.set_xlim(-10, 10)
         ax.set_title(f"{agent_name.upper()} — advantage distribution")
         ax.set_xlabel("Advantage")
         ax.set_ylabel("Density")
         plt.tight_layout()
-        fname = plot_dir / f"adv_dist_{agent_name}_{actor.replace('/', '_')}.pdf"
+        fname = plot_dir / f"adv_dist_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
         plt.savefig(fname)
         print(f"Saved {fname}")
         plt.close()
@@ -320,37 +286,40 @@ if ADV_COLS and merged_results_df is not None:
 # limited to those phase-boundary steps — this is a structural property of the zip format,
 # not a filtering bug.
 if ADV_COLS and merged_results_df is not None:
+    # 1. Create the phase map as before
     phase_map = merged_results_df[
         ["hp.agent_name", "dataset", "config_index", "eval_step", "phase_num"]
     ].drop_duplicates()
 
-    rows_all = []
-    for _, row in merged_training_df.iterrows():
-        for adv_col in ADV_COLS:
-            adv_arr = row.get(adv_col)
-            if adv_arr is None or not isinstance(adv_arr, np.ndarray):
-                continue
-            alpha = row.get("hp.alpha", np.nan)
-            df_tmp = pd.DataFrame(
-                {
-                    "hp.agent_name": row["hp.agent_name"],
-                    "dataset": row["dataset"],
-                    "config_index": row["config_index"],
-                    "seed": row["seed"],
-                    "eval_step": row["eval_step"],
-                    "actor": adv_col,
-                    "advantage": adv_arr,
-                    "alpha": alpha,
-                }
-            )
-            df_tmp["weight"] = np.exp(alpha * adv_arr.astype(np.float64))
-            rows_all.append(df_tmp)
+    # 2. Select only necessary columns to save memory
+    cols_to_keep = ["hp.agent_name", "dataset", "config_index", "seed", "eval_step", "hp.alpha"] + ADV_COLS
+    
+    # 3. Melt ADV_COLS into 'actor' and 'advantage' columns
+    adv_all_df = merged_training_df[cols_to_keep].melt(
+        id_vars=["hp.agent_name", "dataset", "config_index", "seed", "eval_step", "hp.alpha"],
+        value_vars=ADV_COLS,
+        var_name="actor",
+        value_name="advantage"
+    )
 
-    adv_all_df = pd.concat(rows_all, ignore_index=True).merge(
+    # 4. Remove rows where advantage is None or not an array (mimicking your if-check)
+    adv_all_df = adv_all_df[adv_all_df["advantage"].apply(lambda x: isinstance(x, np.ndarray))]
+
+    # 5. Explode the 'advantage' column (turns arrays into individual rows)
+    adv_all_df = adv_all_df.explode("advantage")
+
+    # 6. Ensure numeric types and calculate weights vectorially
+    adv_all_df["advantage"] = adv_all_df["advantage"].astype(np.float64)
+    adv_all_df["weight_unclipped"] = np.exp(adv_all_df["hp.alpha"].astype(np.float64) * adv_all_df["advantage"])
+    adv_all_df["weight"] = adv_all_df["weight_unclipped"].clip(upper=100)
+
+    # 7. Final Merge
+    adv_all_df = adv_all_df.merge(
         phase_map,
         on=["hp.agent_name", "dataset", "config_index", "eval_step"],
         how="left",
     )
+
     print(
         f"All-phases long-format dataframe: {len(adv_all_df)} rows, "
         f"phases: {sorted(adv_all_df['phase_num'].dropna().unique().tolist())}"
@@ -413,12 +382,15 @@ if ADV_COLS and merged_results_df is not None:
 # %%
 # Normalized ESS per config (end of training) + correlation with performance
 # ESS = (sum(w))^2 / sum(w^2), normalized by n -> in [0, 1]; 1 = uniform weights, 0 = single sample dominates
+# Weights are clipped to 100 before computation, consistent with the clipped weight distribution plots.
 def _ess(w: pd.Series) -> float:
-    w_arr = w.values.astype(np.float64)
+    w_arr = w.clip(upper=100).values.astype(np.float64)
     w_finite = w_arr[np.isfinite(w_arr)]
     if len(w_finite) == 0:
         return float("nan")
     # Normalize by max before squaring — ESS is scale-invariant, avoids float64 overflow
+    if w_arr.max() == 0.0:
+        return float(len(w))
     w_scaled = w_finite / w_finite.max()
     return float(w_scaled.sum() ** 2 / (len(w_scaled) * (w_scaled**2).sum()))
 
@@ -468,7 +440,7 @@ if ADV_COLS and merged_results_df is not None:
 
     corr_ess_phased_df = ess_phased.merge(
         perf_per_phase,
-        on=["hp.agent_name", "config_index", "seed", "phase_num"],
+        on=["hp.agent_name", "dataset", "config_index", "seed", "phase_num"],
         how="inner",
     )
 
@@ -480,9 +452,9 @@ if ADV_COLS and merged_results_df is not None:
 
     print("\nCorrelation between ESS and normalized return, per phase:")
     print(
-        corr_ess_phased_df.groupby(["hp.agent_name", "actor", "phase_num"])
+        corr_ess_phased_df.groupby(["hp.agent_name", "dataset", "actor"])
         .apply(_pearson_r_ess_phase)
         .reset_index()
-        .sort_values(["hp.agent_name", "actor", "phase_num"])
+        .sort_values(["hp.agent_name", "dataset", "actor"])
         .to_string(index=False)
     )
