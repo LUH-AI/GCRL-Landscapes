@@ -202,6 +202,24 @@ def merge_experiments(
     )
 
 
+def eps_optimality(df: pd.DataFrame, col: str) -> pd.Series:
+    """Normalise a metric column to [0, 1] relative to the per-group maximum.
+
+    Grouping keys: agent, dataset, constant_dataset, hps, phase_num.
+    """
+    grouping = ["agent", "dataset", "constant_dataset", "hps", "phase_num"]
+    return df[col] / df.groupby(grouping)[col].transform("max")
+
+
+def regret_from_df(df: pd.DataFrame, col: str) -> pd.Series:
+    """Compute regret (group max minus value) for a metric column.
+
+    Grouping keys: agent, dataset, constant_dataset, phase_num.
+    """
+    grouping = ["agent", "dataset", "constant_dataset", "phase_num"]
+    return df.groupby(grouping)[col].transform("max") - df[col]
+
+
 def calculate_regret_for_experiment(
     df: pd.DataFrame, regret_column: str, base_column: str
 ) -> pd.DataFrame:

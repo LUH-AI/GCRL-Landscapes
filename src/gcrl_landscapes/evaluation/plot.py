@@ -1,4 +1,5 @@
 import argparse
+import ast
 from gcrl_landscapes.util.data import (
     ResultsPerStep,
     PhaseResult,
@@ -265,6 +266,323 @@ def plot_regret_curve(
     plt.close()
 
 
+def _build_adv_long_df(
+    training_df: pd.DataFrame,
+    adv_cols: list[str],
+    end_only: bool = True,
+) -> pd.DataFrame:
+    """Build long-format DataFrame: one row per (config, seed, batch sample).
+
+    Parses stringified list columns in ``adv_cols`` to numpy arrays, optionally
+    filters to the final ``eval_step`` per (agent, dataset), then explodes into
+    one row per sample with ``advantage`` and ``weight = exp(alpha * advantage)``.
+    """
+    df = training_df.copy()
+    for col in adv_cols:
+        df[col] = df[col].apply(
+            lambda s: np.array(ast.literal_eval(s), dtype=np.float32)
+            if isinstance(s, str)
+            else (s if isinstance(s, np.ndarray) else None)
+        )
+
+    if end_only:
+        df = df[
+            df["eval_step"]
+            == df.groupby(["hp.agent_name", "dataset"])["eval_step"].transform("max")
+        ].copy()
+
+    rows = []
+    for _, row in df.iterrows():
+        for adv_col in adv_cols:
+            adv_arr = row.get(adv_col)
+            if adv_arr is None or not isinstance(adv_arr, np.ndarray):
+                continue
+            alpha = float(row.get("hp.alpha", np.nan))
+            df_tmp = pd.DataFrame(
+                {
+                    "hp.agent_name": row["hp.agent_name"],
+                    "dataset": row["dataset"],
+                    "config_index": row["config_index"],
+                    "seed": row["seed"],
+                    "eval_step": row["eval_step"],
+                    "actor": adv_col,
+                    "advantage": adv_arr,
+                    "alpha": alpha,
+                }
+            )
+            df_tmp["weight"] = np.exp(alpha * adv_arr.astype(np.float64))
+            rows.append(df_tmp)
+
+    if not rows:
+        return pd.DataFrame()
+    return pd.concat(rows, ignore_index=True)
+
+
+def plot_advantage_distributions(
+    training_df: pd.DataFrame,
+    output_folder: Path,
+    results_df: pd.DataFrame | None = None,
+) -> None:
+    """KDE plots of advantage distributions per (agent, actor).
+
+    Saves end-of-training plots to ``output_folder/advantages/``.
+    If ``results_df`` is provided (and has a ``phase_num`` column), also saves
+    per-phase plots as ``adv_dist_{agent}_{actor}_phase{n}.png``.
+
+    Args:
+        training_df: Training-log DataFrame; must contain ``advantage/*`` columns
+            as stringified arrays, ``hp.agent_name``, ``dataset``, ``eval_step``.
+        output_folder: Per-experiment output folder.
+        results_df: Optional processed results DataFrame used to map eval_step →
+            phase_num for per-phase plots.
+    """
+    adv_cols = [c for c in training_df.columns if c.startswith("advantage/")]
+    if not adv_cols:
+        return
+
+    adv_folder = output_folder / "advantages"
+    adv_folder.mkdir(exist_ok=True, parents=True)
+
+    # Build end-of-training long-format df
+    adv_long = _build_adv_long_df(training_df, adv_cols, end_only=True)
+    if adv_long.empty:
+        return
+
+    # Global x-limits (1st / 99th percentile)
+    adv_vals = adv_long["advantage"].dropna()
+    xlim = (float(adv_vals.quantile(0.01)), float(adv_vals.quantile(0.99)))
+
+    for (agent_name, actor), grp in adv_long.groupby(["hp.agent_name", "actor"]):
+        fig, ax = plt.subplots(figsize=(5, 3))
+        for _, cfg_grp in grp.groupby("config_index"):
+            sns.kdeplot(
+                bw_adjust=0.5, data=cfg_grp, x="advantage", ax=ax,
+                alpha=0.3, linewidth=0.8, color="steelblue",
+            )
+        sns.kdeplot(
+            bw_adjust=0.5, data=grp, x="advantage", ax=ax,
+            color="black", linewidth=2, label="overall",
+        )
+        ax.axvline(0, color="red", linestyle="--", alpha=0.6, linewidth=1)
+        ax.set_xlim(xlim)
+        ax.set_title(f"{agent_name.upper()} — advantage distribution")
+        ax.set_xlabel("Advantage")
+        ax.set_ylabel("Density")
+        plt.tight_layout()
+        fname = adv_folder / f"adv_dist_{agent_name}_{actor.replace('/', '_')}.png"
+        plt.savefig(fname, dpi=300)
+        plt.close()
+
+    # Per-phase plots (if results_df provides phase mapping)
+    if results_df is not None and "phase_num" in results_df.columns:
+        phase_map = (
+            results_df[
+                ["hp.agent_name", "dataset", "config_index", "eval_step", "phase_num"]
+            ]
+            .drop_duplicates()
+        )
+        adv_all = _build_adv_long_df(training_df, adv_cols, end_only=False)
+        if adv_all.empty:
+            return
+        adv_all = adv_all.merge(
+            phase_map,
+            on=["hp.agent_name", "dataset", "config_index", "eval_step"],
+            how="left",
+        )
+        for (agent_name, actor, phase_num), grp in adv_all.dropna(
+            subset=["phase_num"]
+        ).groupby(["hp.agent_name", "actor", "phase_num"]):
+            fig, ax = plt.subplots(figsize=(5, 3))
+            for _, cfg_grp in grp.groupby("config_index"):
+                sns.kdeplot(
+                    bw_adjust=0.5, data=cfg_grp, x="advantage", ax=ax,
+                    alpha=0.3, linewidth=0.8, color="steelblue",
+                )
+            sns.kdeplot(
+                bw_adjust=0.5, data=grp, x="advantage", ax=ax,
+                color="black", linewidth=2, label="overall",
+            )
+            ax.axvline(0, color="red", linestyle="--", alpha=0.6, linewidth=1)
+            ax.set_xlim(xlim)
+            ax.set_title(f"{agent_name.upper()} — phase {int(phase_num)} advantage")
+            ax.set_xlabel("Advantage")
+            ax.set_ylabel("Density")
+            plt.tight_layout()
+            fname = (
+                adv_folder
+                / f"adv_dist_{agent_name}_{actor.replace('/', '_')}_phase{int(phase_num)}.png"
+            )
+            plt.savefig(fname, dpi=300)
+            plt.close()
+
+
+def plot_awr_weights(
+    training_df: pd.DataFrame,
+    output_folder: Path,
+) -> None:
+    """Log-scale KDE plots of AWR weight distributions per (agent, actor).
+
+    Saves to ``output_folder/advantages/weight_dist_{agent}_{actor}.png`` and a
+    clipped variant at 100.
+    """
+    adv_cols = [c for c in training_df.columns if c.startswith("advantage/")]
+    if not adv_cols:
+        return
+
+    adv_folder = output_folder / "advantages"
+    adv_folder.mkdir(exist_ok=True, parents=True)
+
+    adv_long = _build_adv_long_df(training_df, adv_cols, end_only=True)
+    if adv_long.empty:
+        return
+
+    # Global log-scale x-limits
+    w_vals = adv_long["weight"].apply(
+        lambda x: x if np.isfinite(x) and x > 0 else np.nan
+    ).dropna()
+    if w_vals.empty:
+        return
+    w_xlim = (
+        max(float(w_vals.quantile(0.01)), 1e-10),
+        float(w_vals.quantile(0.99)) if np.isfinite(w_vals.quantile(0.99)) else 1e30,
+    )
+
+    for (agent_name, actor), grp in adv_long.groupby(["hp.agent_name", "actor"]):
+        finite_mask = grp["weight"].apply(np.isfinite)
+        grp_valid = grp[finite_mask]
+        if grp_valid.empty:
+            continue
+
+        alpha_median = float(grp["alpha"].median())
+
+        # Log-scale weight distribution
+        fig, ax = plt.subplots(figsize=(5, 3))
+        for _, cfg_grp in grp_valid.groupby("config_index"):
+            cfg_pos = cfg_grp[cfg_grp["weight"] > 0]
+            if cfg_pos.empty:
+                continue
+            sns.kdeplot(
+                bw_adjust=0.5, data=cfg_pos, x="weight", ax=ax,
+                alpha=0.3, linewidth=0.8, color="darkorange", log_scale=True,
+            )
+        overall_pos = grp_valid[grp_valid["weight"] > 0]
+        sns.kdeplot(
+            bw_adjust=0.5, data=overall_pos, x="weight", ax=ax,
+            color="black", linewidth=2, label="overall", log_scale=True,
+        )
+        ax.set_title(
+            f"{agent_name.upper()} — AWR weight distribution (median α={alpha_median:.2f})"
+        )
+        ax.set_xlabel("AWR Weight  exp(α · adv)")
+        ax.set_ylabel("Density")
+        ax.set_xlim(w_xlim)
+        plt.tight_layout()
+        fname = adv_folder / f"weight_dist_{agent_name}_{actor.replace('/', '_')}.png"
+        plt.savefig(fname, dpi=300)
+        plt.close()
+
+        # Clipped at 100
+        grp_clipped = grp_valid.copy()
+        grp_clipped["weight_clipped"] = grp_clipped["weight"].clip(upper=100)
+        fig, ax = plt.subplots(figsize=(5, 3))
+        for _, cfg_grp in grp_clipped.groupby("config_index"):
+            sns.kdeplot(
+                bw_adjust=0.5, data=cfg_grp, x="weight_clipped", ax=ax,
+                alpha=0.3, linewidth=0.8, color="darkorange", clip=(0, 100),
+            )
+        sns.kdeplot(
+            bw_adjust=0.5, data=grp_clipped, x="weight_clipped", ax=ax,
+            color="black", linewidth=2, label="overall", clip=(0, 100),
+        )
+        ax.set_xlim(0, 100)
+        ax.set_ylim(top=1)
+        ax.axvline(100, color="red", linestyle="--", alpha=0.6, linewidth=1)
+        ax.set_title(
+            f"{agent_name.upper()} — AWR weights clipped at 100 (median α={alpha_median:.2f})"
+        )
+        ax.set_xlabel("AWR Weight  exp(α · adv), clipped at 100")
+        ax.set_ylabel("Density")
+        plt.tight_layout()
+        fname = (
+            adv_folder
+            / f"weight_dist_clipped_{agent_name}_{actor.replace('/', '_')}.png"
+        )
+        plt.savefig(fname, dpi=300)
+        plt.close()
+
+
+def grid_advantage_plot(plots_folder: Path) -> None:
+    """Assemble per-experiment advantage KDE plots into grid overviews.
+
+    Scans ``plots_folder/*/advantages/adv_dist_*.png`` and creates one grid per
+    actor, saved to ``plots_folder/grid_plots/advantages/``.
+    End-of-training and per-phase plots are assembled separately.
+    """
+    grid_dir = plots_folder / "grid_plots" / "advantages"
+
+    rows: list[dict] = []
+    for exp_dir in sorted(plots_folder.iterdir()):
+        if not exp_dir.is_dir() or exp_dir.name == "grid_plots":
+            continue
+        adv_dir = exp_dir / "advantages"
+        if not adv_dir.exists():
+            continue
+        for png in sorted(adv_dir.glob("adv_dist_*.png")):
+            # adv_dist_{agent}_{actor_sanitized}[_phase{n}].png
+            stem = png.stem[len("adv_dist_"):]
+            # Last token: phase{n} or actor part
+            phase_match = re.search(r"_phase(\d+)$", stem)
+            phase = int(phase_match.group(1)) if phase_match else None
+            stem_no_phase = stem[: phase_match.start()] if phase_match else stem
+            # Agent name is first token (no underscores)
+            parts = stem_no_phase.split("_", 1)
+            if len(parts) < 2:
+                continue
+            agent, actor_sanitized = parts
+            rows.append(
+                {
+                    "agent": agent,
+                    "actor": actor_sanitized,
+                    "phase": phase,
+                    "dataset": exp_dir.name,
+                    "path": str(png),
+                }
+            )
+
+    if not rows:
+        return
+
+    grid_dir.mkdir(parents=True, exist_ok=True)
+    df = pd.DataFrame(rows)
+
+    for (actor, phase), group in df.groupby(
+        ["actor", "phase"], dropna=False
+    ):
+        group = group.sort_values(["agent", "dataset"]).reset_index(drop=True)
+        n = len(group)
+        if n < 2:
+            continue
+        ncols = min(3, n)
+        nrows = (n + ncols - 1) // ncols
+        fig = plt.figure(figsize=(6 * ncols, 4 * nrows))
+        grid = ImageGrid(fig, 111, nrows_ncols=(nrows, ncols), axes_pad=0.15)
+        for ax, (_, row) in zip(grid, group.iterrows()):
+            ax.imshow(Image.open(row["path"]))
+            ax.axis("off")
+            ax.set_title(f"{row['agent']} / {row['dataset']}", fontsize=6)
+        for ax in list(grid)[n:]:
+            ax.axis("off")
+        phase_label = f"phase {int(phase)}" if phase is not None else "end-of-training"
+        plt.suptitle(f"Advantage distributions — {actor} ({phase_label})", fontsize=9)
+        safe_actor = actor.replace("/", "_")
+        phase_str = f"_phase{int(phase)}" if phase is not None else ""
+        plt.savefig(
+            grid_dir / f"advantage-grid-{safe_actor}{phase_str}.png",
+            bbox_inches="tight",
+        )
+        plt.close()
+
+
 def plot_eval_results(
     results_pandas: pd.DataFrame,
     output_folder: Path,
@@ -274,6 +592,9 @@ def plot_eval_results(
     plot_gp_fits: bool = False,
     plot_regret: bool = False,
     plot_landscapes: bool = True,
+    plot_mobility: bool = True,
+    plot_advantages: bool = False,
+    training_df: pd.DataFrame | None = None,
 ):
     """Main plotting Code to generate the landscapes
 
@@ -437,6 +758,29 @@ def plot_eval_results(
                     "Normalized Goal Distance Return",
                 )
 
+    # Mobility plots (phase-based KDE of optimal HP regions)
+    if plot_mobility:
+        from gcrl_landscapes.evaluation.landscapes import plot_mobility_for_experiment
+        try:
+            plot_mobility_for_experiment(results_pandas, hp_list, output_folder)
+        except Exception:
+            print(
+                f"ERROR in mobility plots for {output_folder.name}:\n{traceback.format_exc()}",
+                flush=True,
+            )
+
+    # Advantage distribution and AWR weight plots
+    if plot_advantages and training_df is not None:
+        try:
+            plot_advantage_distributions(training_df, output_folder, results_pandas)
+            plot_awr_weights(training_df, output_folder)
+        except Exception:
+            print(
+                f"ERROR in advantage plots for {output_folder.name}:\n{traceback.format_exc()}",
+                flush=True,
+            )
+
+
 def plot_train_results(
     results_pandas: pd.DataFrame,
     output_folder: Path,
@@ -536,6 +880,8 @@ def plot_parallel_wrapper(
     plot_gp_fits: bool = False,
     plot_regret: bool = False,
     plot_landscapes: bool = True,
+    plot_mobility: bool = True,
+    plot_advantages: bool = False,
 ):
     prefix, (run_info, results_df, train_log_df) = arg
     run_match = re.match(r"^logs[^/]*/([^/]*)/?", prefix)
@@ -546,6 +892,22 @@ def plot_parallel_wrapper(
     folder = plots_folder / run_name
     folder.mkdir(exist_ok=True, parents=True)
     print(f"Plotting '{prefix}'")
+
+    # Ensure training_df has dataset and hp.agent_name columns for advantage plotting
+    training_df: pd.DataFrame | None = train_log_df if plot_advantages else None
+    if training_df is not None and not training_df.empty:
+        dataset = ",".join(
+            run_info["arguments"].get(
+                "datasets", [run_info["arguments"].get("dataset", "")]
+            )
+        )
+        if "dataset" not in training_df.columns:
+            training_df = training_df.assign(dataset=dataset)
+        if "hp.agent_name" not in training_df.columns:
+            training_df = training_df.assign(
+                **{"hp.agent_name": run_info["arguments"].get("agent", "")}
+            )
+
     try:
         plot_eval_results(
             results_df,
@@ -556,6 +918,9 @@ def plot_parallel_wrapper(
             plot_gp_fits=plot_gp_fits,
             plot_regret=plot_regret,
             plot_landscapes=plot_landscapes,
+            plot_mobility=plot_mobility,
+            plot_advantages=plot_advantages,
+            training_df=training_df,
         )
     except Exception:
         print(f"ERROR while plotting '{prefix}':\n{traceback.format_exc()}", flush=True)
@@ -570,15 +935,17 @@ if __name__ == "__main__":
     parser.add_argument("--plot_gp_fits", action="store_true")
     parser.add_argument("--plot_regret", action="store_true")
     parser.add_argument("--no_plot_landscapes", action="store_true")
+    parser.add_argument("--no_plot_mobility", action="store_true")
+    parser.add_argument("--plot_advantages", action="store_true")
     parser.add_argument("--no_multiprocessing", action="store_true")
     args = parser.parse_args()
 
     sns.set_theme(context="talk", rc={"figure.figsize": (4, 3)})
 
-    # Parse results
+    # Parse results — load training logs only when needed for advantage plots
     plots_folder = Path("plots") / os.path.basename(args.zipfile)
     results: dict[str, tuple[dict, ResultsPerStep[PhaseResult], ResultsPerStep[PhaseResult]]] = (
-        read_results_from_zip(args.zipfile, load_training_logs=False)
+        read_results_from_zip(args.zipfile, load_training_logs=args.plot_advantages)
     )
     results_pandas = {
         identifier: (run_info, phase_results_to_pandas(phase_results), training_logs_to_pandas(training_results))
@@ -593,6 +960,8 @@ if __name__ == "__main__":
                     plot_gp_fits=args.plot_gp_fits,
                     plot_regret=args.plot_regret,
                     plot_landscapes=not args.no_plot_landscapes,
+                    plot_mobility=not args.no_plot_mobility,
+                    plot_advantages=args.plot_advantages,
                 )
 
     if not args.no_multiprocessing:
@@ -702,3 +1071,64 @@ if __name__ == "__main__":
             f"{plot_type}-{agent}-{hps}-{y_col}-{actor_loss}",
             grid_columns=("dataset", "phase"),
         )  # type: ignore
+
+    # Combined post-processing: mobility grid, advantage grid, optimum overlap
+    from gcrl_landscapes.evaluation.landscapes import (
+        plot_optimum_overlap,
+        grid_mobility_plot,
+    )
+
+    if not args.no_plot_mobility:
+        # Collect and process per-experiment results for combined analyses
+        combined_parts: list[pd.DataFrame] = []
+        combined_hp_list: list[str] = []
+        for prefix, (run_info, results_df, _) in results_pandas.items():
+            try:
+                dataset_str = ",".join(
+                    run_info["arguments"].get(
+                        "datasets", [run_info["arguments"].get("dataset", "")]
+                    )
+                )
+                proc = results_df.copy().assign(dataset=dataset_str)
+                proc = resolve_alpha_sync(proc, run_info["arguments"]["hyperparameters"])
+                proc = compute_additional_information(proc)
+                hp_list_local = [
+                    f"hp.{hp}" for hp in run_info["arguments"]["hyperparameters"]
+                ]
+                combined_parts.append(proc)
+                if not combined_hp_list:
+                    combined_hp_list = hp_list_local
+            except Exception:
+                print(
+                    f"WARNING: skipping {prefix} in combined analysis:\n"
+                    f"{traceback.format_exc()}",
+                    flush=True,
+                )
+
+        if combined_parts and len(combined_hp_list) == 2:
+            combined_df = pd.concat(combined_parts, ignore_index=True)
+            # Optimum overlap (needs multiple datasets / agents to be meaningful)
+            n_agents = combined_df["hp.agent_name"].nunique() if "hp.agent_name" in combined_df.columns else 0
+            n_datasets = combined_df["dataset"].nunique()
+            if n_agents >= 1 and n_datasets >= 1:
+                first_exp_folder = plots_folder / list(
+                    re.match(r"^logs[^/]*/([^/]*)/?", k).group(1)  # type: ignore[union-attr]
+                    for k in results_pandas
+                ).__next__()
+                try:
+                    plot_optimum_overlap(
+                        combined_df,
+                        combined_hp_list,
+                        first_exp_folder,
+                        plots_folder / "grid_plots",
+                    )
+                except Exception:
+                    print(
+                        f"ERROR in optimum overlap:\n{traceback.format_exc()}",
+                        flush=True,
+                    )
+
+        grid_mobility_plot(plots_folder)
+
+    if args.plot_advantages:
+        grid_advantage_plot(plots_folder)
