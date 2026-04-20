@@ -634,9 +634,11 @@ if __name__ == "__main__":
         matching_info = [
             filename
             for filename in zipf.namelist()
-            if re.fullmatch(r"^.*/" + experiment_name + r"/info.toml$", filename)
+            if re.fullmatch(r"^.*/" + re.escape(experiment_name) + r"/info.toml$", filename)
         ]
         if not len(matching_info):
+            continue  # not an experiment dir (e.g. 'advantages', 'cdf_swapped')
+        if len(matching_info) > 1:
             raise ValueError("given zip seemingly contains experiment multiple times")
         setup = toml.loads(zipf.read(matching_info[0]).decode(encoding="utf-8"))[
             "arguments"
