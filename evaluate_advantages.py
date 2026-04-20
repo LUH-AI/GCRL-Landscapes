@@ -114,6 +114,10 @@ if ADV_COLS:
 sns.set_theme(context="paper", style="whitegrid")
 
 if ADV_COLS:
+    # Compute global x-limits for advantage plots (1st/99th percentile to avoid extreme outliers)
+    _adv_vals = adv_long_df["advantage"].dropna()
+    _adv_xlim = (float(_adv_vals.quantile(0.01)), float(_adv_vals.quantile(0.99)))
+
     for (agent_name, actor), grp in adv_long_df.groupby(["hp.agent_name", "actor"]):
         fig, ax = plt.subplots(figsize=(5, 3))
         for config_id, cfg_grp in grp.groupby("config_index"):
@@ -136,6 +140,7 @@ if ADV_COLS:
             label="overall",
         )
         ax.axvline(0, color="red", linestyle="--", alpha=0.6, linewidth=1)
+        ax.set_xlim(_adv_xlim)
         ax.set_title(f"{agent_name.upper()} — advantage distribution")
         ax.set_xlabel("Advantage")
         ax.set_ylabel("Density")
@@ -150,6 +155,14 @@ if ADV_COLS:
 
 # %%
 if ADV_COLS:
+    # Compute global log-scale x-limits for weight plots
+    _w_vals = adv_long_df["weight"].apply(lambda x: x if np.isfinite(x) and x > 0 else np.nan).dropna()
+    _w_xlim = (float(_w_vals.quantile(0.01)), float(_w_vals.quantile(0.99)))
+    if not (np.isfinite(_w_xlim[0]) and _w_xlim[0] > 0):
+        _w_xlim = (1e-10, _w_xlim[1])
+    if not np.isfinite(_w_xlim[1]):
+        _w_xlim = (_w_xlim[0], 1e30)
+
     for (agent_name, actor), grp in adv_long_df.groupby(["hp.agent_name", "actor"]):
         # Drop non-finite weights (can occur if alpha * adv overflows float32)
         finite_mask: pd.Series = grp["weight"].apply(np.isfinite)  # type: ignore[arg-type]
@@ -190,8 +203,7 @@ if ADV_COLS:
         )
         ax.set_xlabel("AWR Weight  exp(α · adv)")
         ax.set_ylabel("Density")
-        lo, hi = ax.get_xlim()
-        ax.set_xlim(lo if np.isfinite(lo) else 1e-10, hi if np.isfinite(hi) else 1e30)
+        ax.set_xlim(_w_xlim)
         plt.tight_layout()
         fname = plot_dir / f"weight_dist_{agent_name}_{actor.replace('/', '_')}.png"
         plt.savefig(fname, dpi=300)
@@ -223,6 +235,7 @@ if ADV_COLS:
             label="overall",
             clip=(0, 100),
         )
+        ax.set_xlim(0, 100)
         ax.set_ylim(top=1)
         ax.axvline(100, color="red", linestyle="--", alpha=0.6, linewidth=1)
         ax.set_title(
