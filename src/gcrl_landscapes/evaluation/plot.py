@@ -614,6 +614,18 @@ def plot_eval_results(
     results_pandas = resolve_alpha_sync(results_pandas, run_info["arguments"]["hyperparameters"])
     results_pandas = compute_additional_information(results_pandas)
 
+    _dataset_str = ",".join(
+        run_info["arguments"].get(
+            "datasets", [run_info["arguments"].get("dataset", "")]
+        )
+    )
+    if "dataset" not in results_pandas.columns:
+        results_pandas = results_pandas.assign(dataset=_dataset_str)
+    if "hp.agent_name" not in results_pandas.columns:
+        results_pandas = results_pandas.assign(
+            **{"hp.agent_name": run_info["arguments"].get("agent", "")}
+        )
+
     per_config_folder = output_folder / "per_config"
     per_config_folder.mkdir(exist_ok=True)
 
@@ -1111,10 +1123,10 @@ if __name__ == "__main__":
             n_agents = combined_df["hp.agent_name"].nunique() if "hp.agent_name" in combined_df.columns else 0
             n_datasets = combined_df["dataset"].nunique()
             if n_agents >= 1 and n_datasets >= 1:
-                first_exp_folder = plots_folder / list(
+                first_exp_folder = plots_folder / next(
                     re.match(r"^logs[^/]*/([^/]*)/?", k).group(1)  # type: ignore[union-attr]
                     for k in results_pandas
-                ).__next__()
+                )
                 try:
                     plot_optimum_overlap(
                         combined_df,
