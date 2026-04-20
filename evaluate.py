@@ -1018,9 +1018,12 @@ corr_sorted
 # Difference between the **two**agents (this will not work when adding CRL)
 
 # %%
-corr_diff = corr.loc["hiql"] - corr.loc["qrl"]
-corr_diff_sorted = corr_diff.reindex(corr_diff.abs().sort_values(ascending=False).index)
-corr_diff_sorted
+if "hiql" in corr.index and "qrl" in corr.index:
+    corr_diff = corr.loc["hiql"] - corr.loc["qrl"]
+    corr_diff_sorted = corr_diff.reindex(corr_diff.abs().sort_values(ascending=False).index)
+    display(corr_diff_sorted)
+else:
+    print(f"Skipping corr_diff: available agents in corr = {corr.index.tolist()}")
 
 # %% [markdown]
 # Now lets do this sorted by training progress
@@ -1566,6 +1569,9 @@ with warnings.catch_warnings():
             )
         )
     )
+# pandas >= 2.x may return a long Series with MultiIndex instead of a wide DataFrame
+if isinstance(quality_optimum_share_df, pd.Series):
+    quality_optimum_share_df = quality_optimum_share_df.unstack()
 # %%
 quality_optimum_share_df_long = quality_optimum_share_df.reset_index().melt(
     id_vars=["hp.agent_name", "env"],
