@@ -804,10 +804,13 @@ corr_sorted
 # Difference between the **two**agents (this will not work when adding CRL)
 
 # %%
-corr_diff = corr.loc["hiql"] - corr.loc["qrl"]
-corr_diff_sorted = corr_diff.reindex(corr_diff.abs().sort_values(ascending=False).index)
-# only keep entries without "grad/" and "update/"
-corr_diff_sorted[~corr_diff_sorted.index.str.contains("grad/|update/")]
+if "hiql" in corr.index and "qrl" in corr.index:
+    corr_diff = corr.loc["hiql"] - corr.loc["qrl"]
+    corr_diff_sorted = corr_diff.reindex(corr_diff.abs().sort_values(ascending=False).index)
+    # only keep entries without "grad/" and "update/"
+    display(corr_diff_sorted[~corr_diff_sorted.index.str.contains("grad/|update/")])
+else:
+    print(f"Skipping corr_diff: available agents in corr = {corr.index.tolist()}")
 
 # %% [markdown]
 # **We have found correlation for HIQL between regret/performance and gradient alignment.**
