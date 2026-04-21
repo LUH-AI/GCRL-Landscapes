@@ -1,0 +1,4 @@
+partition: "kisski-inference"
+reservation: null
+gres: null
+gpus_per_node: 1
