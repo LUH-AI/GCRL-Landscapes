@@ -74,7 +74,6 @@
           export SSL_CERT_FILE=$NIX_SSL_CERT_FILE
           export UV_NO_MANAGED_PYTHON=true
           unset PYTHONPATH
-          uv sync --all-extras --locked
           . .venv/bin/activate
         '';
       };
