@@ -108,6 +108,12 @@ if __name__ == "__main__":
         type=str,
         help="Sets actor_loss in configuration. May be ignored by some algorithms",
     )
+    setup_subparser.add_argument(
+        "--normalize_advantages",
+        action="store_true",
+        default=False,
+        help="Enable advantage normalization before AWR weighting. May be ignored by some algorithms",
+    )
     setup_subparser.set_defaults(func=run_setup)
 
     # Setup slurm parsing

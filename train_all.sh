@@ -18,6 +18,7 @@ source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
 logdir="./logs"
 hyperparameters="lr alpha"
 actorloss="awr"
+normalizeadvantages="false"
 numconfigurations="64"
 convergencezip="./convergence.zip"
 phasepercentages="25 50 75 100"
@@ -100,7 +101,8 @@ for environment in "${environments[@]}"; do
       --hyperparameters $hyperparameters \
       --logdir "$full_log_dir" \
       --final_step_is_phase \
-      --actor_loss "$actorloss"
+      --actor_loss "$actorloss" \
+      $([ "$normalizeadvantages" = "true" ] && echo "--normalize_advantages")
     python -m gcrl_landscapes.main submit \
       --logdir "$full_log_dir" \
       --n_seeds "$nseeds" \

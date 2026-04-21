@@ -168,32 +168,32 @@ def get_config_space(agent: str) -> ConfigurationSpace:
 
 
 def get_adapted_default_config(
-    agent: str, env: str, actor_loss: str | None = None
+    agent: str, env: str, actor_loss: str | None = None, normalize_advantages: bool = False
 ) -> FrozenConfigDict:
     agent_config_generators = {
         "crl": lambda: _adapt_base_config(
-            ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss
+            ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
         "cmd": lambda: _adapt_base_config(
-            ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss
+            ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
         "gcbc": lambda: _adapt_base_config(
-            ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss
+            ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
         "gciql": lambda: _adapt_base_config(
-            ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss
+            ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
         "gcivl": lambda: _adapt_base_config(
-            ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss
+            ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
         "hiql": lambda: _adapt_base_config(
-            ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss
+            ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
         "qrl": lambda: _adapt_base_config(
-            ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss
+            ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
         "sac": lambda: _adapt_base_config(
-            ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss
+            ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
     }
     return FrozenConfigDict(initial_dictionary=agent_config_generators[agent.lower()]())
@@ -206,6 +206,7 @@ def generate_configurations(
     env: str,
     seed: int = 0,
     actor_loss: str | None = None,
+    normalize_advantages: bool = False,
 ) -> list[FrozenConfigDict]:
     logger.info(f"Generating {n} configurations for {agent} using {hyperparameters}")
     np.random.seed(seed)
@@ -216,25 +217,25 @@ def generate_configurations(
     agent_config_generators = {
         "CRL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
         ),
         "CMD": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
         ),
         "GCBC": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss, normalize_advantages
             )
             if "discount" not in hyperparameters
             else _adapt_base_config(
-                ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss, normalize_advantages
             )
             | {"actor_geom_sample": True},
             n,
@@ -242,35 +243,35 @@ def generate_configurations(
         ),
         "GCIQL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
         ),
         "GCIVL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
         ),
         "HIQL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
         ),
         "QRL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
         ),
         "SAC": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss
+                ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
@@ -487,7 +488,7 @@ def _generate_dummy_list(n: int, val: object) -> list[object]:
     return [val] * n
 
 
-def _adapt_base_config(config: dict, env: str, actor_loss: str | None) -> dict:
+def _adapt_base_config(config: dict, env: str, actor_loss: str | None, normalize_advantages: bool = False) -> dict:
     visual = "visual" in env or "powderworld" in env
     discrete = "powderworld" in env
     # [TODO: name GCBCs loss properly. For now it says AWR]
@@ -507,6 +508,7 @@ def _adapt_base_config(config: dict, env: str, actor_loss: str | None) -> dict:
         ("alpha", 3.0, awr),
         ("actor_loss", "ddpgbc", ddpgbc),
         ("low_actor_rep_grad", True, hiql_grad_propagation),
+        ("normalize_advantages", True, normalize_advantages and "normalize_advantages" in config),
     ]
     return config | {
         key: value for key, value, condition in key_value_pairs if condition

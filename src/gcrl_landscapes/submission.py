@@ -63,6 +63,7 @@ def run_setup(args: argparse.Namespace) -> None:
         args.agent,
         args.datasets[0],  # Here we assume that all datasets are of the same kind
         args.actor_loss,
+        args.normalize_advantages,
     )
 
     if len(args.datasets) == 1:
@@ -121,6 +122,7 @@ def run_setup(args: argparse.Namespace) -> None:
                 0
             ],  # Here we assume that all datasets are of the same kind
             actor_loss=args.actor_loss,
+            normalize_advantages=args.normalize_advantages,
         )
     else:
         configurations = [adapted_default_config]
