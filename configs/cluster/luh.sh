@@ -19,7 +19,8 @@ export CLUSTER_ZIP_CMD="zip"
 cluster_load_env() {
     module load Miniforge3
     # shellcheck disable=SC1091
-    source "$(conda info --base)/etc/profile.d/conda.sh"
+    eval "$(conda shell.bash hook)"
+    conda deactivate 2>/dev/null || true
     conda activate gcrl
 }
 
