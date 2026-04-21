@@ -47,8 +47,9 @@
         NIX_LD = pkgs.runCommand "ld.so" {} ''
           ln -s "$(cat '${pkgs.stdenv.cc}/nix-support/dynamic-linker')" $out
         '';
+        NIX_SSL_CERT_FILE="${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
         # commented out for now as it does make problems with the normal system. may fix problems with packages
-        LD_LIBRARY_PATH = NIX_LD_LIBRARY_PATH;
+        # LD_LIBRARY_PATH = NIX_LD_LIBRARY_PATH;
         QT_PLUGIN_PATH = "${pkgs.qt6.qtbase}/${pkgs.qt6.qtbase.qtPluginPrefix}:${pkgs.qt6.qtwayland}/${pkgs.qt6.qtbase.qtPluginPrefix}";
         # lib.fileContents "${pkgs.stdenv.cc}/nix-support/dynamic-linker";
         buildInputs = (with pkgs; [
@@ -69,6 +70,13 @@
             pre-commit
             gcc11
           ]);
+        shellHook = ''
+          export SSL_CERT_FILE=$NIX_SSL_CERT_FILE
+          export UV_NO_MANAGED_PYTHON=true
+          unset PYTHONPATH
+          uv sync --all-extras --locked
+          . .venv/bin/activate
+        '';
       };
     });
 }
