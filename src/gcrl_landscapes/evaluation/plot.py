@@ -39,6 +39,7 @@ from itertools import combinations
 from sklearn.metrics import mean_absolute_error, max_error, mean_squared_error
 from sklearn.model_selection import ShuffleSplit
 from typing import Callable
+import pymupdf
 
 
 # fmt: off
@@ -875,7 +876,16 @@ def grid_plot(
     for ax, ((dataset, phase), imgpath) in zip(
         grid, indexed_imgpath_series["path"].items()
     ):
-        ax.imshow(Image.open(imgpath))
+        if str(imgpath).endswith(".pdf"):
+            # Convert PDF to image using pymupdf
+            pdf_doc = pymupdf.open(imgpath)
+            page = pdf_doc[0]
+            pix = page.get_pixmap(matrix=pymupdf.Matrix(2, 2))  # 2x zoom for quality
+            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
+            pdf_doc.close()
+        else:
+            img = Image.open(imgpath)
+        ax.imshow(img)
         ax.axis("off")
         ax.set_title(f"{dataset}-{phase}")
         ax.title.set_size(7)
