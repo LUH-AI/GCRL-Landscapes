@@ -1,3 +1,4 @@
+# %%
 # ruff: noqa
 # %%
 # %% tags=["parameters"]
@@ -9,7 +10,7 @@ _p.add_argument("--zipfiles", nargs="+", type=Path)
 _args, _ = _p.parse_known_args()
 zipfiles = _args.zipfiles or [
     Path(
-        "/home/mtoepperwien/Documents/gcrl/log_zips/2026-04-07-logs_antmaze-medium-all-algs.zip"
+        "/home/mtoepperwien/Documents/gcrl/gcrl_results/2026-04-19-logs-antmaze.zip"
     )
 ]  # <- edit this
 plot_dir = Path("plots") / zipfiles[0].name / "advantages"
@@ -76,7 +77,7 @@ end_of_training_df = merged_training_df[
 
 # %%
 # Build long-format dataframe: one row per (config, seed, batch sample)
-adv_long_df = pd.DataFrame()
+adv_long_end_of_training_df = pd.DataFrame()
 if ADV_COLS:
     rows = []
     for _, row in end_of_training_df.iterrows():
@@ -85,24 +86,36 @@ if ADV_COLS:
             if adv_arr is None or not isinstance(adv_arr, np.ndarray):
                 continue
             alpha = row.get("hp.alpha", np.nan)
+            adv_f64 = adv_arr.astype(np.float64)
+            _mu, _sigma = adv_f64.mean(), adv_f64.std()
+            adv_norm = (adv_f64 - _mu) / _sigma if _sigma > 0 else np.zeros_like(adv_f64)
+            adv_norm_spread = (adv_f64) / _sigma if _sigma > 0 else np.zeros_like(adv_f64)
             df_tmp = pd.DataFrame(
                 {
                     "hp.agent_name": row["hp.agent_name"],
                     "dataset": row["dataset"],
                     "config_index": row["config_index"],
                     "seed": row["seed"],
+                    "eval_step": row["eval_step"],
                     "actor": adv_col,
                     "advantage": adv_arr,
+                    "advantage_norm": adv_norm,
+                    "advantage_norm_spread": adv_norm_spread,
                     "alpha": alpha,
                 }
             )
-            df_tmp["weight"] = np.exp(alpha * adv_arr.astype(np.float64))
+            try:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings("error")
+                    df_tmp["weight"] = np.exp(alpha * adv_f64)
+            except:
+                print(f"np.exp({alpha}*{adv_f64})={np.exp(alpha*adv_f64)}")
             rows.append(df_tmp)
 
-    adv_long_df = pd.concat(rows, ignore_index=True)
-    print(f"Long-format dataframe: {len(adv_long_df)} rows")
+    adv_long_end_of_training_df = pd.concat(rows, ignore_index=True)
+    print(f"Long-format dataframe: {len(adv_long_end_of_training_df)} rows")
     print(
-        adv_long_df.groupby(["hp.agent_name", "dataset", "actor"])[
+        adv_long_end_of_training_df.groupby(["hp.agent_name", "dataset", "actor"])[
             ["advantage", "weight"]
         ].describe()
     )
@@ -115,10 +128,11 @@ sns.set_theme(context="paper", style="whitegrid")
 
 if ADV_COLS:
     # Compute global x-limits for advantage plots (1st/99th percentile to avoid extreme outliers)
-    _adv_vals = adv_long_df["advantage"].dropna()
+    _adv_vals = adv_long_end_of_training_df["advantage"].dropna()
     _adv_xlim = (float(_adv_vals.quantile(0.01)), float(_adv_vals.quantile(0.99)))
+    _adv_xlim = (-10, 10)
 
-    for (agent_name, dataset, actor), grp in adv_long_df.groupby(
+    for (agent_name, dataset, actor), grp in adv_long_end_of_training_df.groupby(
         ["hp.agent_name", "dataset", "actor"]
     ):
         fig, ax = plt.subplots(figsize=(5, 3))
@@ -147,10 +161,119 @@ if ADV_COLS:
         ax.set_xlabel("Advantage")
         ax.set_ylabel("Density")
         plt.tight_layout()
-        fname = plot_dir / f"adv_dist_{agent_name}_{actor.replace('/', '_')}.pdf"
+        fname = plot_dir / f"adv_dist_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
         plt.savefig(fname)
         print(f"Saved {fname}")
         plt.close()
+
+# %%
+# Normalized advantage distribution (z-scored per list / per config-seed row)
+if ADV_COLS:
+    _norm_vals = adv_long_end_of_training_df["advantage_norm"].dropna()
+    _norm_xlim = (float(_norm_vals.quantile(0.01)), float(_norm_vals.quantile(0.99)))
+    _norm_xlim = (-10, 10)
+
+    for (agent_name, dataset, actor), grp in adv_long_end_of_training_df.groupby(
+        ["hp.agent_name", "dataset", "actor"]
+    ):
+        fig, ax = plt.subplots(figsize=(5, 3))
+        for config_id, cfg_grp in grp.groupby("config_index"):
+            sns.kdeplot(
+                bw_adjust=0.5,
+                data=cfg_grp,
+                x="advantage_norm",
+                ax=ax,
+                alpha=0.3,
+                linewidth=0.8,
+                color="steelblue",
+            )
+        sns.kdeplot(
+            bw_adjust=0.5,
+            data=grp,
+            x="advantage_norm",
+            ax=ax,
+            color="black",
+            linewidth=2,
+            label="overall",
+        )
+        ax.axvline(0, color="red", linestyle="--", alpha=0.6, linewidth=1)
+        ax.set_xlim(_norm_xlim)
+        ax.set_title(f"{agent_name.upper()} — normalized advantage distribution")
+        ax.set_xlabel("Normalized Advantage  (adv − μ) / σ  per config-seed")
+        ax.set_ylabel("Density")
+        plt.tight_layout()
+        fname = plot_dir / f"adv_dist_norm_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
+        plt.savefig(fname)
+        print(f"Saved {fname}")
+        plt.close()
+
+# %%
+# describe comparison — raw vs normalised advantages
+if ADV_COLS:
+      for (agent, actor), grp in adv_long_end_of_training_df.groupby(["hp.agent_name", "actor"]):
+          print(f"\n=== {agent} | {actor} ===")
+          desc = grp[["advantage", "advantage_norm", "advantage_norm_spread"]].describe()
+          desc.columns = ["advantage (raw)", "advantage (z-scored)", "advantage spread normalized"]
+          print(desc.to_string())
+
+# %%
+# describe comparison — raw vs normalised advantage means per batch
+if ADV_COLS:
+    print("Statistics over mean of advantages in batch")
+    for (agent, actor), grp in adv_long_end_of_training_df.groupby(["hp.agent_name", "actor"]):
+        print(f"\n=== {agent} | {actor} ===")
+        temp_df = grp.groupby(["dataset", "config_index", "seed", "eval_step"])["advantage"].mean()
+        desc = temp_df.describe()
+        print(desc.to_string())
+
+# %%
+# describe comparison — raw vs normalised advantages, cut out outliers per batch
+# Outliers defined as outside [Q5, Q95] computed per (config_index, seed, actor, eval_step) batch
+if ADV_COLS:
+    q25 = adv_long_end_of_training_df.groupby(["hp.agent_name", "dataset", "config_index", "seed", "actor", "eval_step"])["advantage"].transform("quantile", 0.05)
+    q75 = adv_long_end_of_training_df.groupby(["hp.agent_name", "dataset", "config_index", "seed", "actor", "eval_step"])["advantage"].transform("quantile", 0.95)
+
+    adv_trimmed_df = adv_long_end_of_training_df[(adv_long_end_of_training_df["advantage"] >= q25) & (adv_long_end_of_training_df["advantage"] <= q75)].copy()
+    print(f"Trimmed dataframe: {len(adv_trimmed_df)} rows ({len(adv_long_end_of_training_df) - len(adv_trimmed_df)} outliers removed, {100 * (1 - len(adv_trimmed_df)/len(adv_long_end_of_training_df)):.1f}%)")
+    for (agent, actor), grp in adv_trimmed_df.groupby(["hp.agent_name", "actor"]):
+        print(f"\n=== {agent} | {actor} ===")
+        desc = grp[["advantage", "advantage_norm", "weight"]].describe()
+        desc.columns = ["advantage (raw)", "advantage (z-scored)", "weight"]
+        print(desc.to_string())
+
+
+# %%
+# describe comparison — raw vs normalised advantages
+if ADV_COLS:
+      for (agent, actor), grp in adv_long_end_of_training_df.groupby(["hp.agent_name", "actor"]):
+          print(f"\n=== {agent} | {actor} ===")
+          desc = grp[["weight"]].clip(upper=100).describe()
+          desc.columns = ["advantage"]
+          print(desc.to_string())
+
+
+# %%
+# describe comparison — raw vs normalised advantages (positive only)
+if ADV_COLS:
+    for (agent, actor), grp in adv_long_end_of_training_df.groupby(["hp.agent_name", "actor"]):
+        pos = grp[grp["advantage"] > 0]
+        if pos.empty:
+            continue
+        print(f"\n=== {agent} | {actor} ===")
+        desc = pos[["advantage", "advantage_norm"]].describe()
+        desc.columns = ["advantage (raw)", "advantage (z-scored)"]
+        print(desc.to_string())
+
+# %%
+# Fraction of negative advantages per algorithm-dataset combination
+if ADV_COLS:
+    neg_frac = (
+        adv_long_end_of_training_df.groupby(["hp.agent_name", "actor"])["advantage"]
+        .apply(lambda x: (x < 0).sum() / len(x))
+        .reset_index(name="frac_negative")
+    )
+    print("\nFraction of negative advantages per agent × dataset × actor:")
+    print(neg_frac.to_string(index=False))
 
 # %% [markdown]
 # # AWR Weight Distribution Across Configurations
@@ -158,14 +281,14 @@ if ADV_COLS:
 # %%
 if ADV_COLS:
     # Compute global log-scale x-limits for weight plots
-    _w_vals = adv_long_df["weight"].apply(lambda x: x if np.isfinite(x) and x > 0 else np.nan).dropna()
+    _w_vals = adv_long_end_of_training_df["weight"].apply(lambda x: x if np.isfinite(x) and x > 0 else np.nan).dropna()
     _w_xlim = (float(_w_vals.quantile(0.01)), float(_w_vals.quantile(0.99)))
     if not (np.isfinite(_w_xlim[0]) and _w_xlim[0] > 0):
         _w_xlim = (1e-10, _w_xlim[1])
     if not np.isfinite(_w_xlim[1]):
         _w_xlim = (_w_xlim[0], 1e30)
 
-    for (agent_name, dataset, actor), grp in adv_long_df.groupby(
+    for (agent_name, dataset, actor), grp in adv_long_end_of_training_df.groupby(
         ["hp.agent_name", "dataset", "actor"]
     ):
         # Drop non-finite weights (can occur if alpha * adv overflows float32)
@@ -263,7 +386,7 @@ if ADV_COLS:
 # Ratio of weights > 100 per config, then statistics across configs
 if ADV_COLS:
     high_ratio = (
-        adv_long_df.groupby(
+        adv_long_end_of_training_df.groupby(
             ["hp.agent_name", "dataset", "actor", "config_index", "seed"]
         )["weight"]
         .apply(lambda w: (w > 100).sum() / len(w))  # type: ignore[arg-type]
@@ -331,6 +454,11 @@ if ADV_COLS and merged_results_df is not None:
             if adv_arr is None or not isinstance(adv_arr, np.ndarray):
                 continue
             alpha = row.get("hp.alpha", np.nan)
+            adv_f64 = adv_arr.astype(np.float64)
+            _mu, _sigma = adv_f64.mean(), adv_f64.std()
+            adv_norm = (adv_f64 - _mu) / _sigma if _sigma > 0 else np.zeros_like(adv_f64)
+            adv_norm_spread = (adv_f64) / _sigma if _sigma > 0 else np.zeros_like(adv_f64)
+
             df_tmp = pd.DataFrame(
                 {
                     "hp.agent_name": row["hp.agent_name"],
@@ -340,6 +468,8 @@ if ADV_COLS and merged_results_df is not None:
                     "eval_step": row["eval_step"],
                     "actor": adv_col,
                     "advantage": adv_arr,
+                    "advantage_norm": adv_norm,
+                    "advantage_norm_spread": adv_norm_spread,
                     "alpha": alpha,
                 }
             )
@@ -409,23 +539,96 @@ if ADV_COLS and merged_results_df is not None:
         .to_string(index=False)
     )
 
+# %%
+# describe comparison — raw vs normalised advantages
+if ADV_COLS:
+      for (agent, actor), grp in adv_all_df.groupby(["hp.agent_name", "actor"]):
+          print(f"\n=== {agent} | {actor} ===")
+          desc = grp[["advantage", "advantage_norm", "advantage_norm_spread"]].describe()
+          desc.columns = ["advantage (raw)", "advantage (z-scored)", "advantage spread normalized"]
+          print(desc.to_string())
 
 # %%
+# describe comparison — raw vs normalised advantage means per batch
+if ADV_COLS:
+    print("Statistics over mean of advantages in batch")
+    for (agent, actor), grp in adv_all_df.groupby(["hp.agent_name", "actor"]):
+        print(f"\n=== {agent} | {actor} ===")
+        temp_df = grp.groupby(["dataset", "config_index", "seed", "eval_step"])["advantage"].mean()
+        desc = temp_df.describe()
+        print(desc.to_string())
+
+# %%
+# describe comparison — raw vs normalised advantages, cut out outliers per batch
+# Outliers defined as outside [Q5, Q95] computed per (config_index, seed, actor, eval_step) batch
+if ADV_COLS:
+    q25 = adv_all_df.groupby(["hp.agent_name", "dataset", "config_index", "seed", "actor", "eval_step"])["advantage"].transform("quantile", 0.05)
+    q75 = adv_all_df.groupby(["hp.agent_name", "dataset", "config_index", "seed", "actor", "eval_step"])["advantage"].transform("quantile", 0.95)
+
+    adv_trimmed_df = adv_all_df[(adv_all_df["advantage"] >= q25) & (adv_all_df["advantage"] <= q75)].copy()
+    print(f"Trimmed dataframe: {len(adv_trimmed_df)} rows ({len(adv_all_df) - len(adv_trimmed_df)} outliers removed, {100 * (1 - len(adv_trimmed_df)/len(adv_all_df)):.1f}%)")
+    for (agent, actor), grp in adv_trimmed_df.groupby(["hp.agent_name", "actor"]):
+        print(f"\n=== {agent} | {actor} ===")
+        desc = grp[["advantage", "advantage_norm", "weight"]].describe()
+        desc.columns = ["advantage (raw)", "advantage (z-scored)", "weight"]
+        print(desc.to_string())
+
+
+# %%
+# describe comparison — raw vs normalised advantages
+if ADV_COLS:
+      for (agent, actor), grp in adv_all_df.groupby(["hp.agent_name", "actor"]):
+          print(f"\n=== {agent} | {actor} ===")
+          desc = grp[["weight"]].clip(upper=100).describe()
+          desc.columns = ["advantage"]
+          print(desc.to_string())
+
+
+# %%
+# describe comparison — raw vs normalised advantages (positive only)
+if ADV_COLS:
+    for (agent, actor), grp in adv_all_df.groupby(["hp.agent_name", "actor"]):
+        pos = grp[grp["advantage"] > 0]
+        if pos.empty:
+            continue
+        print(f"\n=== {agent} | {actor} ===")
+        desc = pos[["advantage", "advantage_norm"]].describe()
+        desc.columns = ["advantage (raw)", "advantage (z-scored)"]
+        print(desc.to_string())
+
+# %%
+# Fraction of negative advantages per algorithm-dataset combination
+if ADV_COLS:
+    neg_frac = (
+        adv_all_df.groupby(["hp.agent_name", "actor"])["advantage"]
+        .apply(lambda x: (x < 0).sum() / len(x))
+        .reset_index(name="frac_negative")
+    )
+    print("\nFraction of negative advantages per agent × dataset × actor:")
+    print(neg_frac.to_string(index=False))
+
+# %%
+import warnings
 # Normalized ESS per config (end of training) + correlation with performance
 # ESS = (sum(w))^2 / sum(w^2), normalized by n -> in [0, 1]; 1 = uniform weights, 0 = single sample dominates
 def _ess(w: pd.Series) -> float:
     w_arr = w.values.astype(np.float64)
-    w_finite = w_arr[np.isfinite(w_arr)]
+    w_finite = w_arr.clip(min=10e-10, max=100)
     if len(w_finite) == 0:
         return float("nan")
     # Normalize by max before squaring — ESS is scale-invariant, avoids float64 overflow
-    w_scaled = w_finite / w_finite.max()
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            w_scaled = w_finite / w_finite.max()
+    except RuntimeWarning as e:
+        print(w_finite)
     return float(w_scaled.sum() ** 2 / (len(w_scaled) * (w_scaled**2).sum()))
 
 
 if ADV_COLS:
     ess_df = (
-        adv_long_df.groupby(
+        adv_long_end_of_training_df.groupby(
             ["hp.agent_name", "dataset", "actor", "config_index", "seed"]
         )["weight"]
         .apply(_ess)  # type: ignore[arg-type]
@@ -468,12 +671,13 @@ if ADV_COLS and merged_results_df is not None:
 
     corr_ess_phased_df = ess_phased.merge(
         perf_per_phase,
-        on=["hp.agent_name", "config_index", "seed", "phase_num"],
+        on=["hp.agent_name", "dataset", "config_index", "seed", "phase_num"],
         how="inner",
     )
 
     def _pearson_r_ess_phase(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
         if len(g) < 3:
+            print("here")
             return pd.Series({"pearson_r": float("nan"), "p_value": float("nan")})
         r, p = _pearsonr(g["ess"], g["return_normalized"])
         return pd.Series({"pearson_r": float(r), "p_value": float(p)})
@@ -482,6 +686,69 @@ if ADV_COLS and merged_results_df is not None:
     print(
         corr_ess_phased_df.groupby(["hp.agent_name", "actor", "phase_num"])
         .apply(_pearson_r_ess_phase)
+        .reset_index()
+        .sort_values(["hp.agent_name", "actor", "phase_num"])
+        .to_string(index=False)
+    )
+
+# %%
+# Correlation between fraction of positive advantages and end-of-training return
+if ADV_COLS and merged_results_df is not None:
+    pos_frac = (
+        adv_long_end_of_training_df.groupby(
+            ["hp.agent_name", "dataset", "actor", "config_index", "seed"]
+        )["advantage"]
+        .apply(lambda x: (x > 0).sum() / len(x))
+        .reset_index(name="frac_positive")
+    )
+
+    corr_pos_frac_df = pos_frac.merge(
+        end_perf, on=["hp.agent_name", "dataset", "config_index", "seed"], how="inner"
+    )
+
+    def _pearson_r_pos_frac(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
+        if len(g) < 3:
+            return pd.Series({"pearson_r": float("nan"), "p_value": float("nan")})
+        r, p = _pearsonr(g["frac_positive"], g["mean_normalized_goal_distance_return"])
+        return pd.Series({"pearson_r": float(r), "p_value": float(p)})
+
+    print(
+        "\nCorrelation between fraction of positive advantages and end-of-training mean_normalized_goal_distance_return:"
+    )
+    print(
+        corr_pos_frac_df.groupby(["hp.agent_name", "actor"])
+        .apply(_pearson_r_pos_frac)
+        .reset_index()
+        .to_string(index=False)
+    )
+
+    # Per-phase version
+    pos_frac_phased = (
+        adv_all_df.groupby(
+            ["hp.agent_name", "dataset", "actor", "config_index", "seed", "phase_num"]
+        )["advantage"]
+        .apply(lambda x: (x > 0).sum() / len(x))
+        .reset_index(name="frac_positive")
+    )
+
+    def _pearson_r_pos_frac_phase(g: pd.DataFrame) -> pd.Series:  # type: ignore[type-arg]
+        if len(g) < 3:
+            return pd.Series({"pearson_r": float("nan"), "p_value": float("nan")})
+        r, p = _pearsonr(g["frac_positive"], g["return_normalized"])
+        return pd.Series({"pearson_r": float(r), "p_value": float(p)})
+
+    corr_pos_frac_phased_df = pos_frac_phased.merge(
+        perf_per_phase,
+        on=["hp.agent_name", "dataset", "config_index", "seed", "phase_num"],
+        how="inner",
+    )
+
+    print(
+        "\nCorrelation between fraction of positive advantages and normalized return, per phase:"
+    )
+    print(
+        corr_pos_frac_phased_df.groupby(["hp.agent_name", "actor", "phase_num"])
+        .apply(_pearson_r_pos_frac_phase)
         .reset_index()
         .sort_values(["hp.agent_name", "actor", "phase_num"])
         .to_string(index=False)
