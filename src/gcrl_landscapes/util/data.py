@@ -22,6 +22,12 @@ import io
 
 T = TypeVar("T")
 
+class NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, np.generic):
+            return obj.item()
+        return super(NumpyEncoder, self).default(obj)
+
 
 class ResultsPerStep(dict[int, T], Generic[T]):
     """Mapping of training step/phase step/... to some kind of result"""
@@ -72,7 +78,7 @@ class EvalTrajectory(tuple[ResultsPerStep[EvaluationResult], ResultsPerStep[Path
         def convert_paths(results: ResultsPerStep[Path]):
             return {step: str(path) for step, path in results.items()}
 
-        return json.dumps((convert_evaluation_results(self[0]), convert_paths(self[1])))
+        return json.dumps((convert_evaluation_results(self[0]), convert_paths(self[1])), cls=NumpyEncoder)
 
     @classmethod
     def from_json(cls, eval_trajectory: tuple[dict, dict]) -> "EvalTrajectory":
