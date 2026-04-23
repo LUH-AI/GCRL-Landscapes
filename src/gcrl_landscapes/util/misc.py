@@ -3,6 +3,7 @@ import optax
 from typing import Callable, Any
 from time import sleep
 import numpy as np
+import traceback
 
 
 def jax_has_gpu():
@@ -31,12 +32,12 @@ def retry_call(save_call: Callable) -> Any:
     sleep_interval = [1, 60]
     MAX_SAVE_TRIES = 20
     save_tries = 0
-    error = None
     while save_tries < MAX_SAVE_TRIES:
         try:
             return save_call()
-        except Exception as e:
-            error = e
+        except Exception:
+            error_message = traceback.format_exc()
+            print(error_message)
             save_tries += 1
             wait_time = int(
                 np.random.randint(low=sleep_interval[0], high=sleep_interval[1])
@@ -44,7 +45,6 @@ def retry_call(save_call: Callable) -> Any:
             print(f"Failed to save, sleeping {wait_time}s")
             sleep(wait_time)
     print("Error saving")
-    print(error)
     return None
 
 
