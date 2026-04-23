@@ -70,7 +70,13 @@ def train(
     random.seed(seed)
     np.random.seed(seed)
     if val_dataset is not None:
-        held_out_val_batch = val_dataset.sample(CONST_VAL_BATCH_SIZE)
+        # Get the same random batch in all cases
+        held_out_val_batch = val_dataset.sample(
+            CONST_VAL_BATCH_SIZE,
+            idxs=np.random.default_rng(seed=0).integers(
+                low=0, high=val_dataset.size, size=CONST_VAL_BATCH_SIZE
+            ),
+        )
 
     example_batch = train_dataset.sample(1)
     if config["discrete"]:
