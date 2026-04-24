@@ -1,4 +1,8 @@
+from typing import Any
+
 import gymnasium as gym
+import numpy as np
+from ml_collections import ConfigDict
 from ogbench.impls.utils.evaluation import evaluate
 from ogbench.locomaze.ant import AntEnv
 from ogbench.locomaze.humanoid import HumanoidEnv
@@ -6,8 +10,6 @@ from ogbench.locomaze.point import PointEnv
 from ogbench.manipspace.envs.cube_env import CubeEnv
 from ogbench.manipspace.envs.scene_env import SceneEnv
 from ogbench.powderworld.powderworld_env import PowderworldEnv
-import numpy as np
-from ml_collections import ConfigDict
 
 
 def evaluate_wrapper(
@@ -41,7 +43,7 @@ def evaluate_wrapper(
         [len(traj["reward"]) for traj in trajs_task] for trajs_task in trajs
     ]
 
-    goal_start_distances, goal_end_distances = calc_goal_distances(trajs, env)
+    goal_start_distances, goal_end_distances, real_goal_start_distances, real_goal_end_distances = calc_goal_distances(trajs, env)
 
     for (
         eval_info_task,
@@ -54,12 +56,44 @@ def evaluate_wrapper(
         eval_info_task["length_of_trajectories"] = length_of_trajectories_task
         eval_info_task["goal_start_distances"] = goal_start_distances_task
         eval_info_task["goal_end_distances"] = goal_end_distances_task
+
+    if real_goal_start_distances is not None and real_goal_end_distances is not None:
+        for eval_info_task, real_start_task, real_end_task in zip(
+            eval_info, real_goal_start_distances, real_goal_end_distances
+        ):
+            eval_info_task["real_goal_start_distances"] = real_start_task
+            eval_info_task["real_goal_end_distances"] = real_end_task
     return eval_info, eval_metrics, trajs, renders
+
+
+def compute_maze_distance(
+    env: gym.Env, start_xy: np.ndarray, goal_xy: np.ndarray
+) -> float:
+    """Return shortest-path maze distance (continuous units) between two xy positions.
+
+    Uses BFS on the discrete maze grid via env.unwrapped.get_oracle_subgoal().
+    Returns float('inf') if start is unreachable from goal.
+    Only valid for locomaze environments (AntEnv, HumanoidEnv, PointEnv).
+    """
+    unwrapped: Any = env.unwrapped
+    _, bfs_map = unwrapped.get_oracle_subgoal(start_xy, goal_xy)
+    start_ij = unwrapped.xy_to_ij(start_xy)
+    dist_cells = bfs_map[start_ij[0], start_ij[1]]
+    if dist_cells < 0:
+        return float("inf")
+    return float(dist_cells * unwrapped._maze_unit)
 
 
 def calc_goal_distances(
     trajectories, env
-) -> tuple[list[list[float]], list[list[float]]]:
+) -> tuple[
+    list[list[float]],
+    list[list[float]],
+    list[list[float]] | None,
+    list[list[float]] | None,
+]:
+    real_goal_start_distances = None
+    real_goal_end_distances = None
     if isinstance(env.unwrapped, (HumanoidEnv, AntEnv, PointEnv)):
         goal_start_distances = [
             [
@@ -75,6 +109,20 @@ def calc_goal_distances(
                 float(
                     np.linalg.norm(traj["info"][-1]["xy_goal"] - traj["info"][-1]["xy"])
                 )
+                for traj in trajs_task
+            ]
+            for trajs_task in trajectories
+        ]
+        real_goal_start_distances = [
+            [
+                compute_maze_distance(env, traj["info"][0]["xy"], traj["info"][0]["xy_goal"])
+                for traj in trajs_task
+            ]
+            for trajs_task in trajectories
+        ]
+        real_goal_end_distances = [
+            [
+                compute_maze_distance(env, traj["info"][-1]["xy"], traj["info"][-1]["xy_goal"])
                 for traj in trajs_task
             ]
             for trajs_task in trajectories
@@ -161,4 +209,4 @@ def calc_goal_distances(
             f"{type(env.unwrapped)} not supported for goal distance calculation"
         )
 
-    return goal_start_distances, goal_end_distances
+    return goal_start_distances, goal_end_distances, real_goal_start_distances, real_goal_end_distances
