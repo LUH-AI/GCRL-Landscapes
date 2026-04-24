@@ -70,12 +70,13 @@ def train(
     random.seed(seed)
     np.random.seed(seed)
     if val_dataset is not None:
-        # Get the same random batch in all cases
+        # Get the same batch in all cases: fixed indices and fixed goal relabeling seed.
         held_out_val_batch = val_dataset.sample(
             CONST_VAL_BATCH_SIZE,
             idxs=np.random.default_rng(seed=0).integers(
                 low=0, high=val_dataset.size, size=CONST_VAL_BATCH_SIZE
             ),
+            seed=0,
         )
 
     example_batch = train_dataset.sample(1)
@@ -321,14 +322,17 @@ def _qv_advantage(agent, batch):
     """adv = min(Q1, Q2) - V  — used by GCIQL and CRL-AWR."""
     v = agent.network.select('value')(batch['observations'], batch['actor_goals'])
     q1, q2 = agent.network.select('critic')(batch['observations'], batch['actor_goals'], batch['actions'])
-    return jax.numpy.minimum(q1, q2) - v
+    q = jax.numpy.minimum(q1, q2)
+    return q - v, v, q
 
 
 def _ensemble_td_advantage(agent, obs, next_obs, goals):
     """adv = mean(nV1,nV2) - mean(V1,V2)  — used by GCIVL and HIQL."""
     v1, v2 = agent.network.select('value')(obs, goals)
     nv1, nv2 = agent.network.select('value')(next_obs, goals)
-    return (nv1 + nv2) / 2 - (v1 + v2) / 2
+    v = (v1 + v2) / 2
+    nv = (nv1 + nv2) / 2
+    return nv - v, v, nv
 
 
 def get_advantage_metrics(agent, batch) -> dict:
@@ -340,25 +344,40 @@ def get_advantage_metrics(agent, batch) -> dict:
     result = {}
 
     if agent_name in ('gciql', 'crl'):
-        result['advantage/actor'] = _qv_advantage(agent, batch).tolist()
+        adv, v, q = _qv_advantage(agent, batch)
+        result['advantage/actor'] = adv.tolist()
+        result['value/actor_v'] = v.tolist()
+        result['value/actor_q'] = q.tolist()
 
     elif agent_name == 'gcivl':
-        result['advantage/actor'] = _ensemble_td_advantage(
+        adv, v, nv = _ensemble_td_advantage(
             agent, batch['observations'], batch['next_observations'], batch['actor_goals']
-        ).tolist()
+        )
+        result['advantage/actor'] = adv.tolist()
+        result['value/actor_v'] = v.tolist()
+        result['value/actor_nv'] = nv.tolist()
 
     elif agent_name == 'qrl':
         v = -agent.network.select('value')(batch['observations'], batch['actor_goals'])
         nv = -agent.network.select('value')(batch['next_observations'], batch['actor_goals'])
         result['advantage/actor'] = (nv - v).tolist()
+        result['value/actor_v'] = v.tolist()
+        result['value/actor_nv'] = nv.tolist()
 
     elif agent_name == 'hiql':
-        result['advantage/low_actor'] = _ensemble_td_advantage(
+        adv_low, v_low, nv_low = _ensemble_td_advantage(
             agent, batch['observations'], batch['next_observations'], batch['low_actor_goals']
-        ).tolist()
-        result['advantage/high_actor'] = _ensemble_td_advantage(
+        )
+        result['advantage/low_actor'] = adv_low.tolist()
+        result['value/low_actor_v'] = v_low.tolist()
+        result['value/low_actor_nv'] = nv_low.tolist()
+
+        adv_high, v_high, nv_high = _ensemble_td_advantage(
             agent, batch['observations'], batch['high_actor_targets'], batch['high_actor_goals']
-        ).tolist()
+        )
+        result['advantage/high_actor'] = adv_high.tolist()
+        result['value/high_actor_v'] = v_high.tolist()
+        result['value/high_actor_nv'] = nv_high.tolist()
 
     # GCBC / SAC / CMD / CRL-ddpgbc: no advantage → empty dict
     return result
