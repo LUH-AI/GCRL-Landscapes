@@ -53,8 +53,8 @@ class MixedDataset(GCDataset):
         )
 
     def _split_indices(self, idxs):
-        idxs1 = idxs[idxs < self.dataset1.size] if idxs else None
-        idxs2 = idxs[idxs >= self.dataset1.size] - self.dataset1.size if idxs else None
+        idxs1 = idxs[idxs < self.dataset1.size] if idxs is not None else None
+        idxs2 = idxs[idxs >= self.dataset1.size] - self.dataset1.size if idxs is not None else None
 
         return idxs1, idxs2
 
