@@ -38,6 +38,7 @@ _META_COLS = [
     "seed",
     "configuration",
     "actor",
+    "batch_idx",
 ]
 
 
