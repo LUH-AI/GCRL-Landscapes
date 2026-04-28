@@ -179,6 +179,7 @@ def _build_rows(
     row: pd.Series,
     actor_name: str,
     adv_matrix: np.ndarray,
+    batch_idx: int = 0,
 ) -> pd.DataFrame:
     """Flatten NxN advantage matrix into a per-(obs_idx, goal_idx) DataFrame.
 
@@ -203,6 +204,7 @@ def _build_rows(
             "seed": _const_cat(row["seed"]),
             "configuration": _const_cat(row["configuration"]),
             "actor": _const_cat(actor_name),
+            "batch_idx": _const_cat(batch_idx),
             "obs_idx": pd.Categorical(obs_idxs),
             "goal_idx": pd.Categorical(goal_idxs),
             "is_positive": pd.Categorical(obs_idxs == goal_idxs),
@@ -226,6 +228,8 @@ def _emit_df(
 def _process_chunk_frames(
     agent_name: str,
     chunk: list[tuple],  # [(row, agent, val_ds), ...]
+    batch: dict,
+    batch_idx: int,
     writer: pq.ParquetWriter | None,
     frames: list[pd.DataFrame] | None,
 ) -> None:
@@ -234,8 +238,6 @@ def _process_chunk_frames(
     The caller should clear *chunk* after this returns to release agent params from VRAM.
     """
     ref_agent = chunk[0][1]
-    val_ds = chunk[0][2]
-    batch = _sample_fixed_batch(val_ds, seed=0)
     rows_chunk = [c[0] for c in chunk]
 
     N = BATCH_SIZE
@@ -254,7 +256,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, act_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i]), writer, frames)
+                _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
 
         elif agent_name == "GCIVL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -262,7 +264,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i]), writer, frames)
+                _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
 
         elif agent_name == "QRL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -270,7 +272,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i]), writer, frames)
+                _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
 
         elif agent_name == "HIQL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -282,7 +284,7 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    _emit_df(_build_rows(row, "low_actor", adv_low_batch[i]), writer, frames)
+                    _emit_df(_build_rows(row, "low_actor", adv_low_batch[i], batch_idx), writer, frames)
             if has_high:
                 targets_rep = jnp.repeat(
                     jnp.array(batch["high_actor_targets"]), N, axis=0
@@ -292,7 +294,7 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    _emit_df(_build_rows(row, "high_actor", adv_high_batch[i]), writer, frames)
+                    _emit_df(_build_rows(row, "high_actor", adv_high_batch[i], batch_idx), writer, frames)
 
     except Exception as exc:
         for row in rows_chunk:
@@ -306,6 +308,7 @@ def generate_advantages(
     output_path: Path | None = None,
     chunk_size: int = 32,
     num_workers: int = 8,
+    n_batches: int = 1,
     progress: bool = True,
 ) -> pd.DataFrame | None:
     """Process all rows in *catalog_df*; stream-write to *output_path* or return DataFrame.
@@ -332,7 +335,7 @@ def generate_advantages(
     total_chunks = sum(
         math.ceil(len(group_rows) / chunk_size)
         for group_rows in by_agent_dataset.values()
-    )
+    ) * n_batches
 
     dataset_cache: dict = {}
     frames: list[pd.DataFrame] | None = None if output_path is not None else []
@@ -409,16 +412,22 @@ def generate_advantages(
                 if good:
                     # Lazily open writer on first successful batch to infer schema
                     if output_path is not None and writer is None:
-                        first_df = _build_rows(good[0][0], "actor", np.zeros((BATCH_SIZE, BATCH_SIZE), dtype=np.float32))
+                        first_df = _build_rows(
+                            good[0][0], "actor",
+                            np.zeros((BATCH_SIZE, BATCH_SIZE), dtype=np.float32),
+                            batch_idx=0,
+                        )
                         schema = pa.Schema.from_pandas(first_df, preserve_index=False)
                         output_path = Path(output_path)
                         output_path.parent.mkdir(parents=True, exist_ok=True)
                         writer = pq.ParquetWriter(output_path, schema)
-                    _process_chunk_frames(agent_name, good, writer, frames)
 
-                # good goes out of scope here → agent params freed before next chunk
-                outer_iter.update(1)
-                outer_iter.set_postfix(n=n_constructed, refresh=False)
+                    val_ds = good[0][2]
+                    for b_idx in range(n_batches):
+                        batch = _sample_fixed_batch(val_ds, seed=b_idx)
+                        _process_chunk_frames(agent_name, good, batch, b_idx, writer, frames)
+                        outer_iter.update(1)
+                        outer_iter.set_postfix(n=n_constructed, refresh=False)
 
     finally:
         if writer is not None:
@@ -473,6 +482,12 @@ def main() -> None:
         default=min(8, (os.cpu_count() or 4)),
         help="Worker threads for parallel checkpoint I/O. Does not affect VRAM.",
     )
+    parser.add_argument(
+        "--num-batches",
+        type=int,
+        default=1,
+        help="Number of independent validation batches per checkpoint. Default 1 (original behaviour).",
+    )
     args = parser.parse_args()
 
     catalog_df = pd.read_csv(args.catalog)
@@ -486,6 +501,7 @@ def main() -> None:
         output_path=args.output,
         chunk_size=args.chunk_size,
         num_workers=args.num_workers,
+        n_batches=args.num_batches,
     )
     print(f"Saved to {args.output}")
 
