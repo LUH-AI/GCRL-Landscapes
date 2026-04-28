@@ -240,7 +240,7 @@ def _process_chunk_frames(
 
     N = BATCH_SIZE
     obs_rep = jnp.repeat(jnp.array(batch["observations"]), N, axis=0)
-    goals_rep = jnp.tile(jnp.array(batch["value_goals"]), (N, 1))
+    goals_rep = jnp.tile(jnp.array(batch["actor_goals"]), (N, 1))
 
     batched_params = jax.tree.map(
         lambda *xs: np.stack(xs),
