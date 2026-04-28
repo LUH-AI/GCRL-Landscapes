@@ -50,8 +50,8 @@ def catalog_checkpoints(logdir: pathlib.Path) -> pd.DataFrame:
     Returns
     -------
     pd.DataFrame
-        DataFrame with exactly six columns:
-        ``checkpoint_path``, ``agent``, ``dataset``, ``phase``, ``seed``, ``configuration``.
+        DataFrame with exactly seven columns:
+        ``checkpoint_path``, ``config_path``, ``agent``, ``dataset``, ``phase``, ``seed``, ``configuration``.
     """
     logdir = pathlib.Path(logdir).resolve()
     if not logdir.is_dir():
@@ -59,6 +59,7 @@ def catalog_checkpoints(logdir: pathlib.Path) -> pd.DataFrame:
         return pd.DataFrame(
             columns=[
                 "checkpoint_path",
+                "config_path",
                 "agent",
                 "dataset",
                 "phase",
@@ -82,6 +83,7 @@ def catalog_checkpoints(logdir: pathlib.Path) -> pd.DataFrame:
         return pd.DataFrame(
             columns=[
                 "checkpoint_path",
+                "config_path",
                 "agent",
                 "dataset",
                 "phase",
@@ -163,9 +165,13 @@ def catalog_checkpoints(logdir: pathlib.Path) -> pd.DataFrame:
                     phase=last_phase
                 )
                 if checkpoint_path.is_file():
+                    config_path = str(
+                        agent_dir / "configurations" / f"configuration_{config_idx}.json"
+                    )
                     rows.append(
                         {
                             "checkpoint_path": str(checkpoint_path),
+                            "config_path": config_path,
                             "agent": agent,
                             "dataset": dataset,
                             "phase": last_phase,
@@ -182,6 +188,7 @@ def catalog_checkpoints(logdir: pathlib.Path) -> pd.DataFrame:
         rows,
         columns=[
             "checkpoint_path",
+            "config_path",
             "agent",
             "dataset",
             "phase",
