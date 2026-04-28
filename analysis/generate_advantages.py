@@ -15,10 +15,12 @@ import argparse
 import json
 import time
 import warnings
+from collections import defaultdict
 from pathlib import Path
 from typing import Any
 from tqdm import tqdm
 
+import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
@@ -53,101 +55,96 @@ def _load_agent(row: pd.Series) -> tuple:
     return agent, val_ds, config
 
 
-def _compute_advantages_gciql_crl(agent: Any, batch: dict) -> np.ndarray:
-    """advantage[i,j] = min(Q1,Q2)(s_i,a_i,g_j) - V(s_i,g_j)."""
-    N = BATCH_SIZE
-    obs = jnp.array(batch["observations"])  # (N, obs_dim)
-    actions = jnp.array(batch["actions"])  # (N, act_dim)
-    goals = jnp.array(batch["value_goals"])  # (N, goal_dim)
-
-    obs_rep = jnp.repeat(obs, N, axis=0)  # (N*N, obs_dim)
-    act_rep = jnp.repeat(actions, N, axis=0)  # (N*N, act_dim)
-    goals_rep = jnp.tile(goals, (N, 1))  # (N*N, goal_dim)
-
-    q1, q2 = agent.network.select("critic")(obs_rep, goals_rep, act_rep)
-    q = jnp.minimum(q1, q2)
-    v = agent.network.select("value")(obs_rep, goals_rep)
-
-    adv = (q - v).reshape(N, N)
-    return np.array(adv)
+def _param_shape_key(params: Any) -> str:
+    """Hashable string key encoding the PyTree structure and leaf shapes."""
+    return str(jax.tree.map(lambda x: x.shape, params))
 
 
-def _compute_advantages_gcivl(agent: Any, batch: dict) -> np.ndarray:
-    """advantage[i,j] = mean(V(s'_i,g_j)) - mean(V(s_i,g_j)) (ensemble mean)."""
-    N = BATCH_SIZE
-    obs = jnp.array(batch["observations"])
-    next_obs = jnp.array(batch["next_observations"])
-    goals = jnp.array(batch["value_goals"])
+def _batch_compute_gciql_crl(
+    ref_agent: Any,
+    batched_params: Any,
+    obs_rep: jnp.ndarray,
+    act_rep: jnp.ndarray,
+    goals_rep: jnp.ndarray,
+) -> np.ndarray:
+    """Returns (B, N, N) advantages for a batch of B param sets."""
+    def single(params: Any) -> jnp.ndarray:
+        q1, q2 = ref_agent.network.select("critic")(obs_rep, goals_rep, act_rep, params=params)
+        q = jnp.minimum(q1, q2)
+        v = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
+        return (q - v).reshape(BATCH_SIZE, BATCH_SIZE)
 
-    obs_rep = jnp.repeat(obs, N, axis=0)
-    nobs_rep = jnp.repeat(next_obs, N, axis=0)
-    goals_rep = jnp.tile(goals, (N, 1))
-
-    v1, v2 = agent.network.select("value")(obs_rep, goals_rep)
-    nv1, nv2 = agent.network.select("value")(nobs_rep, goals_rep)
-
-    v = (v1 + v2) / 2
-    nv = (nv1 + nv2) / 2
-    adv = (nv - v).reshape(N, N)
-    return np.array(adv)
+    return np.array(jax.jit(jax.vmap(single))(batched_params))
 
 
-def _compute_advantages_qrl(agent: Any, batch: dict) -> np.ndarray:
-    """advantage[i,j] = V(s_i,g_j) - V(s'_i,g_j)  (negated quasimetric distances)."""
-    N = BATCH_SIZE
-    obs = jnp.array(batch["observations"])
-    next_obs = jnp.array(batch["next_observations"])
-    goals = jnp.array(batch["value_goals"])
+def _batch_compute_gcivl(
+    ref_agent: Any,
+    batched_params: Any,
+    obs_rep: jnp.ndarray,
+    nobs_rep: jnp.ndarray,
+    goals_rep: jnp.ndarray,
+) -> np.ndarray:
+    """Returns (B, N, N) advantages for a batch of B param sets."""
+    def single(params: Any) -> jnp.ndarray:
+        v1, v2 = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
+        nv1, nv2 = ref_agent.network.select("value")(nobs_rep, goals_rep, params=params)
+        v = (v1 + v2) / 2
+        nv = (nv1 + nv2) / 2
+        return (nv - v).reshape(BATCH_SIZE, BATCH_SIZE)
 
-    obs_rep = jnp.repeat(obs, N, axis=0)
-    nobs_rep = jnp.repeat(next_obs, N, axis=0)
-    goals_rep = jnp.tile(goals, (N, 1))
-
-    v = -agent.network.select("value")(obs_rep, goals_rep)  # negate distance
-    nv = -agent.network.select("value")(nobs_rep, goals_rep)
-
-    adv = (nv - v).reshape(N, N)
-    return np.array(adv)
-
-
-def _compute_advantages_hiql_low(agent: Any, batch: dict) -> np.ndarray:
-    """advantage[i,j] for low actor: V(s'_i,g_j) - V(s_i,g_j) (ensemble mean)."""
-    N = BATCH_SIZE
-    obs = jnp.array(batch["observations"])
-    next_obs = jnp.array(batch["next_observations"])
-    goals = jnp.array(batch["low_actor_goals"])
-
-    obs_rep = jnp.repeat(obs, N, axis=0)
-    nobs_rep = jnp.repeat(next_obs, N, axis=0)
-    goals_rep = jnp.tile(goals, (N, 1))
-
-    v1, v2 = agent.network.select("value")(obs_rep, goals_rep)
-    nv1, nv2 = agent.network.select("value")(nobs_rep, goals_rep)
-
-    v = (v1 + v2) / 2
-    nv = (nv1 + nv2) / 2
-    adv = (nv - v).reshape(N, N)
-    return np.array(adv)
+    return np.array(jax.jit(jax.vmap(single))(batched_params))
 
 
-def _compute_advantages_hiql_high(agent: Any, batch: dict) -> np.ndarray:
-    """advantage[i,j] for high actor: V(target_i,g_j) - V(s_i,g_j) (ensemble mean)."""
-    N = BATCH_SIZE
-    obs = jnp.array(batch["observations"])
-    targets = jnp.array(batch["high_actor_targets"])
-    goals = jnp.array(batch["high_actor_goals"])
+def _batch_compute_qrl(
+    ref_agent: Any,
+    batched_params: Any,
+    obs_rep: jnp.ndarray,
+    nobs_rep: jnp.ndarray,
+    goals_rep: jnp.ndarray,
+) -> np.ndarray:
+    """Returns (B, N, N) advantages for a batch of B param sets."""
+    def single(params: Any) -> jnp.ndarray:
+        v = -ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
+        nv = -ref_agent.network.select("value")(nobs_rep, goals_rep, params=params)
+        return (nv - v).reshape(BATCH_SIZE, BATCH_SIZE)
 
-    obs_rep = jnp.repeat(obs, N, axis=0)
-    targets_rep = jnp.repeat(targets, N, axis=0)
-    goals_rep = jnp.tile(goals, (N, 1))
+    return np.array(jax.jit(jax.vmap(single))(batched_params))
 
-    v1, v2 = agent.network.select("value")(obs_rep, goals_rep)
-    nv1, nv2 = agent.network.select("value")(targets_rep, goals_rep)
 
-    v = (v1 + v2) / 2
-    nv = (nv1 + nv2) / 2
-    adv = (nv - v).reshape(N, N)
-    return np.array(adv)
+def _batch_compute_hiql_low(
+    ref_agent: Any,
+    batched_params: Any,
+    obs_rep: jnp.ndarray,
+    nobs_rep: jnp.ndarray,
+    goals_rep: jnp.ndarray,
+) -> np.ndarray:
+    """Returns (B, N, N) low-actor advantages for a batch of B param sets."""
+    def single(params: Any) -> jnp.ndarray:
+        v1, v2 = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
+        nv1, nv2 = ref_agent.network.select("value")(nobs_rep, goals_rep, params=params)
+        v = (v1 + v2) / 2
+        nv = (nv1 + nv2) / 2
+        return (nv - v).reshape(BATCH_SIZE, BATCH_SIZE)
+
+    return np.array(jax.jit(jax.vmap(single))(batched_params))
+
+
+def _batch_compute_hiql_high(
+    ref_agent: Any,
+    batched_params: Any,
+    obs_rep: jnp.ndarray,
+    targets_rep: jnp.ndarray,
+    goals_rep: jnp.ndarray,
+) -> np.ndarray:
+    """Returns (B, N, N) high-actor advantages for a batch of B param sets."""
+    def single(params: Any) -> jnp.ndarray:
+        v1, v2 = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
+        nv1, nv2 = ref_agent.network.select("value")(targets_rep, goals_rep, params=params)
+        v = (v1 + v2) / 2
+        nv = (nv1 + nv2) / 2
+        return (nv - v).reshape(BATCH_SIZE, BATCH_SIZE)
+
+    return np.array(jax.jit(jax.vmap(single))(batched_params))
 
 
 def _build_rows(
@@ -182,72 +179,137 @@ def _build_rows(
     return records
 
 
-def _process_row(row: pd.Series) -> pd.DataFrame:
-    """Compute cross-goal advantages for a single catalog row.
-
-    Returns empty DataFrame for non-AWR agents or on error.
-    """
-    agent_name = row["agent"]
-    if agent_name not in _AWR_AGENTS:
-        return pd.DataFrame()
-
-    try:
-        agent, val_ds, config = _load_agent(row)
-    except Exception as exc:
-        warnings.warn(f"Failed to load agent for {row['checkpoint_path']}: {exc}")
-        return pd.DataFrame()
-
-    if config.get("actor_loss", "awr") != "awr":
-        return pd.DataFrame()
-
-    batch = _sample_fixed_batch(val_ds, seed=0)
-
-    records: list[dict] = []
-    try:
-        if agent_name in ("GCIQL", "CRL"):
-            adv = _compute_advantages_gciql_crl(agent, batch)
-            records.extend(_build_rows(row, "actor", adv))
-        elif agent_name == "GCIVL":
-            adv = _compute_advantages_gcivl(agent, batch)
-            records.extend(_build_rows(row, "actor", adv))
-        elif agent_name == "QRL":
-            adv = _compute_advantages_qrl(agent, batch)
-            records.extend(_build_rows(row, "actor", adv))
-        elif agent_name == "HIQL":
-            if "low_actor_goals" in batch:
-                adv_low = _compute_advantages_hiql_low(agent, batch)
-                records.extend(_build_rows(row, "low_actor", adv_low))
-            if "high_actor_goals" in batch and "high_actor_targets" in batch:
-                adv_high = _compute_advantages_hiql_high(agent, batch)
-                records.extend(_build_rows(row, "high_actor", adv_high))
-    except Exception as exc:
-        warnings.warn(
-            f"Failed advantage computation for {row['checkpoint_path']}: {exc}"
-        )
-        return pd.DataFrame()
-
-    return pd.DataFrame(records)
-
-
 def generate_advantages(
-    catalog_df: pd.DataFrame, progress: bool = True
+    catalog_df: pd.DataFrame,
+    chunk_size: int = 32,
+    progress: bool = True,
 ) -> pd.DataFrame:
-    """Process all rows in *catalog_df*; return combined advantages DataFrame."""
-    frames = []
+    """Process all rows in *catalog_df*; return combined advantages DataFrame.
+
+    Checkpoints are grouped by (agent_name, dataset, param_shape_key) and processed
+    in batches using jax.vmap over the checkpoint dimension, amortizing JIT overhead.
+    """
     start = time.time()
-    iterator = tqdm(
+
+    # --- Phase 1: load all agents sequentially ---
+    loaded: list[tuple] = []
+    load_iter = tqdm(
         catalog_df.iterrows(),
         total=len(catalog_df),
-        desc="Generating advantages",
+        desc="Loading checkpoints",
         disable=not progress,
     )
-    for idx, row in iterator:
-        df = _process_row(row)
-        if not df.empty:
-            frames.append(df)
+    for _, row in load_iter:
+        if row["agent"] not in _AWR_AGENTS:
+            continue
+        try:
+            agent, val_ds, config = _load_agent(row)
+        except Exception as exc:
+            warnings.warn(f"Failed to load agent for {row['checkpoint_path']}: {exc}")
+            continue
+        if config.get("actor_loss", "awr") != "awr":
+            continue
+        shape_key = _param_shape_key(agent.network.params)
+        loaded.append((row, agent, val_ds, shape_key))
+
+    if progress:
+        print(f"Loaded {len(loaded)} checkpoints in {time.time() - start:.1f}s")
+
+    # --- Phase 2: group by (agent_name, dataset, param_shape_key) ---
+    groups: dict[tuple, list] = defaultdict(list)
+    for row, agent, val_ds, shape_key in loaded:
+        key = (row["agent"], row["dataset"], shape_key)
+        groups[key].append((row, agent, val_ds))
+
+    # --- Phase 3: process each group in chunks with vmap ---
+    frames: list[pd.DataFrame] = []
+    group_iter = tqdm(
+        groups.items(),
+        total=len(groups),
+        desc="Computing advantages",
+        disable=not progress,
+    )
+    for (agent_name, dataset, _shape_key), group_items in group_iter:
+        ref_agent = group_items[0][1]
+        val_ds = group_items[0][2]
+        batch = _sample_fixed_batch(val_ds, seed=0)
+
+        # Pre-compute shared tiled inputs (identical for all checkpoints in group)
+        N = BATCH_SIZE
+        obs_rep = jnp.repeat(jnp.array(batch["observations"]), N, axis=0)
+        goals_rep = jnp.tile(jnp.array(batch["value_goals"]), (N, 1))
+
+        if agent_name in ("GCIQL", "CRL"):
+            act_rep = jnp.repeat(jnp.array(batch["actions"]), N, axis=0)
+        elif agent_name in ("GCIVL", "QRL", "HIQL"):
+            nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
+
+        if agent_name == "HIQL":
+            has_low = "low_actor_goals" in batch
+            has_high = "high_actor_goals" in batch and "high_actor_targets" in batch
+            if has_low:
+                low_goals_rep = jnp.tile(jnp.array(batch["low_actor_goals"]), (N, 1))
+            if has_high:
+                targets_rep = jnp.repeat(jnp.array(batch["high_actor_targets"]), N, axis=0)
+                high_goals_rep = jnp.tile(jnp.array(batch["high_actor_goals"]), (N, 1))
+
+        for chunk_start in range(0, len(group_items), chunk_size):
+            chunk = group_items[chunk_start : chunk_start + chunk_size]
+            rows_chunk = [c[0] for c in chunk]
+            batched_params = jax.tree.map(
+                lambda *xs: np.stack(xs),
+                *[c[1].network.params for c in chunk],
+            )
+
+            try:
+                if agent_name in ("GCIQL", "CRL"):
+                    adv_batch = _batch_compute_gciql_crl(
+                        ref_agent, batched_params, obs_rep, act_rep, goals_rep
+                    )
+                    for i, row in enumerate(rows_chunk):
+                        frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+
+                elif agent_name == "GCIVL":
+                    adv_batch = _batch_compute_gcivl(
+                        ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
+                    )
+                    for i, row in enumerate(rows_chunk):
+                        frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+
+                elif agent_name == "QRL":
+                    adv_batch = _batch_compute_qrl(
+                        ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
+                    )
+                    for i, row in enumerate(rows_chunk):
+                        frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+
+                elif agent_name == "HIQL":
+                    if has_low:
+                        adv_low_batch = _batch_compute_hiql_low(
+                            ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
+                        )
+                        for i, row in enumerate(rows_chunk):
+                            frames.append(
+                                pd.DataFrame(_build_rows(row, "low_actor", adv_low_batch[i]))
+                            )
+                    if has_high:
+                        adv_high_batch = _batch_compute_hiql_high(
+                            ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
+                        )
+                        for i, row in enumerate(rows_chunk):
+                            frames.append(
+                                pd.DataFrame(_build_rows(row, "high_actor", adv_high_batch[i]))
+                            )
+
+            except Exception as exc:
+                for row in rows_chunk:
+                    warnings.warn(
+                        f"Failed advantage computation for {row['checkpoint_path']}: {exc}"
+                    )
+
     elapsed = time.time() - start
     if progress:
-        print(f"\nProcessed {len(frames)} of {len(catalog_df)} rows in {elapsed:.1f}s")
+        print(f"\nProcessed {len(frames)} checkpoint results in {elapsed:.1f}s total")
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
@@ -276,6 +338,15 @@ def main() -> None:
         required=True,
         help="Output parquet file path.",
     )
+    parser.add_argument(
+        "--chunk-size",
+        type=int,
+        default=32,
+        help=(
+            "Checkpoints per vmap batch. Memory scales as B × N² × hidden_dim × layers × 4 bytes"
+            " in activations. Default 32 is safe for 20 GB VRAM; try 64 if not OOM."
+        ),
+    )
     args = parser.parse_args()
 
     catalog_df = pd.read_csv(args.catalog)
@@ -284,7 +355,7 @@ def main() -> None:
             "catalog CSV missing 'config_path' column — re-run catalog_checkpoints.py"
         )
 
-    result = generate_advantages(catalog_df)
+    result = generate_advantages(catalog_df, chunk_size=args.chunk_size)
     if result.empty:
         print("No advantages generated.")
     else:
