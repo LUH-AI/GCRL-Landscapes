@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import pickle
 import time
@@ -56,7 +57,9 @@ def _construct_agent(row: pd.Series, raw_ckpt: dict, dataset_cache: dict) -> tup
     config = FrozenConfigDict(json.loads(Path(row["config_path"]).read_text()))
     key = (row["dataset"], row["agent"])
     if key not in dataset_cache:
-        env, train_ds, val_ds = create_env_and_dataset(row["dataset"], row["agent"], config)
+        env, train_ds, val_ds = create_env_and_dataset(
+            row["dataset"], row["agent"], config
+        )
         dataset_cache[key] = (env, train_ds, val_ds)
     env, train_ds, val_ds = dataset_cache[key]
 
@@ -82,8 +85,11 @@ def _batch_compute_gciql_crl(
     goals_rep: jnp.ndarray,
 ) -> np.ndarray:
     """Returns (B, N, N) advantages for a batch of B param sets."""
+
     def single(params: Any) -> jnp.ndarray:
-        q1, q2 = ref_agent.network.select("critic")(obs_rep, goals_rep, act_rep, params=params)
+        q1, q2 = ref_agent.network.select("critic")(
+            obs_rep, goals_rep, act_rep, params=params
+        )
         q = jnp.minimum(q1, q2)
         v = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
         return (q - v).reshape(BATCH_SIZE, BATCH_SIZE)
@@ -99,6 +105,7 @@ def _batch_compute_gcivl(
     goals_rep: jnp.ndarray,
 ) -> np.ndarray:
     """Returns (B, N, N) advantages for a batch of B param sets."""
+
     def single(params: Any) -> jnp.ndarray:
         v1, v2 = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
         nv1, nv2 = ref_agent.network.select("value")(nobs_rep, goals_rep, params=params)
@@ -117,6 +124,7 @@ def _batch_compute_qrl(
     goals_rep: jnp.ndarray,
 ) -> np.ndarray:
     """Returns (B, N, N) advantages for a batch of B param sets."""
+
     def single(params: Any) -> jnp.ndarray:
         v = -ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
         nv = -ref_agent.network.select("value")(nobs_rep, goals_rep, params=params)
@@ -133,6 +141,7 @@ def _batch_compute_hiql_low(
     goals_rep: jnp.ndarray,
 ) -> np.ndarray:
     """Returns (B, N, N) low-actor advantages for a batch of B param sets."""
+
     def single(params: Any) -> jnp.ndarray:
         v1, v2 = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
         nv1, nv2 = ref_agent.network.select("value")(nobs_rep, goals_rep, params=params)
@@ -151,9 +160,12 @@ def _batch_compute_hiql_high(
     goals_rep: jnp.ndarray,
 ) -> np.ndarray:
     """Returns (B, N, N) high-actor advantages for a batch of B param sets."""
+
     def single(params: Any) -> jnp.ndarray:
         v1, v2 = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
-        nv1, nv2 = ref_agent.network.select("value")(targets_rep, goals_rep, params=params)
+        nv1, nv2 = ref_agent.network.select("value")(
+            targets_rep, goals_rep, params=params
+        )
         v = (v1 + v2) / 2
         nv = (nv1 + nv2) / 2
         return (nv - v).reshape(BATCH_SIZE, BATCH_SIZE)
@@ -251,9 +263,13 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    frames.append(pd.DataFrame(_build_rows(row, "low_actor", adv_low_batch[i])))
+                    frames.append(
+                        pd.DataFrame(_build_rows(row, "low_actor", adv_low_batch[i]))
+                    )
             if has_high:
-                targets_rep = jnp.repeat(jnp.array(batch["high_actor_targets"]), N, axis=0)
+                targets_rep = jnp.repeat(
+                    jnp.array(batch["high_actor_targets"]), N, axis=0
+                )
                 high_goals_rep = jnp.tile(jnp.array(batch["high_actor_goals"]), (N, 1))
                 adv_high_batch = _batch_compute_hiql_high(
                     ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
@@ -265,7 +281,9 @@ def _process_chunk_frames(
 
     except Exception as exc:
         for row in rows_chunk:
-            warnings.warn(f"Failed advantage computation for {row['checkpoint_path']}: {exc}")
+            warnings.warn(
+                f"Failed advantage computation for {row['checkpoint_path']}: {exc}"
+            )
 
 
 def generate_advantages(
@@ -283,9 +301,7 @@ def generate_advantages(
     start = time.time()
 
     eligible = [
-        (idx, row)
-        for idx, row in catalog_df.iterrows()
-        if row["agent"] in _AWR_AGENTS
+        (idx, row) for idx, row in catalog_df.iterrows() if row["agent"] in _AWR_AGENTS
     ]
 
     # Pre-group by (agent_name, dataset) — O(N) scan, zero I/O
@@ -293,14 +309,19 @@ def generate_advantages(
     for idx, row in eligible:
         by_agent_dataset[(row["agent"], row["dataset"])].append((idx, row))
 
+    total_chunks = sum(
+        math.ceil(len(group_rows) / chunk_size)
+        for group_rows in by_agent_dataset.values()
+    )
+
     dataset_cache: dict = {}
     frames: list[pd.DataFrame] = []
     n_constructed = 0
 
     outer_iter = tqdm(
         by_agent_dataset.items(),
-        total=len(by_agent_dataset),
-        desc="Groups",
+        total=total_chunks,
+        desc="Checkpoint chunks",
         disable=not progress,
     )
     for (agent_name, dataset_name), group_rows in outer_iter:
@@ -313,7 +334,9 @@ def generate_advantages(
             raw_ckpts: dict[int, dict] = {}
             with ThreadPoolExecutor(max_workers=num_workers) as executor:
                 future_to_idx = {
-                    executor.submit(_load_raw_checkpoint, Path(str(row["checkpoint_path"]))): idx
+                    executor.submit(
+                        _load_raw_checkpoint, Path(str(row["checkpoint_path"]))
+                    ): idx
                     for idx, row in chunk_rows
                 }
                 for future in as_completed(future_to_idx):
@@ -329,7 +352,9 @@ def generate_advantages(
                 if idx not in raw_ckpts:
                     continue
                 try:
-                    agent, val_ds, config = _construct_agent(row, raw_ckpts[idx], dataset_cache)
+                    agent, val_ds, config = _construct_agent(
+                        row, raw_ckpts[idx], dataset_cache
+                    )
                     del raw_ckpts[idx]
                 except Exception as exc:
                     warnings.warn(
@@ -349,7 +374,9 @@ def generate_advantages(
             if ref_shape is None:
                 ref_shape = _param_shape_key(chunk[0][1].network.params)
 
-            good = [c for c in chunk if _param_shape_key(c[1].network.params) == ref_shape]
+            good = [
+                c for c in chunk if _param_shape_key(c[1].network.params) == ref_shape
+            ]
             skipped = len(chunk) - len(good)
             if skipped:
                 warnings.warn(
@@ -359,7 +386,10 @@ def generate_advantages(
 
             if good:
                 _process_chunk_frames(agent_name, good, frames)
+
             # good goes out of scope here → agent params freed before next chunk
+            outer_iter.update(1)
+            outer_iter.set_postfix(n=n_constructed, refresh=False)
 
     elapsed = time.time() - start
     if progress:
@@ -415,7 +445,9 @@ def main() -> None:
             "catalog CSV missing 'config_path' column — re-run catalog_checkpoints.py"
         )
 
-    result = generate_advantages(catalog_df, chunk_size=args.chunk_size, num_workers=args.num_workers)
+    result = generate_advantages(
+        catalog_df, chunk_size=args.chunk_size, num_workers=args.num_workers
+    )
     if result.empty:
         print("No advantages generated.")
     else:
