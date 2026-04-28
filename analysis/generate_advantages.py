@@ -13,20 +13,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import pickle
 import time
 import warnings
 from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 from tqdm import tqdm
 
+import flax.serialization
 import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
 from ml_collections import FrozenConfigDict
 
-from gcrl_landscapes.util.data import restore_agent
 from gcrl_landscapes.util.datasets import AGENT_CLASSES, create_env_and_dataset
 
 BATCH_SIZE = 256
@@ -42,16 +45,27 @@ def _sample_fixed_batch(dataset: Any, seed: int = 0) -> dict:
     return dataset.sample(BATCH_SIZE, idxs=idxs, seed=seed)
 
 
-def _load_agent(row: pd.Series) -> tuple:
-    """Load agent, env, and datasets from a catalog row."""
+def _load_raw_checkpoint(checkpoint_path: Path) -> dict:
+    """Load raw pickle dict from disk — I/O only, thread-safe."""
+    with open(checkpoint_path, "rb") as f:
+        return pickle.load(f)
+
+
+def _construct_agent(row: pd.Series, raw_ckpt: dict, dataset_cache: dict) -> tuple:
+    """Construct agent from cached dataset + raw checkpoint dict. Main thread only."""
     config = FrozenConfigDict(json.loads(Path(row["config_path"]).read_text()))
-    env, train_ds, val_ds = create_env_and_dataset(row["dataset"], row["agent"], config)
+    key = (row["dataset"], row["agent"])
+    if key not in dataset_cache:
+        env, train_ds, val_ds = create_env_and_dataset(row["dataset"], row["agent"], config)
+        dataset_cache[key] = (env, train_ds, val_ds)
+    env, train_ds, val_ds = dataset_cache[key]
+
     agent_cls = AGENT_CLASSES[row["agent"]]
     example = train_ds.sample(1)
     if config.get("discrete", False):
         example["actions"] = np.full_like(example["actions"], env.action_space.n - 1)
     agent = agent_cls.create(0, example["observations"], example["actions"], config)
-    agent = restore_agent(agent, Path(row["checkpoint_path"]))
+    agent = flax.serialization.from_state_dict(agent, raw_ckpt["agent"])
     return agent, val_ds, config
 
 
@@ -182,6 +196,7 @@ def _build_rows(
 def generate_advantages(
     catalog_df: pd.DataFrame,
     chunk_size: int = 32,
+    num_workers: int = 8,
     progress: bool = True,
 ) -> pd.DataFrame:
     """Process all rows in *catalog_df*; return combined advantages DataFrame.
@@ -191,21 +206,49 @@ def generate_advantages(
     """
     start = time.time()
 
-    # --- Phase 1: load all agents sequentially ---
+    # Collect eligible rows
+    eligible = [
+        (idx, row)
+        for idx, row in catalog_df.iterrows()
+        if row["agent"] in _AWR_AGENTS
+    ]
+
+    # --- Phase 1a: parallel pickle I/O ---
+    raw_ckpts: dict[int, dict] = {}
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        future_to_idx = {
+            executor.submit(_load_raw_checkpoint, Path(str(row["checkpoint_path"]))): idx
+            for idx, row in eligible
+        }
+        load_iter = tqdm(
+            as_completed(future_to_idx),
+            total=len(eligible),
+            desc="Loading checkpoints (I/O)",
+            disable=not progress,
+        )
+        for future in load_iter:
+            idx = future_to_idx[future]
+            try:
+                raw_ckpts[idx] = future.result()
+            except Exception as exc:
+                warnings.warn(f"Failed to read checkpoint for row {idx}: {exc}")
+
+    # --- Phase 1b: sequential agent construction (JAX, main thread) ---
+    dataset_cache: dict = {}
     loaded: list[tuple] = []
-    load_iter = tqdm(
-        catalog_df.iterrows(),
-        total=len(catalog_df),
-        desc="Loading checkpoints",
+    construct_iter = tqdm(
+        eligible,
+        desc="Constructing agents",
         disable=not progress,
     )
-    for _, row in load_iter:
-        if row["agent"] not in _AWR_AGENTS:
+    for idx, row in construct_iter:
+        if idx not in raw_ckpts:
             continue
         try:
-            agent, val_ds, config = _load_agent(row)
+            agent, val_ds, config = _construct_agent(row, raw_ckpts[idx], dataset_cache)
+            del raw_ckpts[idx]
         except Exception as exc:
-            warnings.warn(f"Failed to load agent for {row['checkpoint_path']}: {exc}")
+            warnings.warn(f"Failed to construct agent for {row['checkpoint_path']}: {exc}")
             continue
         if config.get("actor_loss", "awr") != "awr":
             continue
@@ -347,6 +390,12 @@ def main() -> None:
             " in activations. Default 32 is safe for 20 GB VRAM; try 64 if not OOM."
         ),
     )
+    parser.add_argument(
+        "--num-workers",
+        type=int,
+        default=min(8, (os.cpu_count() or 4)),
+        help="Worker threads for parallel checkpoint I/O. Does not affect VRAM.",
+    )
     args = parser.parse_args()
 
     catalog_df = pd.read_csv(args.catalog)
@@ -355,7 +404,7 @@ def main() -> None:
             "catalog CSV missing 'config_path' column — re-run catalog_checkpoints.py"
         )
 
-    result = generate_advantages(catalog_df, chunk_size=args.chunk_size)
+    result = generate_advantages(catalog_df, chunk_size=args.chunk_size, num_workers=args.num_workers)
     if result.empty:
         print("No advantages generated.")
     else:
