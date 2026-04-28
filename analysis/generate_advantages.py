@@ -29,6 +29,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from ml_collections import FrozenConfigDict
 
 from gcrl_landscapes.util.datasets import AGENT_CLASSES, create_env_and_dataset
@@ -187,15 +189,20 @@ def _build_rows(
     obs_idxs = np.repeat(np.arange(N), N)
     goal_idxs = np.tile(np.arange(N), N)
 
+    def _const_cat(value: Any) -> pd.Categorical:
+        return pd.Categorical.from_codes(
+            np.zeros(n2, dtype=np.int8), categories=[str(value)]
+        )
+
     return pd.DataFrame(
         {
-            "checkpoint_path": pd.Categorical([row["checkpoint_path"]] * n2),
-            "agent": pd.Categorical([row["agent"]] * n2),
-            "dataset": pd.Categorical([row["dataset"]] * n2),
-            "phase": pd.Categorical([row["phase"]] * n2),
-            "seed": pd.Categorical([row["seed"]] * n2),
-            "configuration": pd.Categorical([row["configuration"]] * n2),
-            "actor": pd.Categorical([actor_name] * n2),
+            "checkpoint_path": _const_cat(row["checkpoint_path"]),
+            "agent": _const_cat(row["agent"]),
+            "dataset": _const_cat(row["dataset"]),
+            "phase": _const_cat(row["phase"]),
+            "seed": _const_cat(row["seed"]),
+            "configuration": _const_cat(row["configuration"]),
+            "actor": _const_cat(actor_name),
             "obs_idx": pd.Categorical(obs_idxs),
             "goal_idx": pd.Categorical(goal_idxs),
             "is_positive": pd.Categorical(obs_idxs == goal_idxs),
@@ -204,12 +211,25 @@ def _build_rows(
     )
 
 
+def _emit_df(
+    df: pd.DataFrame,
+    writer: pq.ParquetWriter | None,
+    frames: list[pd.DataFrame] | None,
+) -> None:
+    """Write *df* to *writer* (streaming) or append to *frames* (in-memory)."""
+    if writer is not None:
+        writer.write_table(pa.Table.from_pandas(df, preserve_index=False))
+    elif frames is not None:
+        frames.append(df)
+
+
 def _process_chunk_frames(
     agent_name: str,
     chunk: list[tuple],  # [(row, agent, val_ds), ...]
-    frames: list[pd.DataFrame],
+    writer: pq.ParquetWriter | None,
+    frames: list[pd.DataFrame] | None,
 ) -> None:
-    """Compute advantages for one chunk and append DataFrames to *frames*.
+    """Compute advantages for one chunk and write to *writer* or *frames*.
 
     The caller should clear *chunk* after this returns to release agent params from VRAM.
     """
@@ -234,7 +254,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, act_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                frames.append(_build_rows(row, "actor", adv_batch[i]))
+                _emit_df(_build_rows(row, "actor", adv_batch[i]), writer, frames)
 
         elif agent_name == "GCIVL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -242,7 +262,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                frames.append(_build_rows(row, "actor", adv_batch[i]))
+                _emit_df(_build_rows(row, "actor", adv_batch[i]), writer, frames)
 
         elif agent_name == "QRL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -250,7 +270,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                frames.append(_build_rows(row, "actor", adv_batch[i]))
+                _emit_df(_build_rows(row, "actor", adv_batch[i]), writer, frames)
 
         elif agent_name == "HIQL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -262,7 +282,7 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    frames.append(_build_rows(row, "low_actor", adv_low_batch[i]))
+                    _emit_df(_build_rows(row, "low_actor", adv_low_batch[i]), writer, frames)
             if has_high:
                 targets_rep = jnp.repeat(
                     jnp.array(batch["high_actor_targets"]), N, axis=0
@@ -272,7 +292,7 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    frames.append(_build_rows(row, "high_actor", adv_high_batch[i]))
+                    _emit_df(_build_rows(row, "high_actor", adv_high_batch[i]), writer, frames)
 
     except Exception as exc:
         for row in rows_chunk:
@@ -283,11 +303,16 @@ def _process_chunk_frames(
 
 def generate_advantages(
     catalog_df: pd.DataFrame,
+    output_path: Path | None = None,
     chunk_size: int = 32,
     num_workers: int = 8,
     progress: bool = True,
-) -> pd.DataFrame:
-    """Process all rows in *catalog_df*; return combined advantages DataFrame.
+) -> pd.DataFrame | None:
+    """Process all rows in *catalog_df*; stream-write to *output_path* or return DataFrame.
+
+    If *output_path* is given, each chunk is written immediately and freed — peak output
+    RAM is O(chunk_size) rows. Returns None in this mode.
+    If *output_path* is None, accumulates all frames in memory and returns them concatenated.
 
     Checkpoints are pre-grouped by (agent_name, dataset) from the DataFrame (no I/O),
     then processed in chunks of *chunk_size*. Per chunk: parallel I/O → construct →
@@ -310,7 +335,8 @@ def generate_advantages(
     )
 
     dataset_cache: dict = {}
-    frames: list[pd.DataFrame] = []
+    frames: list[pd.DataFrame] | None = None if output_path is not None else []
+    writer: pq.ParquetWriter | None = None
     n_constructed = 0
 
     outer_iter = tqdm(
@@ -319,76 +345,91 @@ def generate_advantages(
         desc="Checkpoint chunks",
         disable=not progress,
     )
-    for (agent_name, dataset_name), group_rows in outer_iter:
-        ref_shape: str | None = None
+    try:
+        for (agent_name, dataset_name), group_rows in outer_iter:
+            ref_shape: str | None = None
 
-        for chunk_start in range(0, len(group_rows), chunk_size):
-            chunk_rows = group_rows[chunk_start : chunk_start + chunk_size]
+            for chunk_start in range(0, len(group_rows), chunk_size):
+                chunk_rows = group_rows[chunk_start : chunk_start + chunk_size]
 
-            # Parallel I/O — only chunk_size files in flight at once
-            raw_ckpts: dict[int, dict] = {}
-            with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                future_to_idx = {
-                    executor.submit(
-                        _load_raw_checkpoint, Path(str(row["checkpoint_path"]))
-                    ): idx
-                    for idx, row in chunk_rows
-                }
-                for future in as_completed(future_to_idx):
-                    idx = future_to_idx[future]
+                # Parallel I/O — only chunk_size files in flight at once
+                raw_ckpts: dict[int, dict] = {}
+                with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                    future_to_idx = {
+                        executor.submit(
+                            _load_raw_checkpoint, Path(str(row["checkpoint_path"]))
+                        ): idx
+                        for idx, row in chunk_rows
+                    }
+                    for future in as_completed(future_to_idx):
+                        idx = future_to_idx[future]
+                        try:
+                            raw_ckpts[idx] = future.result()
+                        except Exception as exc:
+                            warnings.warn(f"Failed to read checkpoint for row {idx}: {exc}")
+
+                # Sequential construction (JAX, main thread); free raw pkl immediately
+                chunk: list[tuple] = []
+                for idx, row in chunk_rows:
+                    if idx not in raw_ckpts:
+                        continue
                     try:
-                        raw_ckpts[idx] = future.result()
+                        agent, val_ds, config = _construct_agent(
+                            row, raw_ckpts[idx], dataset_cache
+                        )
+                        del raw_ckpts[idx]
                     except Exception as exc:
-                        warnings.warn(f"Failed to read checkpoint for row {idx}: {exc}")
+                        warnings.warn(
+                            f"Failed to construct agent for {row['checkpoint_path']}: {exc}"
+                        )
+                        continue
+                    if config.get("actor_loss", "awr") != "awr":
+                        continue
+                    chunk.append((row, agent, val_ds))
+                    n_constructed += 1
 
-            # Sequential construction (JAX, main thread); free raw pkl immediately
-            chunk: list[tuple] = []
-            for idx, row in chunk_rows:
-                if idx not in raw_ckpts:
+                if not chunk:
                     continue
-                try:
-                    agent, val_ds, config = _construct_agent(
-                        row, raw_ckpts[idx], dataset_cache
-                    )
-                    del raw_ckpts[idx]
-                except Exception as exc:
+
+                # Shape check: vmap requires identical param shapes within a chunk.
+                # Same (agent, dataset) group almost always shares one shape; warn + skip outliers.
+                if ref_shape is None:
+                    ref_shape = _param_shape_key(chunk[0][1].network.params)
+
+                good = [
+                    c for c in chunk if _param_shape_key(c[1].network.params) == ref_shape
+                ]
+                skipped = len(chunk) - len(good)
+                if skipped:
                     warnings.warn(
-                        f"Failed to construct agent for {row['checkpoint_path']}: {exc}"
+                        f"{skipped} checkpoint(s) in {agent_name}/{dataset_name} have mismatched "
+                        f"param shapes; skipping."
                     )
-                    continue
-                if config.get("actor_loss", "awr") != "awr":
-                    continue
-                chunk.append((row, agent, val_ds))
-                n_constructed += 1
 
-            if not chunk:
-                continue
+                if good:
+                    # Lazily open writer on first successful batch to infer schema
+                    if output_path is not None and writer is None:
+                        first_df = _build_rows(good[0][0], "actor", np.zeros((BATCH_SIZE, BATCH_SIZE), dtype=np.float32))
+                        schema = pa.Schema.from_pandas(first_df, preserve_index=False)
+                        output_path = Path(output_path)
+                        output_path.parent.mkdir(parents=True, exist_ok=True)
+                        writer = pq.ParquetWriter(output_path, schema)
+                    _process_chunk_frames(agent_name, good, writer, frames)
 
-            # Shape check: vmap requires identical param shapes within a chunk.
-            # Same (agent, dataset) group almost always shares one shape; warn + skip outliers.
-            if ref_shape is None:
-                ref_shape = _param_shape_key(chunk[0][1].network.params)
+                # good goes out of scope here → agent params freed before next chunk
+                outer_iter.update(1)
+                outer_iter.set_postfix(n=n_constructed, refresh=False)
 
-            good = [
-                c for c in chunk if _param_shape_key(c[1].network.params) == ref_shape
-            ]
-            skipped = len(chunk) - len(good)
-            if skipped:
-                warnings.warn(
-                    f"{skipped} checkpoint(s) in {agent_name}/{dataset_name} have mismatched "
-                    f"param shapes; skipping."
-                )
-
-            if good:
-                _process_chunk_frames(agent_name, good, frames)
-
-            # good goes out of scope here → agent params freed before next chunk
-            outer_iter.update(1)
-            outer_iter.set_postfix(n=n_constructed, refresh=False)
+    finally:
+        if writer is not None:
+            writer.close()
 
     elapsed = time.time() - start
     if progress:
         print(f"\nProcessed {n_constructed} checkpoints in {elapsed:.1f}s total")
+
+    if output_path is not None:
+        return None
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
@@ -440,17 +481,13 @@ def main() -> None:
             "catalog CSV missing 'config_path' column — re-run catalog_checkpoints.py"
         )
 
-    result = generate_advantages(
-        catalog_df, chunk_size=args.chunk_size, num_workers=args.num_workers
+    generate_advantages(
+        catalog_df,
+        output_path=args.output,
+        chunk_size=args.chunk_size,
+        num_workers=args.num_workers,
     )
-    if result.empty:
-        print("No advantages generated.")
-    else:
-        print(
-            f"Generated {len(result):,} rows ({result['checkpoint_path'].nunique()} checkpoints)"
-        )
-        save_advantages(result, args.output)
-        print(f"Saved to {args.output}")
+    print(f"Saved to {args.output}")
 
 
 if __name__ == "__main__":
