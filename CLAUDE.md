@@ -9,6 +9,7 @@ GCRL-Landscapes is a hyperparameter landscape exploration framework for offline 
 ## Commands
 
 ### Linting & Formatting
+
 ```bash
 ruff check src/
 ruff format src/
@@ -17,6 +18,7 @@ pre-commit run --all-files
 ```
 
 ### Running the main workflows
+
 ```bash
 # 1. Setup experiment (generate configs and phases)
 python -m gcrl_landscapes.main setup --agent CRL --datasets antmaze-medium-navigate --n_configurations 100 --logdir /path/to/logs
@@ -30,9 +32,14 @@ python -m gcrl_landscapes.main run --logdir /path/to/logs --phase_idx 0 --config
 # Evaluate results
 python -m gcrl_landscapes.evaluation.plot --plot_return_distributions --plot_eval_curves --plot_gp_fits --zipfile LOGFILEPATH
 python -m gcrl_landscapes.evaluation.tabular --zipfile LOGFILEPATH
+
+# Analyze advantage landscapes
+python analysis/catalog_checkpoints.py --logdir ./logs-antmaze-medium/ --output checkpoints.csv
+python analysis/generate_advantages.py --catalog checkpoints.csv --output advantages.parquet
 ```
 
 ### Orchestration scripts (Slurm)
+
 ```bash
 bash submit_train_all.sh                    # Submit train_all.sh to Slurm (auto-selects partition/reservation for cluster)
 CLUSTER=pc2 bash submit_train_all.sh        # Override cluster (default: luh)
@@ -62,6 +69,7 @@ bash zip_and_plot.sh                        # Post-job zip + evaluation
 ### Configuration Space (`configurations.py`)
 
 Hyperparameters with bounds (log-scale where appropriate):
+
 - `lr` (1e-6 to 1e-2), `discount`, `actor_p_trajgoal`, `alpha`, `eps`, `low_alpha`, `high_alpha`, `tau`
 - Agent-specific subsets defined per agent type
 - `low_alpha`/`high_alpha` sync logic: if only `alpha` is set, both are synced to it
@@ -80,6 +88,18 @@ Hyperparameters with bounds (log-scale where appropriate):
 - `evaluation/tabular.py` — Aggregated tables across phases/seeds
 - `visualization/maze.py` — Renders agent trajectories overlaid on maze environments
 - `visualization/dataset_heatmap.py` — KDE-based heatmaps of dataset coverage
+
+### Analysis Pipeline
+
+Two-step pipeline for computing cross-goal advantage landscapes from trained checkpoints:
+
+- `analysis/catalog_checkpoints.py` — Scans agent subdirectories (prefix: CRL, QRL, GCIQL, GCIVL, CMD, GCBC, HIQL, SAC) for `params_{phase}.pkl` checkpoints in each agent's `run_logs/configuration_*/phase_N/seed_M/` tree. Reads `info.toml` to extract agent, datasets, phases, n_configurations. Walks `max(phases)` and yields (checkpoint_path, config_path, agent, dataset, phase, seed, configuration) rows. Outputs CSV.
+- `analysis/generate_advantages.py` — For each cataloged checkpoint, loads agent + 256-sample fixed validation batch (`seed=0`), computes NxN cross-goal advantage matrix for every (obs_i, action_i, goal_j) triple. Agent-specific formulas:
+  - GCIQL / CRL: `advantage[i,j] = min(Q1,Q2)(s_i,a_i,g_j) - V(s_i,g_j)`
+  - GCIVL: `advantage[i,j] = mean(V(s'_i,g_j)) - mean(V(s_i,g_j))` (ensemble mean)
+  - QRL: `advantage[i,j] = V(s_i,g_j) - V(s'_i,g_j)` (negated quasimetric distances)
+  - HIQL: low_actor=`V(s'_i,g_j)-V(s_i,g_j)`, high_actor=`V(target_i,g_j)-V(s_i,g_j)`
+    Only AWR-type agents (GCIQL, CRL, GCIVL, QRL, HIQL) with `actor_loss='awr'` are supported. Output is flattened to per-(obs_idx, goal_idx) rows saved to parquet.
 
 ### Hydra + SMAC Integration
 
@@ -102,6 +122,7 @@ Hyperparameters with bounds (log-scale where appropriate):
 ## Development Environment
 
 Uses Nix (`flake.nix`) for reproducible environments. Alternatively, install via:
+
 ```bash
 pip install -e ".[dev]"
 pre-commit install
