@@ -193,6 +193,81 @@ def _build_rows(
     return records
 
 
+def _process_chunk_frames(
+    agent_name: str,
+    chunk: list[tuple],  # [(row, agent, val_ds), ...]
+    frames: list[pd.DataFrame],
+) -> None:
+    """Compute advantages for one chunk and append DataFrames to *frames*.
+
+    The caller should clear *chunk* after this returns to release agent params from VRAM.
+    """
+    ref_agent = chunk[0][1]
+    val_ds = chunk[0][2]
+    batch = _sample_fixed_batch(val_ds, seed=0)
+    rows_chunk = [c[0] for c in chunk]
+
+    N = BATCH_SIZE
+    obs_rep = jnp.repeat(jnp.array(batch["observations"]), N, axis=0)
+    goals_rep = jnp.tile(jnp.array(batch["value_goals"]), (N, 1))
+
+    batched_params = jax.tree.map(
+        lambda *xs: np.stack(xs),
+        *[c[1].network.params for c in chunk],
+    )
+
+    try:
+        if agent_name in ("GCIQL", "CRL"):
+            act_rep = jnp.repeat(jnp.array(batch["actions"]), N, axis=0)
+            adv_batch = _batch_compute_gciql_crl(
+                ref_agent, batched_params, obs_rep, act_rep, goals_rep
+            )
+            for i, row in enumerate(rows_chunk):
+                frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+
+        elif agent_name == "GCIVL":
+            nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
+            adv_batch = _batch_compute_gcivl(
+                ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
+            )
+            for i, row in enumerate(rows_chunk):
+                frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+
+        elif agent_name == "QRL":
+            nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
+            adv_batch = _batch_compute_qrl(
+                ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
+            )
+            for i, row in enumerate(rows_chunk):
+                frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+
+        elif agent_name == "HIQL":
+            nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
+            has_low = "low_actor_goals" in batch
+            has_high = "high_actor_goals" in batch and "high_actor_targets" in batch
+            if has_low:
+                low_goals_rep = jnp.tile(jnp.array(batch["low_actor_goals"]), (N, 1))
+                adv_low_batch = _batch_compute_hiql_low(
+                    ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
+                )
+                for i, row in enumerate(rows_chunk):
+                    frames.append(pd.DataFrame(_build_rows(row, "low_actor", adv_low_batch[i])))
+            if has_high:
+                targets_rep = jnp.repeat(jnp.array(batch["high_actor_targets"]), N, axis=0)
+                high_goals_rep = jnp.tile(jnp.array(batch["high_actor_goals"]), (N, 1))
+                adv_high_batch = _batch_compute_hiql_high(
+                    ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
+                )
+                for i, row in enumerate(rows_chunk):
+                    frames.append(
+                        pd.DataFrame(_build_rows(row, "high_actor", adv_high_batch[i]))
+                    )
+
+    except Exception as exc:
+        for row in rows_chunk:
+            warnings.warn(f"Failed advantage computation for {row['checkpoint_path']}: {exc}")
+
+
 def generate_advantages(
     catalog_df: pd.DataFrame,
     chunk_size: int = 32,
@@ -201,158 +276,94 @@ def generate_advantages(
 ) -> pd.DataFrame:
     """Process all rows in *catalog_df*; return combined advantages DataFrame.
 
-    Checkpoints are grouped by (agent_name, dataset, param_shape_key) and processed
-    in batches using jax.vmap over the checkpoint dimension, amortizing JIT overhead.
+    Checkpoints are pre-grouped by (agent_name, dataset) from the DataFrame (no I/O),
+    then processed in chunks of *chunk_size*. Per chunk: parallel I/O → construct →
+    vmap → free. Peak CPU RAM and VRAM scale with chunk_size, not total checkpoints.
     """
     start = time.time()
 
-    # Collect eligible rows
     eligible = [
         (idx, row)
         for idx, row in catalog_df.iterrows()
         if row["agent"] in _AWR_AGENTS
     ]
 
-    # --- Phase 1a: parallel pickle I/O ---
-    raw_ckpts: dict[int, dict] = {}
-    with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        future_to_idx = {
-            executor.submit(_load_raw_checkpoint, Path(str(row["checkpoint_path"]))): idx
-            for idx, row in eligible
-        }
-        load_iter = tqdm(
-            as_completed(future_to_idx),
-            total=len(eligible),
-            desc="Loading checkpoints (I/O)",
-            disable=not progress,
-        )
-        for future in load_iter:
-            idx = future_to_idx[future]
-            try:
-                raw_ckpts[idx] = future.result()
-            except Exception as exc:
-                warnings.warn(f"Failed to read checkpoint for row {idx}: {exc}")
+    # Pre-group by (agent_name, dataset) — O(N) scan, zero I/O
+    by_agent_dataset: dict[tuple, list] = defaultdict(list)
+    for idx, row in eligible:
+        by_agent_dataset[(row["agent"], row["dataset"])].append((idx, row))
 
-    # --- Phase 1b: sequential agent construction (JAX, main thread) ---
     dataset_cache: dict = {}
-    loaded: list[tuple] = []
-    construct_iter = tqdm(
-        eligible,
-        desc="Constructing agents",
-        disable=not progress,
-    )
-    for idx, row in construct_iter:
-        if idx not in raw_ckpts:
-            continue
-        try:
-            agent, val_ds, config = _construct_agent(row, raw_ckpts[idx], dataset_cache)
-            del raw_ckpts[idx]
-        except Exception as exc:
-            warnings.warn(f"Failed to construct agent for {row['checkpoint_path']}: {exc}")
-            continue
-        if config.get("actor_loss", "awr") != "awr":
-            continue
-        shape_key = _param_shape_key(agent.network.params)
-        loaded.append((row, agent, val_ds, shape_key))
-
-    if progress:
-        print(f"Loaded {len(loaded)} checkpoints in {time.time() - start:.1f}s")
-
-    # --- Phase 2: group by (agent_name, dataset, param_shape_key) ---
-    groups: dict[tuple, list] = defaultdict(list)
-    for row, agent, val_ds, shape_key in loaded:
-        key = (row["agent"], row["dataset"], shape_key)
-        groups[key].append((row, agent, val_ds))
-
-    # --- Phase 3: process each group in chunks with vmap ---
     frames: list[pd.DataFrame] = []
-    group_iter = tqdm(
-        groups.items(),
-        total=len(groups),
-        desc="Computing advantages",
+    n_constructed = 0
+
+    outer_iter = tqdm(
+        by_agent_dataset.items(),
+        total=len(by_agent_dataset),
+        desc="Groups",
         disable=not progress,
     )
-    for (agent_name, dataset, _shape_key), group_items in group_iter:
-        ref_agent = group_items[0][1]
-        val_ds = group_items[0][2]
-        batch = _sample_fixed_batch(val_ds, seed=0)
+    for (agent_name, dataset_name), group_rows in outer_iter:
+        ref_shape: str | None = None
 
-        # Pre-compute shared tiled inputs (identical for all checkpoints in group)
-        N = BATCH_SIZE
-        obs_rep = jnp.repeat(jnp.array(batch["observations"]), N, axis=0)
-        goals_rep = jnp.tile(jnp.array(batch["value_goals"]), (N, 1))
+        for chunk_start in range(0, len(group_rows), chunk_size):
+            chunk_rows = group_rows[chunk_start : chunk_start + chunk_size]
 
-        if agent_name in ("GCIQL", "CRL"):
-            act_rep = jnp.repeat(jnp.array(batch["actions"]), N, axis=0)
-        elif agent_name in ("GCIVL", "QRL", "HIQL"):
-            nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
+            # Parallel I/O — only chunk_size files in flight at once
+            raw_ckpts: dict[int, dict] = {}
+            with ThreadPoolExecutor(max_workers=num_workers) as executor:
+                future_to_idx = {
+                    executor.submit(_load_raw_checkpoint, Path(str(row["checkpoint_path"]))): idx
+                    for idx, row in chunk_rows
+                }
+                for future in as_completed(future_to_idx):
+                    idx = future_to_idx[future]
+                    try:
+                        raw_ckpts[idx] = future.result()
+                    except Exception as exc:
+                        warnings.warn(f"Failed to read checkpoint for row {idx}: {exc}")
 
-        if agent_name == "HIQL":
-            has_low = "low_actor_goals" in batch
-            has_high = "high_actor_goals" in batch and "high_actor_targets" in batch
-            if has_low:
-                low_goals_rep = jnp.tile(jnp.array(batch["low_actor_goals"]), (N, 1))
-            if has_high:
-                targets_rep = jnp.repeat(jnp.array(batch["high_actor_targets"]), N, axis=0)
-                high_goals_rep = jnp.tile(jnp.array(batch["high_actor_goals"]), (N, 1))
-
-        for chunk_start in range(0, len(group_items), chunk_size):
-            chunk = group_items[chunk_start : chunk_start + chunk_size]
-            rows_chunk = [c[0] for c in chunk]
-            batched_params = jax.tree.map(
-                lambda *xs: np.stack(xs),
-                *[c[1].network.params for c in chunk],
-            )
-
-            try:
-                if agent_name in ("GCIQL", "CRL"):
-                    adv_batch = _batch_compute_gciql_crl(
-                        ref_agent, batched_params, obs_rep, act_rep, goals_rep
-                    )
-                    for i, row in enumerate(rows_chunk):
-                        frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
-
-                elif agent_name == "GCIVL":
-                    adv_batch = _batch_compute_gcivl(
-                        ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
-                    )
-                    for i, row in enumerate(rows_chunk):
-                        frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
-
-                elif agent_name == "QRL":
-                    adv_batch = _batch_compute_qrl(
-                        ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
-                    )
-                    for i, row in enumerate(rows_chunk):
-                        frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
-
-                elif agent_name == "HIQL":
-                    if has_low:
-                        adv_low_batch = _batch_compute_hiql_low(
-                            ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
-                        )
-                        for i, row in enumerate(rows_chunk):
-                            frames.append(
-                                pd.DataFrame(_build_rows(row, "low_actor", adv_low_batch[i]))
-                            )
-                    if has_high:
-                        adv_high_batch = _batch_compute_hiql_high(
-                            ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
-                        )
-                        for i, row in enumerate(rows_chunk):
-                            frames.append(
-                                pd.DataFrame(_build_rows(row, "high_actor", adv_high_batch[i]))
-                            )
-
-            except Exception as exc:
-                for row in rows_chunk:
+            # Sequential construction (JAX, main thread); free raw pkl immediately
+            chunk: list[tuple] = []
+            for idx, row in chunk_rows:
+                if idx not in raw_ckpts:
+                    continue
+                try:
+                    agent, val_ds, config = _construct_agent(row, raw_ckpts[idx], dataset_cache)
+                    del raw_ckpts[idx]
+                except Exception as exc:
                     warnings.warn(
-                        f"Failed advantage computation for {row['checkpoint_path']}: {exc}"
+                        f"Failed to construct agent for {row['checkpoint_path']}: {exc}"
                     )
+                    continue
+                if config.get("actor_loss", "awr") != "awr":
+                    continue
+                chunk.append((row, agent, val_ds))
+                n_constructed += 1
+
+            if not chunk:
+                continue
+
+            # Shape check: vmap requires identical param shapes within a chunk.
+            # Same (agent, dataset) group almost always shares one shape; warn + skip outliers.
+            if ref_shape is None:
+                ref_shape = _param_shape_key(chunk[0][1].network.params)
+
+            good = [c for c in chunk if _param_shape_key(c[1].network.params) == ref_shape]
+            skipped = len(chunk) - len(good)
+            if skipped:
+                warnings.warn(
+                    f"{skipped} checkpoint(s) in {agent_name}/{dataset_name} have mismatched "
+                    f"param shapes; skipping."
+                )
+
+            if good:
+                _process_chunk_frames(agent_name, good, frames)
+            # good goes out of scope here → agent params freed before next chunk
 
     elapsed = time.time() - start
     if progress:
-        print(f"\nProcessed {len(frames)} checkpoint results in {elapsed:.1f}s total")
+        print(f"\nProcessed {n_constructed} checkpoints in {elapsed:.1f}s total")
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)
