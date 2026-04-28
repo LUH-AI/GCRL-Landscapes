@@ -177,32 +177,31 @@ def _build_rows(
     row: pd.Series,
     actor_name: str,
     adv_matrix: np.ndarray,
-) -> list[dict]:
-    """Flatten NxN advantage matrix into per-(obs_idx, goal_idx) rows."""
+) -> pd.DataFrame:
+    """Flatten NxN advantage matrix into a per-(obs_idx, goal_idx) DataFrame.
+
+    All columns except *advantage* are Categorical to minimise RAM.
+    """
     N = BATCH_SIZE
+    n2 = N * N
     obs_idxs = np.repeat(np.arange(N), N)
     goal_idxs = np.tile(np.arange(N), N)
-    is_positive = obs_idxs == goal_idxs
-    advantages = adv_matrix.ravel()
 
-    records = []
-    for i in range(N * N):
-        records.append(
-            {
-                "checkpoint_path": row["checkpoint_path"],
-                "agent": row["agent"],
-                "dataset": row["dataset"],
-                "phase": row["phase"],
-                "seed": row["seed"],
-                "configuration": row["configuration"],
-                "actor": actor_name,
-                "obs_idx": int(obs_idxs[i]),
-                "goal_idx": int(goal_idxs[i]),
-                "is_positive": bool(is_positive[i]),
-                "advantage": float(advantages[i]),
-            }
-        )
-    return records
+    return pd.DataFrame(
+        {
+            "checkpoint_path": pd.Categorical([row["checkpoint_path"]] * n2),
+            "agent": pd.Categorical([row["agent"]] * n2),
+            "dataset": pd.Categorical([row["dataset"]] * n2),
+            "phase": pd.Categorical([row["phase"]] * n2),
+            "seed": pd.Categorical([row["seed"]] * n2),
+            "configuration": pd.Categorical([row["configuration"]] * n2),
+            "actor": pd.Categorical([actor_name] * n2),
+            "obs_idx": pd.Categorical(obs_idxs),
+            "goal_idx": pd.Categorical(goal_idxs),
+            "is_positive": pd.Categorical(obs_idxs == goal_idxs),
+            "advantage": adv_matrix.ravel().astype(np.float32),
+        }
+    )
 
 
 def _process_chunk_frames(
@@ -235,7 +234,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, act_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+                frames.append(_build_rows(row, "actor", adv_batch[i]))
 
         elif agent_name == "GCIVL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -243,7 +242,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+                frames.append(_build_rows(row, "actor", adv_batch[i]))
 
         elif agent_name == "QRL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -251,7 +250,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                frames.append(pd.DataFrame(_build_rows(row, "actor", adv_batch[i])))
+                frames.append(_build_rows(row, "actor", adv_batch[i]))
 
         elif agent_name == "HIQL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -263,9 +262,7 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    frames.append(
-                        pd.DataFrame(_build_rows(row, "low_actor", adv_low_batch[i]))
-                    )
+                    frames.append(_build_rows(row, "low_actor", adv_low_batch[i]))
             if has_high:
                 targets_rep = jnp.repeat(
                     jnp.array(batch["high_actor_targets"]), N, axis=0
@@ -275,9 +272,7 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    frames.append(
-                        pd.DataFrame(_build_rows(row, "high_actor", adv_high_batch[i]))
-                    )
+                    frames.append(_build_rows(row, "high_actor", adv_high_batch[i]))
 
     except Exception as exc:
         for row in rows_chunk:
