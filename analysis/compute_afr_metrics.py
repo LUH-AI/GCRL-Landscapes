@@ -30,6 +30,16 @@ import pyarrow.parquet as pq
 BATCH_SIZE = 256
 EPS = 1e-8
 
+_GROUP_COLS = [
+    "checkpoint_path",
+    "agent",
+    "dataset",
+    "phase",
+    "seed",
+    "configuration",
+    "actor",
+]
+
 _META_COLS = [
     "checkpoint_path",
     "agent",
@@ -121,7 +131,33 @@ def main() -> None:
         default=Path("Analysis/afr_metrics.csv"),
         help="Output CSV path (default: Analysis/afr_metrics.csv)",
     )
+    parser.add_argument(
+        "--no-aggregate",
+        action="store_true",
+        help="Skip aggregation across batches (output one row per batch instead of mean±std).",
+    )
+    parser.add_argument(
+        "--batches",
+        type=str,
+        default=None,
+        metavar="LIST",
+        help="Comma-separated list of batch indices to include (e.g. 0,1,2 or 0-5). "
+        "If unset, all batches are used.",
+    )
     args = parser.parse_args()
+
+    # Parse batch filter (batch_idx is stored as string in the parquet)
+    batch_filter: set[str] | None = None
+    if args.batches is not None:
+        batch_filter = set()
+        for part in args.batches.split(","):
+            part = part.strip()
+            if "-" in part:
+                lo, hi = part.split("-", 1)
+                batch_filter.update(str(i) for i in range(int(lo), int(hi) + 1))
+            else:
+                batch_filter.add(part)
+        print(f"Batch filter: {sorted(batch_filter, key=int)}")
 
     pf = pq.ParquetFile(args.input)
     n_groups = pf.metadata.num_row_groups
@@ -139,14 +175,49 @@ def main() -> None:
             print(f"  {i + 1}/{n_groups}  ok={len(results)}  skipped={skipped}")
 
     result_df = pd.DataFrame(results)
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    result_df.to_csv(args.output, index=False)
-    print(f"\nSaved {len(result_df)} rows → {args.output}")
 
-    summary = (
-        result_df.groupby("agent")[["fr_auc", "gap_mean", "gap_std", "extractability_index"]]
-        .agg(["mean", "std"])
-    )
+    # Filter by batch index if requested
+    if batch_filter is not None:
+        before = len(result_df)
+        result_df = result_df[result_df["batch_idx"].isin(batch_filter)]
+        print(f"Filtered {before} → {len(result_df)} rows (batch filter)")
+
+    # Aggregate across batches: one row per (checkpoint, agent, dataset, phase, seed,
+    # configuration, actor) with mean ± std of each metric.
+    agg_cols = [
+        "fr_auc",
+        "gap_mean",
+        "gap_std",
+        "extractability_index",
+        "adv_plus_mean",
+        "adv_minus_mean",
+    ]
+    agg_df = result_df.groupby(_GROUP_COLS)[agg_cols].agg(["mean", "std"]).round(6)
+    # Flatten: "fr_auc_mean", "fr_auc_std", ...
+    agg_df.columns = [f"{col}_{stat}" for col, stat in agg_df.columns]
+    agg_df = agg_df.reset_index()
+
+    n_batches = result_df["batch_idx"].nunique()
+    print(f"\nAggregated {n_batches} batch(es) into {len(agg_df)} rows")
+
+    if args.no_aggregate:
+        out_df = result_df[_GROUP_COLS + ["batch_idx"] + agg_cols]
+    else:
+        out_df = agg_df
+
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    out_df.to_csv(args.output, index=False)
+    print(f"Saved {len(out_df)} rows → {args.output}")
+
+    summary = out_df.groupby("agent")[
+        [
+            c
+            for c in out_df.columns
+            if c.startswith("fr_auc")
+            or c.startswith("extractability")
+            or c.startswith("gap_mean")
+        ]
+    ].agg(["mean", "std"])
     print("\nSummary by agent:")
     print(summary.to_string())
 
