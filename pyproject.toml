@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "gcrl-landscapes"
-version = "0.5.1"
+version = "0.5.2"
 description = ""
 readme = "README.md"
 requires-python = ">=3.10, <3.11"
@@ -68,7 +68,7 @@ Source = "https://github.com/LUH-AI/GCRL-Landscapes"
 
 [tool.uv.sources]
 ogbench = { git = "https://github.com/CrunchyFlakes/ogbench", branch = "master" }
-smac = { git = "https://github.com/automl/SMAC3", branch="v2.4.0" }
+smac = { git = "https://github.com/automl/SMAC3", branch = "v2.4.0" }
 
 [tool.hatch.metadata]
 allow-direct-references = true
@@ -77,9 +77,7 @@ allow-direct-references = true
 path = "src/gcrl_landscapes/__about__.py"
 
 [tool.hatch.envs.types]
-extra-dependencies = [
-  "mypy>=1.0.0",
-]
+extra-dependencies = ["mypy>=1.0.0"]
 [tool.hatch.envs.types.scripts]
 check = "mypy --install-types --non-interactive {args:src/gcrl_landscapes tests}"
 
@@ -87,20 +85,17 @@ check = "mypy --install-types --non-interactive {args:src/gcrl_landscapes tests}
 source_pkgs = ["gcrl_landscapes", "tests"]
 branch = true
 parallel = true
-omit = [
-  "src/gcrl_landscapes/__about__.py",
-]
+omit = ["src/gcrl_landscapes/__about__.py"]
 
 [tool.coverage.paths]
-gcrl_landscapes = ["src/gcrl_landscapes", "*/gcrl-landscapes/src/gcrl_landscapes"]
+gcrl_landscapes = [
+  "src/gcrl_landscapes",
+  "*/gcrl-landscapes/src/gcrl_landscapes",
+]
 tests = ["tests", "*/gcrl-landscapes/tests"]
 
 [tool.coverage.report]
-exclude_lines = [
-  "no cov",
-  "if __name__ == .__main__.:",
-  "if TYPE_CHECKING:",
-]
+exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
 
 [tool.ruff]
-extend-exclude = [ "src/gcrl_landscapes/plots/triple_gp.py", ]
+extend-exclude = ["src/gcrl_landscapes/plots/triple_gp.py"]
