@@ -7,10 +7,45 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import numpy as np
 import pandas as pd
-from scipy.stats import spearmanr as _spearmanr_oracle, pearsonr as _pearsonr_oracle, kendalltau as _kendalltau_oracle
+from scipy.stats import (
+    spearmanr as _spearmanr_oracle,
+    pearsonr as _pearsonr_oracle,
+    kendalltau as _kendalltau_oracle,
+)
 from gcrl_landscapes.util.data import load_or_compute
 from gcrl_landscapes.evaluation.tabular import compute_merged_df
 from _common import parse_args, build_adv_df, literal_lists_to_numpy
+
+
+def _save_tex(filename: Path, caption: str, label: str, df: pd.DataFrame) -> None:
+    """Write a DataFrame to a booktabs-style .tex table."""
+    col_format = "l" + "r" * len(df.columns)
+    header = " & ".join(df.columns.tolist()) + r" \midrule\n"
+    rows = []
+    for _, row in df.iterrows():
+        vals = []
+        for v in row:
+            if isinstance(v, float):
+                vals.append(f"{v:.3f}")
+            else:
+                vals.append(str(v))
+        rows.append(" & ".join(vals) + r" \ ")
+    body = "\n".join(rows)
+
+    tex = (
+        "\\begin{table}[htbp]\n"
+        "\\centering\n"
+        f"\\begin{{tabular}}{{{col_format}}}\n"
+        "\\toprule\n" + header + body + "\n\\bottomrule\n"
+        "\\end{tabular}\n"
+        f"\\caption{{{caption}}}\n"
+        f"\\label{{{label}}}\n"
+        "\\end{table}"
+    )
+    with open(filename, "w") as f:
+        f.write(tex)
+    print(f"Saved {filename}")
+
 
 zipfiles, plot_dir = parse_args()
 os.makedirs(plot_dir, exist_ok=True)
@@ -22,7 +57,9 @@ phase_map_simple = adv_data["phase_map_simple"]
 adv_all_df = adv_data["adv_all_df"]
 
 # Re-apply in-memory transforms (fast, cache stores raw)
-merged_training_df.drop(columns=["target/held_out_val_batch_values"], errors="ignore", inplace=True)
+merged_training_df.drop(
+    columns=["target/held_out_val_batch_values"], errors="ignore", inplace=True
+)
 for col in ADV_COLS:
     merged_training_df[col] = merged_training_df[col].apply(literal_lists_to_numpy)
 
@@ -42,10 +79,9 @@ ORACLE_ADV_KEY = "advantage/oracle"
 _oracle_all_base = merged_training_df.merge(
     phase_map_simple, on=["hp.agent_name", "dataset", "eval_step"], how="inner"
 )
-_phase_oracle_inputs = (
-    _oracle_all_base[["dataset", "phase_num", "hp.actor_p_trajgoal", "seed"]]
-    .drop_duplicates()
-)
+_phase_oracle_inputs = _oracle_all_base[
+    ["dataset", "phase_num", "hp.actor_p_trajgoal", "seed"]
+].drop_duplicates()
 
 _oracle_env_cache: dict[str, tuple] = {}
 _oracle_gc_cache: dict[tuple, object] = {}
@@ -94,7 +130,9 @@ for _, _phase_row in _phase_oracle_inputs.iterrows():
         _config_dict["actor_p_trajgoal"] = _actor_p_trajgoal
         _config_dict["actor_p_randomgoal"] = 1.0 - _actor_p_trajgoal
         _config_dict["actor_p_curgoal"] = 0.0
-        _oracle_gc_cache[_gc_key] = _GCDataset(_OGBDataset.create(**_val_raw), _MLConfigDict(_config_dict))
+        _oracle_gc_cache[_gc_key] = _GCDataset(
+            _OGBDataset.create(**_val_raw), _MLConfigDict(_config_dict)
+        )
     _val_dataset = _oracle_gc_cache[_gc_key]
 
     np.random.seed(_seed_int)
@@ -103,7 +141,7 @@ for _, _phase_row in _phase_oracle_inputs.iterrows():
     )
     _batch = _val_dataset.sample(_CONST_VAL_BATCH_SIZE, idxs=_idxs)
 
-    _obs_xy  = np.asarray(_batch["observations"])[:, :2]
+    _obs_xy = np.asarray(_batch["observations"])[:, :2]
     _next_xy = np.asarray(_batch["next_observations"])[:, :2]
     _goal_xy = np.asarray(_batch["actor_goals"])[:, :2]
 
@@ -136,14 +174,16 @@ if any(v is not None for v in oracle_advantages.values()) and _predicted_cols:
     _diag_printed = False
 
     _norm_lookup: dict = (
-        adv_all_df
-        .groupby(["hp.agent_name", "dataset", "config_index", "seed", "eval_step", "actor"])["advantage_norm"]
+        adv_all_df.groupby(
+            ["hp.agent_name", "dataset", "config_index", "seed", "eval_step", "actor"]
+        )["advantage_norm"]
         .apply(np.array)
         .to_dict()
     )
     _raw_lookup: dict = (
-        adv_all_df
-        .groupby(["hp.agent_name", "dataset", "config_index", "seed", "eval_step", "actor"])["advantage"]
+        adv_all_df.groupby(
+            ["hp.agent_name", "dataset", "config_index", "seed", "eval_step", "actor"]
+        )["advantage"]
         .apply(np.array)
         .to_dict()
     )
@@ -152,25 +192,42 @@ if any(v is not None for v in oracle_advantages.values()) and _predicted_cols:
         phase_map_simple,
         on=["hp.agent_name", "dataset", "eval_step"],
         how="inner",
-    )[["hp.agent_name", "dataset", "config_index", "seed", "eval_step", "phase_num", "hp.actor_p_trajgoal"]].drop_duplicates()
+    )[
+        [
+            "hp.agent_name",
+            "dataset",
+            "config_index",
+            "seed",
+            "eval_step",
+            "phase_num",
+            "hp.actor_p_trajgoal",
+        ]
+    ].drop_duplicates()
 
     for _, _row in _oracle_merged_df.iterrows():
         _phase_idx = int(_row["phase_num"]) - 1
         _phase_datasets = [s.strip() for s in str(_row["dataset"]).split(",")]
         _single_dataset = _phase_datasets[min(_phase_idx, len(_phase_datasets) - 1)]
         _actor_p_trajgoal = float(_row.get("hp.actor_p_trajgoal", 1.0))
-        _oracle_raw = oracle_advantages.get((_single_dataset, round(_actor_p_trajgoal, 8), int(_row["seed"])))
+        _oracle_raw = oracle_advantages.get(
+            (_single_dataset, round(_actor_p_trajgoal, 8), int(_row["seed"]))
+        )
         if _oracle_raw is None:
             continue
         _o_f = _oracle_raw.astype(np.float64)
         _o_std = _o_f.std()
-        _oracle_norm = (_o_f - _o_f.mean()) / _o_std if _o_std > 0 else np.zeros_like(_o_f)
+        _oracle_norm = (
+            (_o_f - _o_f.mean()) / _o_std if _o_std > 0 else np.zeros_like(_o_f)
+        )
 
         for _pred_col in _predicted_cols:
             _lookup_key = (
-                _row["hp.agent_name"], _row["dataset"],
-                _row["config_index"], _row["seed"],
-                _row["eval_step"], _pred_col,
+                _row["hp.agent_name"],
+                _row["dataset"],
+                _row["config_index"],
+                _row["seed"],
+                _row["eval_step"],
+                _pred_col,
             )
             _p_norm = _norm_lookup.get(_lookup_key)
             _p_raw = _raw_lookup.get(_lookup_key)
@@ -211,7 +268,7 @@ if any(v is not None for v in oracle_advantages.values()) and _predicted_cols:
                 _raw_finite = np.isfinite(_oracle_raw_clipped) & np.isfinite(_p_raw_arr)
                 _diff_raw = _p_raw_arr[_raw_finite] - _oracle_raw_clipped[_raw_finite]
                 _mae_raw = float(np.mean(np.abs(_diff_raw)))
-                _mse_raw = float(np.mean(_diff_raw ** 2))
+                _mse_raw = float(np.mean(_diff_raw**2))
                 _bias_raw = float(np.mean(_diff_raw))
             else:
                 _mae_raw = float("nan")
@@ -252,7 +309,7 @@ if any(v is not None for v in oracle_advantages.values()) and _predicted_cols:
                     _rfinite50 = np.isfinite(_oraw50) & np.isfinite(_praw50)
                     _diff50 = _praw50[_rfinite50] - _oraw50[_rfinite50]
                     _mae_raw50 = float(np.mean(np.abs(_diff50)))
-                    _mse_raw50 = float(np.mean(_diff50 ** 2))
+                    _mse_raw50 = float(np.mean(_diff50**2))
                     _bias_raw50 = float(np.mean(_diff50))
                 else:
                     _mae_raw50 = float("nan")
@@ -280,7 +337,9 @@ if any(v is not None for v in oracle_advantages.values()) and _predicted_cols:
 
     if corr_oracle_records:
         corr_oracle_df = pd.DataFrame(corr_oracle_records)
-        print("\nCorrelation between oracle advantage and predicted advantages per phase:")
+        print(
+            "\nCorrelation between oracle advantage and predicted advantages per phase:"
+        )
         agg_oracle = (
             corr_oracle_df.groupby(["hp.agent_name", "predicted", "phase_num"])
             .agg(
@@ -301,9 +360,39 @@ if any(v is not None for v in oracle_advantages.values()) and _predicted_cols:
         )
         print(agg_oracle.to_string(index=False))
 
+        # --- .tex output: oracle Spearman r per agent x phase ---
+        oracle_tex = (
+            agg_oracle[["hp.agent_name", "predicted", "phase_num", "mean_spearman_r"]]
+            .copy()
+            .rename(
+                columns={
+                    "hp.agent_name": "Agent",
+                    "predicted": "Actor",
+                    "phase_num": "Phase",
+                    "mean_spearman_r": "Oracle r",
+                }
+            )
+        )
+        oracle_tex["Actor"] = oracle_tex["Actor"].str.strip()
+        oracle_tex["Phase"] = oracle_tex["Phase"].astype(int).astype(str)
+
+        # Keep only the last phase per agent
+        last_phase = int(oracle_tex["Phase"].max())
+        oracle_tex = oracle_tex[oracle_tex["Phase"] == str(last_phase)].copy()
+        oracle_tex = oracle_tex[["Agent", "Oracle r"]].sort_values("Agent")
+
+        _save_tex(
+            plot_dir / "oracle_corr.tex",
+            "Oracle (maze-distance) Spearman correlation per agent, actor, and training phase.",
+            "tab:oracle_corr",
+            oracle_tex,
+        )
+
     if corr_oracle_top50_records:
         corr_oracle_top50_df = pd.DataFrame(corr_oracle_top50_records)
-        print("\nCorrelation between oracle advantage and predicted advantages per phase (top-50% oracle):")
+        print(
+            "\nCorrelation between oracle advantage and predicted advantages per phase (top-50% oracle):"
+        )
         agg_oracle_top50 = (
             corr_oracle_top50_df.groupby(["hp.agent_name", "predicted", "phase_num"])
             .agg(
