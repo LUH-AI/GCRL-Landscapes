@@ -19,6 +19,7 @@ def parse_args():
 
     _p = argparse.ArgumentParser()
     _p.add_argument("--zipfiles", nargs="+", type=Path)
+    _p.add_argument("--top-k", type=int, default=None)
     _args, _ = _p.parse_known_args()
     zipfiles = _args.zipfiles or [
         Path(
@@ -26,7 +27,60 @@ def parse_args():
         )
     ]
     plot_dir = Path("plots") / zipfiles[0].name / "advantages"
-    return zipfiles, plot_dir
+    return zipfiles, plot_dir, _args.top_k
+
+
+def _iqm(series: pd.Series | np.ndarray) -> float:
+    """Interquartile mean: trim 25%% each tail, compute mean of remainder."""
+    arr = np.sort(np.asarray(series).flatten())
+    trim = len(arr) // 4
+    if trim == 0:
+        return float(arr.mean())
+    return float(arr[trim:-trim].mean())
+
+
+def get_top_k_configs(
+    merged_results_df: pd.DataFrame, k: int = 5
+) -> dict[str, list[int]]:
+    """
+    Identify top-k configs per agent by final phase success (IQM across seeds).
+    Returns dict[agent -> sorted list of top-k config_indices].
+    Raises ValueError if fewer than k configs exist for any agent.
+    """
+    # Get last phase for each agent
+    last_phase = (
+        merged_results_df.groupby("hp.agent_name")["phase_num"]
+        .max()
+        .reset_index()
+        .rename(columns={"phase_num": "last_phase_num"})
+    )
+
+    # Filter to last phase only
+    last_phase_df = merged_results_df.merge(last_phase, on="hp.agent_name")
+    last_phase_df = last_phase_df[
+        last_phase_df["phase_num"] == last_phase_df["last_phase_num"]
+    ]
+
+    # IQM across seeds per config
+    iqm_success = (
+        last_phase_df.groupby(["hp.agent_name", "config_index"])["success"]
+        .apply(_iqm)
+        .reset_index()
+        .rename(columns={"success": "iqm_success"})
+    )
+
+    # Top-k per agent
+    top_configs: dict[str, list[int]] = {}
+    for agent, grp in iqm_success.groupby("hp.agent_name"):
+        grp_sorted = grp.sort_values("iqm_success", ascending=False)
+        if len(grp_sorted) < k:
+            raise ValueError(
+                f"Agent {agent} has only {len(grp_sorted)} configs, "
+                f"fewer than requested k={k}"
+            )
+        top_configs[agent] = grp_sorted.head(k)["config_index"].tolist()
+
+    return top_configs
 
 
 def literal_lists_to_numpy(s):
@@ -53,9 +107,11 @@ def _ess(w: pd.Series) -> float:
     return float(w_scaled.sum() ** 2 / (len(w_scaled) * (w_scaled**2).sum()))
 
 
-def build_adv_df(filepaths):
+def build_adv_df(filepaths, top_k: int | None = None):
     """Cached via load_or_compute. Builds adv_all_df + phase_map_simple."""
-    merged_results_df, merged_training_df = load_or_compute(filepaths, compute_merged_df)
+    merged_results_df, merged_training_df = load_or_compute(
+        filepaths, compute_merged_df
+    )
 
     # Memory optimization
     to_category_columns = ["dataset", "hps", "agent"] + merged_training_df.columns[
@@ -80,7 +136,9 @@ def build_adv_df(filepaths):
     # Build long-format dataframe over ALL phases
     adv_all_df = pd.DataFrame()
     adv_last_phase_df = pd.DataFrame()
-    phase_map_simple = pd.DataFrame(columns=["hp.agent_name", "dataset", "eval_step", "phase_num"])
+    phase_map_simple = pd.DataFrame(
+        columns=["hp.agent_name", "dataset", "eval_step", "phase_num"]
+    )
 
     if ADV_COLS and merged_results_df is not None:
         phase_map = merged_results_df[
@@ -96,8 +154,12 @@ def build_adv_df(filepaths):
                 alpha = row.get("hp.alpha", np.nan)
                 adv_f64 = adv_arr.astype(np.float64)
                 _mu, _sigma = adv_f64.mean(), adv_f64.std()
-                adv_norm = (adv_f64 - _mu) / _sigma if _sigma > 0 else np.zeros_like(adv_f64)
-                adv_norm_spread = (adv_f64) / _sigma if _sigma > 0 else np.zeros_like(adv_f64)
+                adv_norm = (
+                    (adv_f64 - _mu) / _sigma if _sigma > 0 else np.zeros_like(adv_f64)
+                )
+                adv_norm_spread = (
+                    (adv_f64) / _sigma if _sigma > 0 else np.zeros_like(adv_f64)
+                )
 
                 df_tmp = pd.DataFrame(
                     {
@@ -145,7 +207,9 @@ def build_adv_df(filepaths):
             .sort_values(["hp.agent_name", "dataset", "eval_step"])
         )
         _parts = []
-        for (_agent, _dataset), _grp in _all_train_steps.groupby(["hp.agent_name", "dataset"]):
+        for (_agent, _dataset), _grp in _all_train_steps.groupby(
+            ["hp.agent_name", "dataset"]
+        ):
             _bounds = _phase_boundaries[
                 (_phase_boundaries["hp.agent_name"] == _agent)
                 & (_phase_boundaries["dataset"] == _dataset)
@@ -163,12 +227,28 @@ def build_adv_df(filepaths):
         phase_map_simple = (
             pd.concat(_parts, ignore_index=True).dropna(subset=["phase_num"])
             if _parts
-            else pd.DataFrame(columns=["hp.agent_name", "dataset", "eval_step", "phase_num"])
+            else pd.DataFrame(
+                columns=["hp.agent_name", "dataset", "eval_step", "phase_num"]
+            )
         )
 
-    return {
+    result = {
         "adv_all_df": adv_all_df,
         "adv_last_phase_df": adv_last_phase_df,
         "phase_map_simple": phase_map_simple,
         "ADV_COLS": ADV_COLS,
     }
+
+    # Filter to top-k configs per agent
+    if top_k is not None:
+        top_configs = get_top_k_configs(merged_results_df, k=top_k)
+        for agent, configs in top_configs.items():
+            agent_mask = result["adv_all_df"]["hp.agent_name"] == agent
+            config_mask = result["adv_all_df"]["config_index"].isin(configs)
+            result["adv_all_df"] = result["adv_all_df"][~(agent_mask & ~config_mask)]
+            result["adv_last_phase_df"] = result["adv_last_phase_df"][
+                ~(agent_mask & ~config_mask)
+            ]
+        print(f"Filtered to top-{top_k} configs per agent")
+
+    return result
