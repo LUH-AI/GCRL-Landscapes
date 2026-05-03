@@ -18,6 +18,7 @@ Reference: afr_signal_ogbench_diagnostic.md
 """
 
 import argparse
+import json
 from pathlib import Path
 from typing import Optional
 
@@ -86,6 +87,8 @@ def afr_metrics(adv_matrix: np.ndarray, eps: float = EPS) -> dict:
         "extractability_index": ei,
         "adv_plus_mean": float(np.mean(adv_plus)),
         "adv_minus_mean": float(np.mean(adv_matrix[off_diag])),
+        "adv_total_mean": float(np.mean(adv_matrix)),
+        "adv_total_std": float(np.std(adv_matrix)),
     }
 
 
@@ -144,6 +147,12 @@ def main() -> None:
         help="Comma-separated list of batch indices to include (e.g. 0,1,2 or 0-5). "
         "If unset, all batches are used.",
     )
+    parser.add_argument(
+        "--config-ids",
+        type=Path,
+        default=None,
+        help="Path to JSON file with {agent: [config_ids]} to filter to.",
+    )
     args = parser.parse_args()
 
     # Parse batch filter (batch_idx is stored as string in the parquet)
@@ -191,6 +200,8 @@ def main() -> None:
         "extractability_index",
         "adv_plus_mean",
         "adv_minus_mean",
+        "adv_total_mean",
+        "adv_total_std",
     ]
     agg_df = result_df.groupby(_GROUP_COLS)[agg_cols].agg(["mean", "std"]).round(6)
     # Flatten: "fr_auc_mean", "fr_auc_std", ...
@@ -206,6 +217,24 @@ def main() -> None:
         out_df = agg_df
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
+
+    # Filter by config IDs if provided (must be after aggregation)
+    if args.config_ids is not None:
+        config_filter: dict[str, list[str]] = json.loads(args.config_ids.read_text())
+        # Normalize: ensure values are strings
+        config_filter = {
+            agent: [str(c) for c in ids] for agent, ids in config_filter.items()
+        }
+        before = len(out_df)
+        mask = out_df.apply(
+            lambda row: (
+                str(row["configuration"]) in config_filter.get(row["agent"], [])
+            ),
+            axis=1,
+        )
+        out_df = out_df[mask]
+        print(f"Filtered to config IDs: {before} → {len(out_df)} rows")
+
     out_df.to_csv(args.output, index=False)
     print(f"Saved {len(out_df)} rows → {args.output}")
 
@@ -216,6 +245,7 @@ def main() -> None:
             if c.startswith("fr_auc")
             or c.startswith("extractability")
             or c.startswith("gap_mean")
+            or c.startswith("adv_total")
         ]
     ].agg(["mean", "std"])
     print("\nSummary by agent:")
