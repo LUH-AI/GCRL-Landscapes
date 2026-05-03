@@ -13,11 +13,11 @@ from gcrl_landscapes.util.data import load_or_compute
 from gcrl_landscapes.evaluation.tabular import compute_merged_df
 from _common import parse_args, build_adv_df
 
-zipfiles, plot_dir = parse_args()
+zipfiles, plot_dir, top_k = parse_args()
 os.makedirs(plot_dir, exist_ok=True)
 
 merged_results_df, merged_training_df = load_or_compute(zipfiles, compute_merged_df)
-adv_data = load_or_compute(zipfiles, build_adv_df)
+adv_data = load_or_compute(zipfiles, lambda: build_adv_df(zipfiles, top_k=top_k))
 adv_all_df = adv_data["adv_all_df"]
 adv_last_phase_df = adv_data["adv_last_phase_df"]
 ADV_COLS = adv_data["ADV_COLS"]
@@ -58,7 +58,9 @@ if ADV_COLS and merged_results_df is not None:
         ax.set_xlabel("Advantage")
         ax.set_ylabel("Density")
         plt.tight_layout()
-        fname = plot_dir / f"adv_dist_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
+        fname = (
+            plot_dir / f"adv_dist_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
+        )
         plt.savefig(fname)
         print(f"Saved {fname}")
         plt.close()
@@ -95,7 +97,10 @@ if ADV_COLS and merged_results_df is not None:
         ax.set_xlabel("Normalized Advantage  (adv − μ) / σ  per config-seed")
         ax.set_ylabel("Density")
         plt.tight_layout()
-        fname = plot_dir / f"adv_dist_norm_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
+        fname = (
+            plot_dir
+            / f"adv_dist_norm_{agent_name}_{dataset}_{actor.replace('/', '_')}.png"
+        )
         plt.savefig(fname)
         print(f"Saved {fname}")
         plt.close()

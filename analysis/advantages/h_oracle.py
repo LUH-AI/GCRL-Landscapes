@@ -47,11 +47,11 @@ def _save_tex(filename: Path, caption: str, label: str, df: pd.DataFrame) -> Non
     print(f"Saved {filename}")
 
 
-zipfiles, plot_dir = parse_args()
+zipfiles, plot_dir, top_k = parse_args()
 os.makedirs(plot_dir, exist_ok=True)
 
 merged_results_df, merged_training_df = load_or_compute(zipfiles, compute_merged_df)
-adv_data = load_or_compute(zipfiles, build_adv_df)
+adv_data = load_or_compute(zipfiles, lambda: build_adv_df(zipfiles, top_k=top_k))
 ADV_COLS = adv_data["ADV_COLS"]
 phase_map_simple = adv_data["phase_map_simple"]
 adv_all_df = adv_data["adv_all_df"]
@@ -114,11 +114,8 @@ for _, _phase_row in _phase_oracle_inputs.iterrows():
             continue
 
         if not isinstance(_env_tmp.unwrapped, (AntEnv, HumanoidEnv, PointEnv)):
-            print(f"Skipping oracle for {_single_dataset} (not a locomaze env)")
-            _oracle_failed_datasets.add(_single_dataset)
-            oracle_advantages[_key] = None
-            _env_tmp.close()
-            continue
+            # Cube / other envs: still compute Euclidean oracle
+            _oracle_env_cache[_single_dataset] = (_env_tmp, _val_raw)
 
         _oracle_env_cache[_single_dataset] = (_env_tmp, _val_raw)
 
