@@ -116,8 +116,8 @@ for _, _phase_row in _phase_oracle_inputs.iterrows():
         if not isinstance(_env_tmp.unwrapped, (AntEnv, HumanoidEnv, PointEnv)):
             # Cube / other envs: still compute Euclidean oracle
             _oracle_env_cache[_single_dataset] = (_env_tmp, _val_raw)
-
-        _oracle_env_cache[_single_dataset] = (_env_tmp, _val_raw)
+        else:
+            _oracle_env_cache[_single_dataset] = (_env_tmp, _val_raw)
 
     _env, _val_raw = _oracle_env_cache[_single_dataset]
 

@@ -31,8 +31,10 @@ ENVIRONMENTS = {
 }
 
 SCRIPTS_DIR = REPO_DIR / "analysis" / "advantages"
+EXPORT_SCRIPT = SCRIPTS_DIR / "export_top_k.py"
 AFR_SCRIPT = REPO_DIR / "analysis" / "compute_afr_metrics.py"
 OUT_DIR = Path("logs/evaluation")
+TOP_K = 5
 
 
 def run(name: str, cmd: list[str], log_file: Path) -> int:
@@ -57,7 +59,24 @@ def run(name: str, cmd: list[str], log_file: Path) -> int:
     return result.returncode
 
 
-def run_afr_metrics(env: str, parquet: Path, output: Path) -> int:
+def export_top_k(env: str, zipfile: Path) -> Path:
+    """Export top-k config IDs to JSON for an environment."""
+    name = f"export/{env}"
+    config_ids_file = OUT_DIR / env / f"top_k_{TOP_K}.json"
+    cmd = [
+        sys.executable,
+        str(EXPORT_SCRIPT),
+        "--zipfiles",
+        str(zipfile),
+        "--top-k",
+        str(TOP_K),
+    ]
+    log_file = OUT_DIR / env / f"{datetime.now().strftime('%Y%m%d')}_export_top_k.log"
+    run(name, cmd, log_file)
+    return config_ids_file
+
+
+def run_afr_metrics(env: str, parquet: Path, output: Path, config_ids: Path) -> int:
     name = f"afr/{env}"
     cmd = [
         sys.executable,
@@ -66,6 +85,8 @@ def run_afr_metrics(env: str, parquet: Path, output: Path) -> int:
         str(parquet),
         "--output",
         str(output),
+        "--config-ids",
+        str(config_ids),
     ]
     log_file = OUT_DIR / env / f"{datetime.now().strftime('%Y%m%d')}_afr_{env}.log"
     return run(name, cmd, log_file)
@@ -89,7 +110,7 @@ def run_advantages_scripts(env: str, zipfile: Path) -> dict[str, int]:
             "--zipfiles",
             str(zipfile),
             "--top-k",
-            "5",
+            str(TOP_K),
         ]
         log_file = (
             OUT_DIR
@@ -104,9 +125,19 @@ def main() -> int:
     all_results: dict[str, int] = {}
     for env, cfg in ENVIRONMENTS.items():
         (OUT_DIR / env).mkdir(parents=True, exist_ok=True)
+
+        # 1. Export top-k config IDs
+        config_ids_file = export_top_k(env, cfg["zipfile"])
+
+        # 2. Run AFR with config filter
         all_results[f"afr/{env}"] = run_afr_metrics(
-            env, cfg["parquet"], Path(f"Analysis/afr_metrics-{env}.csv")
+            env,
+            cfg["parquet"],
+            Path(f"Analysis/afr_metrics-{env}.csv"),
+            config_ids_file,
         )
+
+        # 3. Run advantage scripts (filter via --top-k)
         all_results.update(run_advantages_scripts(env, cfg["zipfile"]))
 
     print("\n" + "=" * 60)
