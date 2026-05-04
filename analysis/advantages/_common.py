@@ -107,7 +107,22 @@ def _ess(w: pd.Series) -> float:
     return float(w_scaled.sum() ** 2 / (len(w_scaled) * (w_scaled**2).sum()))
 
 
-def build_adv_df(filepaths, top_k: int | None = None):
+def filter_adv_data(adv_data: dict, top_configs: dict[str, list[int]]) -> dict:
+    """Filter adv_data dicts to only include top-k configs per agent."""
+    result = dict(adv_data)
+    result["adv_all_df"] = adv_data["adv_all_df"].copy()
+    result["adv_last_phase_df"] = adv_data["adv_last_phase_df"].copy()
+    for agent, configs in top_configs.items():
+        agent_mask = result["adv_all_df"]["hp.agent_name"] == agent
+        config_mask = result["adv_all_df"]["config_index"].isin(configs)
+        result["adv_all_df"] = result["adv_all_df"][~(agent_mask & ~config_mask)]
+        agent_mask2 = result["adv_last_phase_df"]["hp.agent_name"] == agent
+        config_mask2 = result["adv_last_phase_df"]["config_index"].isin(configs)
+        result["adv_last_phase_df"] = result["adv_last_phase_df"][~(agent_mask2 & ~config_mask2)]
+    return result
+
+
+def build_adv_df(filepaths):
     """Cached via load_or_compute. Builds adv_all_df + phase_map_simple."""
     merged_results_df, merged_training_df = load_or_compute(
         filepaths, compute_merged_df
@@ -232,23 +247,9 @@ def build_adv_df(filepaths, top_k: int | None = None):
             )
         )
 
-    result = {
+    return {
         "adv_all_df": adv_all_df,
         "adv_last_phase_df": adv_last_phase_df,
         "phase_map_simple": phase_map_simple,
         "ADV_COLS": ADV_COLS,
     }
-
-    # Filter to top-k configs per agent
-    if top_k is not None:
-        top_configs = get_top_k_configs(merged_results_df, k=top_k)
-        for agent, configs in top_configs.items():
-            agent_mask = result["adv_all_df"]["hp.agent_name"] == agent
-            config_mask = result["adv_all_df"]["config_index"].isin(configs)
-            result["adv_all_df"] = result["adv_all_df"][~(agent_mask & ~config_mask)]
-            result["adv_last_phase_df"] = result["adv_last_phase_df"][
-                ~(agent_mask & ~config_mask)
-            ]
-        print(f"Filtered to top-{top_k} configs per agent")
-
-    return result
