@@ -221,9 +221,9 @@ def main() -> None:
     # Filter by config IDs if provided (must be after aggregation)
     if args.config_ids is not None:
         config_filter: dict[str, list[str]] = json.loads(args.config_ids.read_text())
-        # Normalize: ensure values are strings
+        # Normalize: uppercase agent keys, stringify config IDs
         config_filter = {
-            agent: [str(c) for c in ids] for agent, ids in config_filter.items()
+            agent.upper(): [str(c) for c in ids] for agent, ids in config_filter.items()
         }
         before = len(out_df)
         mask = out_df.apply(
