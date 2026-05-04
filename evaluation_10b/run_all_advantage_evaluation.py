@@ -43,6 +43,13 @@ ENVIRONMENTS = {
         "parquet": REPO_DIR / "evaluation_10b" / "advantage-10b-cube.parquet",
         "checkpoints": REPO_DIR / "evaluation_10b" / "checkpoints-10b-cube.csv",
     },
+    "scene": {
+        "zipfile": REPO_DIR
+        / "evaluation_10b"
+        / ("2026-05-03-logs-advantage-scene-single-fixed-batch.zip"),
+        "parquet": REPO_DIR / "evaluation_10b" / "advantage-10b-scene.parquet",
+        "checkpoints": REPO_DIR / "evaluation_10b" / "checkpoints-10b-scene.csv",
+    },
 }
 
 SCRIPTS_DIR = REPO_DIR / "analysis" / "advantages"
