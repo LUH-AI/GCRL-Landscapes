@@ -14,7 +14,7 @@ from scipy.stats import (
 )
 from gcrl_landscapes.util.data import load_or_compute
 from gcrl_landscapes.evaluation.tabular import compute_merged_df
-from _common import parse_args, build_adv_df, literal_lists_to_numpy
+from _common import parse_args, build_adv_df, filter_adv_data, get_top_k_configs, literal_lists_to_numpy
 
 
 def _save_tex(filename: Path, caption: str, label: str, df: pd.DataFrame) -> None:
@@ -51,7 +51,11 @@ zipfiles, plot_dir, top_k = parse_args()
 os.makedirs(plot_dir, exist_ok=True)
 
 merged_results_df, merged_training_df = load_or_compute(zipfiles, compute_merged_df)
-adv_data = load_or_compute(zipfiles, lambda: build_adv_df(zipfiles, top_k=top_k))
+adv_data = load_or_compute(zipfiles, build_adv_df)
+if top_k is not None:
+    top_configs = get_top_k_configs(merged_results_df, k=top_k)
+    adv_data = filter_adv_data(adv_data, top_configs)
+    print(f"Filtered to top-{top_k} configs per agent")
 ADV_COLS = adv_data["ADV_COLS"]
 phase_map_simple = adv_data["phase_map_simple"]
 adv_all_df = adv_data["adv_all_df"]
