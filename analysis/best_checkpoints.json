@@ -1,0 +1,58 @@
+{
+  "cube": {
+    "CRL":   {"cfg": 42, "seed": 3, "success": 0.42, "phase": 315517,
+              "checkpoint": "gcrl-cluster/logs-advantage-cube-single-fixed-batch/CRL_cube-single-play-v0_64c_lr-alpha/run_logs/configuration_42/phase_315517/seed_3/params_315517.pkl",
+              "config":     "gcrl-cluster/logs-advantage-cube-single-fixed-batch/CRL_cube-single-play-v0_64c_lr-alpha/configurations/configuration_42.json"},
+    "GCIQL": {"cfg": 61, "seed": 0, "success": 0.86, "phase": 949583,
+              "checkpoint": "gcrl-cluster/logs-advantage-cube-single-fixed-batch/GCIQL_cube-single-play-v0_64c_lr-alpha/run_logs/configuration_61/phase_949583/seed_0/params_949583.pkl",
+              "config":     "gcrl-cluster/logs-advantage-cube-single-fixed-batch/GCIQL_cube-single-play-v0_64c_lr-alpha/configurations/configuration_61.json"},
+    "GCIVL": {"cfg": 18, "seed": 2, "success": 0.98, "phase": 46888,
+              "checkpoint": "gcrl-cluster/logs-advantage-cube-single-fixed-batch/GCIVL_cube-single-play-v0_64c_lr-alpha/run_logs/configuration_18/phase_46888/seed_2/params_46888.pkl",
+              "config":     "gcrl-cluster/logs-advantage-cube-single-fixed-batch/GCIVL_cube-single-play-v0_64c_lr-alpha/configurations/configuration_18.json"},
+    "QRL":   {"cfg": 22, "seed": 2, "success": 0.32, "phase": 809000,
+              "checkpoint": "gcrl-cluster/logs-advantage-cube-single-fixed-batch/QRL_cube-single-play-v0_64c_lr-alpha/run_logs/configuration_22/phase_809000/seed_2/params_809000.pkl",
+              "config":     "gcrl-cluster/logs-advantage-cube-single-fixed-batch/QRL_cube-single-play-v0_64c_lr-alpha/configurations/configuration_22.json"}
+  },
+  "antmaze-medium": {
+    "CRL":   {"cfg": 33, "seed": 2, "success": 0.94, "phase": 159090,
+              "checkpoint": "gcrl-cluster/logs-advantage-antmaze-medium-fixed-batch/CRL_antmaze-medium-navigate-v0_64c_lr-alpha/run_logs/configuration_33/phase_159090/seed_2/params_159090.pkl",
+              "config":     "gcrl-cluster/logs-advantage-antmaze-medium-fixed-batch/CRL_antmaze-medium-navigate-v0_64c_lr-alpha/configurations/configuration_33.json"},
+    "GCIQL": {"cfg": 12, "seed": 4, "success": 0.72, "phase": 820277,
+              "checkpoint": "gcrl-cluster/logs-advantage-antmaze-medium-fixed-batch/GCIQL_antmaze-medium-navigate-v0_64c_lr-alpha/run_logs/configuration_12/phase_820277/seed_4/params_820277.pkl",
+              "config":     "gcrl-cluster/logs-advantage-antmaze-medium-fixed-batch/GCIQL_antmaze-medium-navigate-v0_64c_lr-alpha/configurations/configuration_12.json"},
+    "GCIVL": {"cfg": 42, "seed": 4, "success": 0.86, "phase": 865793,
+              "checkpoint": "gcrl-cluster/logs-advantage-antmaze-medium-fixed-batch/GCIVL_antmaze-medium-navigate-v0_64c_lr-alpha/run_logs/configuration_42/phase_865793/seed_4/params_865793.pkl",
+              "config":     "gcrl-cluster/logs-advantage-antmaze-medium-fixed-batch/GCIVL_antmaze-medium-navigate-v0_64c_lr-alpha/configurations/configuration_42.json"},
+    "QRL":   {"cfg": 56, "seed": 0, "success": 0.92, "phase": 310750,
+              "checkpoint": "gcrl-cluster/logs-advantage-antmaze-medium-fixed-batch/QRL_antmaze-medium-navigate-v0_64c_lr-alpha/run_logs/configuration_56/phase_310750/seed_0/params_310750.pkl",
+              "config":     "gcrl-cluster/logs-advantage-antmaze-medium-fixed-batch/QRL_antmaze-medium-navigate-v0_64c_lr-alpha/configurations/configuration_56.json"}
+  },
+  "antmaze-large": {
+    "CRL":   {"cfg": 15, "seed": 3, "success": 0.64, "phase": 926500,
+              "checkpoint": "gcrl-cluster/logs-advantage-antmaze-large-single-fixed-batch/CRL_antmaze-large-navigate-v0_64c_lr-alpha/run_logs/configuration_15/phase_926500/seed_3/params_926500.pkl",
+              "config":     "gcrl-cluster/logs-advantage-antmaze-large-single-fixed-batch/CRL_antmaze-large-navigate-v0_64c_lr-alpha/configurations/configuration_15.json"},
+    "GCIQL": {"cfg": 52, "seed": 0, "success": 0.34, "phase": 626296,
+              "checkpoint": "gcrl-cluster/logs-advantage-antmaze-large-single-fixed-batch/GCIQL_antmaze-large-navigate-v0_64c_lr-alpha/run_logs/configuration_52/phase_626296/seed_0/params_626296.pkl",
+              "config":     "gcrl-cluster/logs-advantage-antmaze-large-single-fixed-batch/GCIQL_antmaze-large-navigate-v0_64c_lr-alpha/configurations/configuration_52.json"},
+    "GCIVL": {"cfg": 63, "seed": 4, "success": 0.22, "phase": 42964,
+              "checkpoint": "gcrl-cluster/logs-advantage-antmaze-large-single-fixed-batch/GCIVL_antmaze-large-navigate-v0_64c_lr-alpha/run_logs/configuration_63/phase_42964/seed_4/params_42964.pkl",
+              "config":     "gcrl-cluster/logs-advantage-antmaze-large-single-fixed-batch/GCIVL_antmaze-large-navigate-v0_64c_lr-alpha/configurations/configuration_63.json"},
+    "QRL":   {"cfg": 18, "seed": 3, "success": 0.66, "phase": 402222,
+              "checkpoint": "gcrl-cluster/logs-advantage-antmaze-large-single-fixed-batch/QRL_antmaze-large-navigate-v0_64c_lr-alpha/run_logs/configuration_18/phase_402222/seed_3/params_402222.pkl",
+              "config":     "gcrl-cluster/logs-advantage-antmaze-large-single-fixed-batch/QRL_antmaze-large-navigate-v0_64c_lr-alpha/configurations/configuration_18.json"}
+  },
+  "scene": {
+    "CRL":   {"cfg": 36, "seed": 4, "success": 0.24, "phase": 53000,
+              "checkpoint": "gcrl-cluster/logs-advantage-scene-single-fixed-batch/CRL_scene-play-v0_64c_lr-alpha/run_logs/configuration_36/phase_53000/seed_4/params_53000.pkl",
+              "config":     "gcrl-cluster/logs-advantage-scene-single-fixed-batch/CRL_scene-play-v0_64c_lr-alpha/configurations/configuration_36.json"},
+    "GCIQL": {"cfg": 50, "seed": 1, "success": 0.92, "phase": 845714,
+              "checkpoint": "gcrl-cluster/logs-advantage-scene-single-fixed-batch/GCIQL_scene-play-v0_64c_lr-alpha/run_logs/configuration_50/phase_845714/seed_1/params_845714.pkl",
+              "config":     "gcrl-cluster/logs-advantage-scene-single-fixed-batch/GCIQL_scene-play-v0_64c_lr-alpha/configurations/configuration_50.json"},
+    "GCIVL": {"cfg": 32, "seed": 4, "success": 0.78, "phase": 569000,
+              "checkpoint": "gcrl-cluster/logs-advantage-scene-single-fixed-batch/GCIVL_scene-play-v0_64c_lr-alpha/run_logs/configuration_32/phase_569000/seed_4/params_569000.pkl",
+              "config":     "gcrl-cluster/logs-advantage-scene-single-fixed-batch/GCIVL_scene-play-v0_64c_lr-alpha/configurations/configuration_32.json"},
+    "QRL":   {"cfg": 20, "seed": 4, "success": 0.30, "phase": 83750,
+              "checkpoint": "gcrl-cluster/logs-advantage-scene-single-fixed-batch/QRL_scene-play-v0_64c_lr-alpha/run_logs/configuration_20/phase_83750/seed_4/params_83750.pkl",
+              "config":     "gcrl-cluster/logs-advantage-scene-single-fixed-batch/QRL_scene-play-v0_64c_lr-alpha/configurations/configuration_20.json"}
+  }
+}
