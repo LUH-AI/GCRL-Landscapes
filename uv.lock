@@ -759,12 +759,12 @@ requires-dist = [
     { name = "gymnasium", extras = ["mujoco"] },
     { name = "hydra-core" },
     { name = "hydra-submitit-launcher" },
-    { name = "hypersweeper", git = "https://github.com/jmtoepperwien/hypersweeper" },
+    { name = "hypersweeper", git = "https://anonymous.4open.science/r/hypersweeper-265A" },
     { name = "jax", extras = ["cuda12"], marker = "sys_platform == 'linux'", specifier = ">=0.6.2,<0.7.0" },
     { name = "jinja2" },
     { name = "more-itertools" },
     { name = "numpy", specifier = "<2.0.0" },
-    { name = "ogbench", marker = "sys_platform == 'linux'", git = "https://github.com/CrunchyFlakes/ogbench?branch=master" },
+    { name = "ogbench", marker = "sys_platform == 'linux'", git = "https://anonymous.4open.science/r/ogbench-5C3B" },
     { name = "omegaconf" },
     { name = "pandas" },
     { name = "pyarrow" },
@@ -1005,7 +1005,7 @@ wheels = [
 [[package]]
 name = "hypersweeper"
 version = "0.2.2"
-source = { git = "https://github.com/jmtoepperwien/hypersweeper#67d860bbd61a4ca9843e6081275b77634439fbb9" }
+source = { git = "https://anonymous.4open.science/r/hypersweeper-265A#67d860bbd61a4ca9843e6081275b77634439fbb9" }
 dependencies = [
     { name = "bump-my-version" },
     { name = "configspace" },
@@ -1763,7 +1763,7 @@ wheels = [
 [[package]]
 name = "ogbench"
 version = "1.2.0"
-source = { git = "https://github.com/CrunchyFlakes/ogbench?branch=master#7f854a35e69cb9be07147fc00ceb9b79d363d501" }
+source = { git = "https://anonymous.4open.science/r/ogbench-5C3B=master#7f854a35e69cb9be07147fc00ceb9b79d363d501" }
 dependencies = [
     { name = "distrax", marker = "sys_platform == 'linux'" },
     { name = "dm-control", marker = "sys_platform == 'linux'" },

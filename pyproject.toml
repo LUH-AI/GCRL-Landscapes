@@ -53,7 +53,7 @@ dependencies = [
   "omegaconf",
   "hydra-submitit-launcher",
   "smac >= 2.4.0",
-  "hypersweeper @ git+https://github.com/jmtoepperwien/hypersweeper",
+  "hypersweeper @ git+https://anonymous.4open.science/r/hypersweeper-265A",
   "swig",
   "setuptools < 81",
   "tensorflow > 2.15.0",
@@ -68,7 +68,7 @@ Issues = "https://github.com/LUH-AI/GCRL-Landscapes/issues"
 Source = "https://github.com/LUH-AI/GCRL-Landscapes"
 
 [tool.uv.sources]
-ogbench = { git = "https://github.com/CrunchyFlakes/ogbench", branch = "master" }
+ogbench = { git = "https://anonymous.4open.science/r/ogbench-5C3B", branch = "master" }
 smac = { git = "https://github.com/automl/SMAC3", branch = "v2.4.0" }
 
 [tool.hatch.metadata]
