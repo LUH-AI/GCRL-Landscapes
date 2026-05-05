@@ -218,6 +218,7 @@ def mobility_plot(
     plt.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     plt.savefig(output_path, dpi=1200)
+    plt.savefig(output_path.with_suffix(".pdf"))
     plt.close()
 
 
