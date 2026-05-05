@@ -2,10 +2,10 @@
 
 A hyperparameter landscape exploration framework for offline goal-conditioned RL agents. It generates diverse hyperparameter configurations, trains agents in phases across Slurm clusters, and analyzes how optimality landscapes evolve during training.
 
-Supported agents: **CRL, CMD, GCBC, GCIQL, GCIVL, QRL, HIQL, SAC** (via [OGBench](https://github.com/seohongpark/ogbench)).  
-Environments: antmaze, humanoid, cube, powderworld (via [Gymnasium](https://gymnasium.farama.org/)).
+Supported agents: **CRL, GCIQL, GCIVL, QRL, HIQL** (via [OGBench](https://github.com/seohongpark/ogbench)).  
+Environments: antmaze, humanoid, cube, scene (via [Gymnasium](https://gymnasium.farama.org/)).
 
-Convergence data required for phase splitting can be found on [Huggingface](https://huggingface.co/datasets/jmtoepperwien/GCRL-Landscapes). Precomputed log files are available there as well.
+Already generated convergence data required for phase splitting can be found on [Huggingface](https://huggingface.co/datasets/jmtoepperwien/GCRL-Landscapes). Precomputed log files are available there as well. All of this can be reproduced given the code
 
 ## Installation
 
