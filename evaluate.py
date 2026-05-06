@@ -83,8 +83,8 @@ def marginalize_seeds(df: pd.DataFrame):
                 "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
                     column_values, proportiontocut=0.25
                 ),
-                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
-                    column_values, proportiontocut=0.25
+                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: (
+                    trim_mean(column_values, proportiontocut=0.25)
                 ),
                 "seed": trim_mean_with_assert,
                 **{
@@ -357,9 +357,11 @@ def compute_drift_to(group: pd.DataFrame, target: str = "end"):
     else:
         raise ValueError(f"Unknown target: {target}")
     return group["target/held_out_val_batch_values_np"].apply(
-        lambda x: target_drift(x, compare_value) / drift_start_end
-        if drift_start_end
-        else None
+        lambda x: (
+            target_drift(x, compare_value) / drift_start_end
+            if drift_start_end
+            else None
+        )
     )
 
 
@@ -629,9 +631,7 @@ def plot_swapped_cdf(df: pd.DataFrame, name: str) -> None:
     plt.xlabel("Gradient Cosine Similarity")
     plt.ylabel("Cumulative Probability")
     plt.tight_layout()
-    plt.savefig(
-        plot_dir / "cdf_swapped" / f"gradient-alignment-cdf-{name}.pdf"
-    )
+    plt.savefig(plot_dir / "cdf_swapped" / f"gradient-alignment-cdf-{name}.pdf")
 
     plt.close()
 
@@ -772,7 +772,9 @@ corr_sorted
 # %%
 if "hiql" in corr.index and "qrl" in corr.index:
     corr_diff = corr.loc["hiql"] - corr.loc["qrl"]
-    corr_diff_sorted = corr_diff.reindex(corr_diff.abs().sort_values(ascending=False).index)
+    corr_diff_sorted = corr_diff.reindex(
+        corr_diff.abs().sort_values(ascending=False).index
+    )
     # only keep entries without "grad/" and "update/"
     display(corr_diff_sorted[~corr_diff_sorted.index.str.contains("grad/|update/")])
 else:
@@ -986,7 +988,9 @@ corr_sorted
 # %%
 if "hiql" in corr.index and "qrl" in corr.index:
     corr_diff = corr.loc["hiql"] - corr.loc["qrl"]
-    corr_diff_sorted = corr_diff.reindex(corr_diff.abs().sort_values(ascending=False).index)
+    corr_diff_sorted = corr_diff.reindex(
+        corr_diff.abs().sort_values(ascending=False).index
+    )
     display(corr_diff_sorted)
 else:
     print(f"Skipping corr_diff: available agents in corr = {corr.index.tolist()}")
@@ -1032,12 +1036,15 @@ for name, group in merged_results_df.groupby(["hp.agent_name", "dataset_condense
     datasets = name[1]
 
     print(f"mobility-{agent}-{datasets}")
-    for performance_threshold in [95, 90]:
+    for performance_threshold in [95, 90, 85, 80]:
         mobility_plot(
             group,
             agent,
             _hp_list,
-            output_path=plot_dir / "mobility" / str(performance_threshold) / f"mobility-{agent}-{datasets}.png",
+            output_path=plot_dir
+            / "mobility"
+            / str(performance_threshold)
+            / f"mobility-{agent}-{datasets}.png",
             performance_threshold=performance_threshold / 100,
         )
 
@@ -1071,12 +1078,16 @@ for name, group in merged_results_df_constant_last_phase.groupby(
         continue
 
     print(f"mobility-last-phase-{agent}-{envs}")
-    for performance_threshold in [95, 90]:
+    for performance_threshold in [95, 90, 85, 80]:
         mobility_plot(
             group,
             agent,
             _hp_list,
-            output_path=plot_dir / "mobility" / "across-dataquality" / str(performance_threshold) / f"mobility-last-phase-{agent}-{envs}.png",
+            output_path=plot_dir
+            / "mobility"
+            / "across-dataquality"
+            / str(performance_threshold)
+            / f"mobility-last-phase-{agent}-{envs}.png",
             by_col="Exploration Ratio",
             performance_threshold=performance_threshold / 100,
         )

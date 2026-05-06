@@ -17,8 +17,8 @@ from .common import (
 from gcrl_landscapes.configurations import hp_to_sobol_codomain, get_bounds
 from gcrl_landscapes.submission import SUPPORTED_DATASETS
 from gcrl_landscapes.phase_splitting import get_all_phases
-from scipy.stats import trim_mean
 from scipy.optimize import shgo
+from scipy.stats import trim_mean
 from scipy.spatial import distance
 from typing import Any
 import zipfile
@@ -49,8 +49,8 @@ def marginalize_seeds(df: pd.DataFrame):
                 "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
                     column_values, proportiontocut=0.25
                 ),
-                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
-                    column_values, proportiontocut=0.25
+                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: (
+                    trim_mean(column_values, proportiontocut=0.25)
                 ),
             }
         )
@@ -104,26 +104,31 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
                 "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
                     column_values, proportiontocut=0.25
                 ),
-                "mean_normalized_goal_distance_return_normalized_regret": lambda column_values: trim_mean(
-                    column_values, proportiontocut=0.25
-                ),
             }
         )
         .reset_index()
     )
 
     def aggregation(df: pd.DataFrame):
+        def rho_09(s: pd.Series) -> float:
+            mx = s.max()
+            return (s >= 0.9 * mx).mean() if mx > 0 else float("nan")
+
+        def rho_08(s: pd.Series) -> float:
+            mx = s.max()
+            return (s >= 0.8 * mx).mean() if mx > 0 else float("nan")
+
         return df.groupby(
             by=["agent", "dataset", "constant_dataset", "hps", "phase_num"]
         ).agg(
             **{
-                "Goal Distance Score Normalized Regret $< 0.1$ Ratio": pd.NamedAgg(
-                    column="mean_normalized_goal_distance_return_normalized_regret",
-                    aggfunc=lambda x: (x < 0.1).mean(),
+                "Success $\\rho_{0.9}$": pd.NamedAgg(
+                    column="success",
+                    aggfunc=rho_09,
                 ),
-                "Goal Distance Score Normalized Regret $< 0.2$ Ratio": pd.NamedAgg(
-                    column="mean_normalized_goal_distance_return_normalized_regret",
-                    aggfunc=lambda x: (x < 0.2).mean(),
+                "Success $\\rho_{0.8}$": pd.NamedAgg(
+                    column="success",
+                    aggfunc=rho_08,
                 ),
                 "Goal Distance Score": pd.NamedAgg(
                     column="mean_normalized_goal_distance_return", aggfunc="mean"
@@ -132,6 +137,7 @@ def create_phased_tables(results_pandas: pd.DataFrame, output_folder: Path):
                     column="mean_normalized_goal_distance_return", aggfunc="max"
                 ),
                 "Success": pd.NamedAgg(column="success", aggfunc="mean"),
+                "Max Success": pd.NamedAgg(column="success", aggfunc="max"),
             }
         )
 
@@ -193,14 +199,16 @@ def create_igprfit_tables(results_pandas: pd.DataFrame, output_folder: Path):
     table = final_results_pandas.groupby(
         by=["agent", "dataset", "constant_dataset", "hps", "phase_num"]
     ).apply(
-        lambda df: fit_model(
-            df.reset_index(drop=True),
-            "mean_normalized_goal_distance_return",
-            [f"hp.{hp_name}" for hp_name in df["hps"].iloc[0]],
-        )
-        .estimate_iqm_fit()
-        .drop(axis="columns", labels="fold")
-        .mean(axis=0),
+        lambda df: (
+            fit_model(
+                df.reset_index(drop=True),
+                "mean_normalized_goal_distance_return",
+                [f"hp.{hp_name}" for hp_name in df["hps"].iloc[0]],
+            )
+            .estimate_iqm_fit()
+            .drop(axis="columns", labels="fold")
+            .mean(axis=0)
+        ),
     )
 
     with open(output_folder / "igpr_fit_table.md", "w") as f:
@@ -337,8 +345,8 @@ def create_optimum_shift_table(results_pandas: pd.DataFrame, out):
                     "success": lambda column_values: trim_mean(
                         column_values, proportiontocut=0.25
                     ),
-                    "mean_normalized_goal_distance_return": lambda column_values: trim_mean(
-                        column_values, proportiontocut=0.25
+                    "mean_normalized_goal_distance_return": lambda column_values: (
+                        trim_mean(column_values, proportiontocut=0.25)
                     ),
                 }
                 | {
@@ -470,9 +478,9 @@ def create_mean_diff_table(results_pandas: pd.DataFrame, output_folder: Path):
             .reset_index(level="phase_num")
         )
         df_diff["phase_num"] = df_diff["phase_num"].apply(
-            lambda phase_num: f"{phase_num - 1} -> {phase_num}"
-            if pd.notna(phase_num)
-            else None
+            lambda phase_num: (
+                f"{phase_num - 1} -> {phase_num}" if pd.notna(phase_num) else None
+            )
         )
         return (
             df_diff.set_index(["phase_num"])
