@@ -19,6 +19,7 @@ Reference: afr_signal_ogbench_diagnostic.md
 
 import argparse
 import json
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -53,7 +54,49 @@ _META_COLS = [
 ]
 
 
-def afr_metrics(adv_matrix: np.ndarray, eps: float = EPS) -> dict:
+CLUSTER_MOUNT = Path("/tmp/cluster-mount")
+CLUSTER_PREFIX = "/bigwork/USERNAME/gcrl/code/"
+
+# Compiled regex to extract agent dir and config index from checkpoint_path
+# e.g. /bigwork/.../CRL_antmaze-large-navigate-v0_64c_lr-alpha/run_logs/configuration_0/phase_926500/seed_0/params_926500.pkl
+_CKPT_RE = re.compile(
+    r"(?P<agent_dir>CRL_.*?|GCIQL_.*?|GCIVL_.*?|QRL_.*?|HIQL_.*?)"
+    r"/run_logs/configuration_(?P<config_idx>\d+)"
+)
+
+
+def _get_alpha(checkpoint_path: str, config_idx: str) -> float:
+    """Derive config JSON path from checkpoint_path and extract 'alpha'.
+
+    checkpoint_path points to a .pkl inside a run_logs/configuration_N/ subdir.
+    The corresponding config file lives at:
+      cluster-mount/{experiment_root}/configurations/configuration_N.json
+
+    Falls back to 0.5 if the file cannot be read.
+    """
+    m = _CKPT_RE.search(checkpoint_path)
+    if m:
+        agent_dir = m.group("agent_dir")
+        idx = m.group("config_idx")
+        # Locate the agent dir start in the string to get the experiment root
+        prefix_end = checkpoint_path.index(agent_dir) + len(agent_dir)
+        experiment_root = checkpoint_path[:prefix_end]
+        # Strip cluster prefix and route through cluster-mount
+        local_root = CLUSTER_MOUNT / Path(experiment_root).relative_to(CLUSTER_PREFIX)
+        config_path = local_root / "configurations" / f"configuration_{idx}.json"
+        try:
+            config = json.loads(config_path.read_text())
+            for key, val in config.items():
+                if key.lower() == "alpha":
+                    return float(val)
+        except Exception:
+            pass
+    return 0.5
+
+
+def afr_metrics(
+    adv_matrix: np.ndarray, alpha: float, w_max: float = 100.0, eps: float = EPS
+) -> dict:
     """Compute AFR metrics from NxN advantage matrix.
 
     adv_matrix[i, j] = A_alg(obs_i, goal_j)
@@ -80,6 +123,27 @@ def afr_metrics(adv_matrix: np.ndarray, eps: float = EPS) -> dict:
     fr_auc = float(np.mean(gaps > 0.0))
     ei = gap_mean / (gap_std + eps)
 
+    # Cross-goal ranking: rank all 256 goals by descending advantage,
+    # find the rank of the positive goal (g_i^+) for each anchor row i.
+    # r_i = 1 means highest advantage.
+    reciprocal_ranks = np.empty(N, dtype=np.float32)
+    for i in range(N):
+        ranks = np.argsort(adv_matrix[i])[::-1]  # goal indices sorted by descending A
+        rank_of_positive = int(np.where(ranks == i)[0][0]) + 1  # 1-indexed
+        reciprocal_ranks[i] = 1.0 / rank_of_positive
+    mrr = float(np.mean(reciprocal_ranks))
+
+    # AWR concentration: compute exp(alpha * A+) weights with w_max clipping
+    with np.errstate(over="ignore"):
+        raw_weights = np.exp(alpha * adv_plus)
+    clipped = raw_weights > w_max
+    weights = np.minimum(raw_weights, w_max)
+
+    top_k = int(np.ceil(N * 0.05))  # 13
+    sorted_w = np.sort(weights)[::-1]
+    top_5_pct_mass = float(np.sum(sorted_w[:top_k]) / (np.sum(weights) + eps))
+    saturation_mass = float(np.sum(weights[clipped]) / (np.sum(weights) + eps))
+
     return {
         "fr_auc": fr_auc,
         "gap_mean": gap_mean,
@@ -89,6 +153,9 @@ def afr_metrics(adv_matrix: np.ndarray, eps: float = EPS) -> dict:
         "adv_minus_mean": float(np.mean(adv_matrix[off_diag])),
         "adv_total_mean": float(np.mean(adv_matrix)),
         "adv_total_std": float(np.std(adv_matrix)),
+        "mrr": mrr,
+        "top_5_pct_mass": top_5_pct_mass,
+        "saturation_mass": saturation_mass,
     }
 
 
@@ -107,6 +174,9 @@ def process_batch(batch: pa.RecordBatch) -> Optional[dict]:
         return None
 
     meta = {col: _dict_col_scalar(batch.column(col)) for col in _META_COLS}
+    checkpoint_path = meta["checkpoint_path"]
+    config_idx = meta["configuration"]
+    alpha = _get_alpha(checkpoint_path, config_idx)
 
     obs_np = batch.column("obs_idx").to_numpy().astype(np.int32)
     goal_np = batch.column("goal_idx").to_numpy().astype(np.int32)
@@ -115,7 +185,9 @@ def process_batch(batch: pa.RecordBatch) -> Optional[dict]:
     matrix = np.empty((BATCH_SIZE, BATCH_SIZE), dtype=np.float32)
     matrix[obs_np, goal_np] = adv_np
 
-    return {**meta, **afr_metrics(matrix)}
+    metrics = afr_metrics(matrix, alpha)
+    metrics["alpha"] = alpha
+    return {**meta, **metrics}
 
 
 def main() -> None:
@@ -202,6 +274,9 @@ def main() -> None:
         "adv_minus_mean",
         "adv_total_mean",
         "adv_total_std",
+        "mrr",
+        "top_5_pct_mass",
+        "saturation_mass",
     ]
     agg_df = result_df.groupby(_GROUP_COLS)[agg_cols].agg(["mean", "std"]).round(6)
     # Flatten: "fr_auc_mean", "fr_auc_std", ...
@@ -246,6 +321,8 @@ def main() -> None:
             or c.startswith("extractability")
             or c.startswith("gap_mean")
             or c.startswith("adv_total")
+            or c.startswith("mrr")
+            or c.startswith("top_5_pct")
         ]
     ].agg(["mean", "std"])
     print("\nSummary by agent:")
