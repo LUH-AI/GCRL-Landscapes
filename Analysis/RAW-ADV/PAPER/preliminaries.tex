@@ -1,0 +1,48 @@
+\section{Preliminaries}
+\label{sec:preliminaries}
+
+We consider a controlled Markov process without rewards $\mathcal{M}=(\mathcal{S},\mathcal{A},\mu,p)$, and an unlabeled offline dataset $\mathcal{D} = \{\tau^{(n)}\}_{n=1}^{N}$ of trajectories $\tau = (s_0,a_0,\ldots,s_T)$. The objective is to learn a policy $\pi(a\mid s,g)$ that reaches a goal state $g \in \mathcal{S}$ from $s$ efficiently.
+
+\paragraph{Self-supervised goal relabeling.}
+Algorithms obtain their learning signal by relabeling transitions with goals drawn from the dataset. Standard distributions include uniform future-state sampling $p_{\mathcal{D}}^{\mathrm{traj}}(g\mid s_t)$, truncated geometric future-state sampling $p_{\mathcal{D}}^{\mathrm{geom}}(g\mid s_t)$ with decay $\beta$, and random-goal sampling $p_{\mathcal{D}}^{\mathrm{rand}}(g)$.
+Future goals provide dataset-reachable relabeling targets, while random goals provide contrastive comparisons.
+
+\paragraph{Policy extraction with AWR.}
+To reduce policy-extraction confounds, we use a shared advantage-weighted regression (AWR) extractor across algorithms.
+Given an algorithm-specific, actor-facing advantage $A_{\mathrm{alg}}(s,a,g)$, AWR trains the policy via weighted behavioral cloning:
+\begin{equation}
+    \mathcal{L}_{\mathrm{AWR}}(\pi) = -\mathbb{E}_{(s,a,g)\sim\mathcal{D}} \left[ w_\alpha(s,a,g)\log\pi(a\mid s,g) \right],
+\end{equation}
+where $w_\alpha(s,a,g) = \min\{\exp(\alpha A_{\mathrm{alg}}(s,a,g)), w_{\max}\}$. The AWR temperature $\alpha$ controls how aggressively the learned advantage is converted into an imitation weight.
+
+\paragraph{Advantage semantics.}
+The algorithms we evaluate learn distinct representations, resulting in different semantics for the actor-facing advantage $A_{\mathrm{alg}}$, as summarized in \cref{tab:advantages}.
+Because these actor-facing quantities have different semantics, ranging from bootstrapped temporal difference errors to quasimetric distances and contrastive reachability ratios, correlating all advantages with a single geometric distance metric can be misleading.
+Full objective derivations for each method are provided in \cref{app:algorithms}.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+\textbf{Algorithm} & \textbf{Advantage Signal} \(A_{\mathrm{alg}}(s,a,g)\) & \textbf{Semantics} \\
+\midrule
+GCIQL & \(Q(s,a,g) - V(s,g)\) & Bootstrapped \(Q-V\) margin \\
+GCIVL & \(V(s',g) - V(s,g)\) & Local value progress \\
+QRL   & \(d_\phi(s,g) - d_\phi(s',g)\) & Quasimetric distance reduction \\
+CRL   & \(f_\theta(s,a,g) - f_\theta^V(s,g)\) & Approximate Log-reachability density ratio \\
+\bottomrule
+\end{tabular}
+\caption{\textbf{Summary of actor-facing advantages.} While all methods utilize the shared AWR extractor, the underlying semantics of their advantage signals vary significantly. Detailed definitions are provided in \cref{app:algorithms}.}
+\label{tab:advantages}
+\end{table}
+
+\paragraph{Advantage extractability.}
+We distinguish what an advantage is intended to estimate from how easily it can be converted into an actor update: whether it induces a stable, useful weighting of dataset actions under exponentiation.
+A diagnostic to measure this is \emph{future-vs-random advantage separation.}
+For a transition $(s,a)$, sampling $g^+\sim p_{\mathcal{D}}^{\mathrm{geom}}(\cdot\mid s,a)$ and $g^-\sim p_{\mathcal{D}}^{\mathrm{rand}}$, we define $\Delta A_{\mathrm{FR}} = A_{\mathrm{alg}}(s,a,g^+) - A_{\mathrm{alg}}(s,a,g^-)$.
+A large positive \(\Delta A_{\mathrm{FR}}\) indicates that the advantage provides an extractable future-vs-random signal; through AWR, this gap is amplified as \(\exp(\alpha \Delta A_{\mathrm{FR}})\) before clipping.
+
+\paragraph{Hyperparameter landscapes.}
+We analyze extractability through phase-indexed response surfaces \(f_t:\Lambda\to\mathbb{R}\) \citep{mohan-automlconf23a}. In this work, the matched landscape is \(\Lambda = \Lambda_{\eta}\times\Lambda_{\alpha}\), where \(\eta\) is the learning rate and \(\alpha\) is the AWR temperature.
+This plane captures the interaction we study: \(\eta\) shapes the learned value signal, while \(\alpha\) controls its extraction.

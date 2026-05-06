@@ -1,0 +1,86 @@
+\section{Introduction}
+
+Offline goal-conditioned reinforcement learning (GCRL) provides a simple and fully self-supervised recipe for learning reusable behavior from unlabeled
+trajectories: relabel states in the dataset as goals, learn a goal-conditioned value or representation, and extract a policy that reaches arbitrary dataset
+states. Recent benchmarks such as OGBench have made this setting substantially more systematic by evaluating a diverse set of algorithms across locomotion,
+manipulation, stochastic, visual, and long-horizon tasks. However, current benchmark practice still largely reports final performance after tuning. This
+leaves a basic question unanswered: \emph{How easily can a policy be extracted from a learned value function?}
+
+This question is especially important in offline RL because policy extraction is not a minor implementation detail.
+Most methods regularize the learned policy toward dataset actions, and the strength of this regularization is often one of the most important hyperparameters.
+In advantage-weighted regression (AWR), the actor is trained by weighted behavioral cloning and the weights are determined by the advantages.
+Thus, policy extraction depends not only on whether the value model
+is accurate, but on whether its advantages are \emph{well-conditioned}: whether they induce a stable and useful weighting of dataset actions under exponentiation.
+
+The difficulty lies in the fact that different offline GCRL algorithms assign fundamentally different semantics to this advantage: bootstrapped temporal-difference margins (GCIQL), local value progress (GCIVL), quasimetric distance reduction (QRL), or contrastive reachability ratios (CRL).
+Because these semantics vary so widely, evaluating them solely on success metrics can mischaracterize their utility.
+What ultimately matters for the AWR extractor is not a universal notion of distance, but whether the learned signal reliably separates useful dataset actions from irrelevant ones.
+
+\begin{figure}[t]
+  \centering
+  \begin{minipage}[c]{0.66\textwidth}
+    \centering
+    \begin{tabular}{@{}cc@{}}
+      \includegraphics[width=0.48\linewidth]{figures/awr-mobility/antmaze-medium/90/mobility-gciql-antmaze-medium-navigate-v0.png}
+      &
+      \includegraphics[width=0.48\linewidth]{figures/awr-mobility/antmaze-medium/90/mobility-gcivl-antmaze-medium-navigate-v0.png}
+      \\
+      \footnotesize (a) GCIQL & \footnotesize (b) GCIVL \\ [4pt]
+      \includegraphics[width=0.48\linewidth]{figures/awr-mobility/antmaze-medium/90/mobility-crl-antmaze-medium-navigate-v0.png}
+      &
+      \includegraphics[width=0.48\linewidth]{figures/awr-mobility/antmaze-medium/90/mobility-qrl-antmaze-medium-navigate-v0.png}
+      \\
+      \footnotesize (c) CRL & \footnotesize (d) QRL
+    \end{tabular}
+  \end{minipage}\hfill
+  \begin{minipage}[c]{0.32\textwidth}
+    \captionsetup{
+      type=figure,
+      justification=raggedright,
+      singlelinecheck=false,
+      font=small
+    }
+    \caption{\textbf{Trainability landscapes in the learning-rate ($\eta$) -- AWR-temperature ($\alpha$) plane.}
+    We visualize the top-10\% regions to compare how different objectives interact with the policy extractor.
+    \textbf{Progress-based methods} (GCIVL, QRL) exhibit broad, stable winner sets across a wide range of $\alpha$, indicating high extractability.
+    \textbf{CRL} shows a concentrated but stable region, suggesting its reachability signal supports selective updates.
+    \textbf{GCIQL} (bootstrapped $Q-V$) displays sharper, more mobile landscapes that are highly sensitive to both hyperparameters, reflecting the difficulty of extracting from bootstrapped margins.
+    }
+    \label{fig:mobility:phases_vs_quality-antmaze}
+  \end{minipage}
+\end{figure}
+
+We therefore study offline GCRL through \emph{trainability landscapes}.
+Following the hyperparameter-landscape methodology of \citet{mohan-automlconf23a}, we view training as a phase-indexed response surface \(f_t:\Lambda\to\mathbb{R}\), where each hyperparameter configuration \(\lambda\in\Lambda\) maps to downstream evaluation performance at phase \(t\).
+Unlike prior online RL landscape studies, we work in a fixed offline dataset setting, which removes exploration-induced distribution shift.
+Unlike standard algorithm benchmarks, we do not only ask which method achieves the highest success; we ask which methods expose broad, stable near-optimal regions in the hyperparameter space, and what actor-facing signals make such regions possible.
+Our primary analytical lens is the shared $(\eta,\alpha)$ landscape, capturing the central tension of offline extraction: the learning rate ($\eta$) controls the shape of the learned value signal, while the AWR temperature ($\alpha$) controls how aggressively that signal is converted into a policy.
+By holding the extractor fixed, we ask not just which method peaks highest, but which methods expose broad, stable near-optimal regions.
+
+% Our main experimental lens is the shared \((\eta,\alpha)\) landscape, where \(\eta\) is the learning rate and \(\alpha\) is the AWR temperature. This pair
+% captures the central interaction in offline GCRL extraction: the learning rate controls the value or representation signal that is learned, while \(\alpha\)
+% controls how aggressively that signal is converted into a policy. By holding the extractor fixed across algorithms, we can compare value-learning schemes through
+% the geometry they induce for the actor. We find that these geometries differ substantially: some methods produce broad positive support, others produce calibrated but sparse winners, and others produce sparse or miscalibrated advantages whose extraction is highly temperature-sensitive.
+Our analysis reveals three qualitative regimes.
+First, progress-based methods such as GCIVL and QRL often produce broad winner sets: many dataset transitions
+receive positive advantages, making AWR extraction comparatively diffuse.
+Second, CRL often produces fewer positive advantages, but the successful configurations use highly selective AWR updates: lower effective sample size correlates with better return, suggesting that its contrastive reachability signal supports stable hard selection of dataset actions.
+Third, GCIQL exhibits sharper and more mobile landscapes, including distinct regimes in the learning-rate--temperature plane.
+We hypothesize this to be due to the difficulty of extracting from a bootstrapped \(Q-V\) margin whose positive mass is not always predictive of return.
+
+These findings suggest that final return alone misses an important benchmark axis: \emph{extractability}.
+A value-learning scheme may be accurate in its own semantics, yet hard to use with a behavioral policy extractor if its
+actor-facing signal is poorly calibrated, overly sparse, or highly sensitive to temperature.
+Conversely, a method such as CRL may be stable not because it estimates geometric distance, but because it learns a behavior-supported
+reachability ranking that AWR can safely concentrate on.
+To bridge this gap, we introduce diagnostics connecting response-surface geometry to the learned objective.
+
+\paragraph{Contributions.}
+Our contributions are:
+\begin{inparaenum}[(i)]
+    \item We introduce trainability landscapes for offline GCRL under a shared policy extractor, focusing on the learning-rate--AWR-temperature plane as
+    the central interaction between value learning and behavioral policy extraction.
+    \item We show that different value-learning schemes induce qualitatively different extraction geometries, yielding broad, calibrated, or brittle hyperparameter landscapes even on fixed offline datasets.
+    \item We identify advantage extractability as a mechanism behind this behavior: stable landscapes arise when AWR sees a reliable winner set, while sparse or miscalibrated advantages induce stronger temperature sensitivity.
+    \item We propose lightweight diagnostics, including AWR winner-set geometry and future-vs-random advantage separation, that help explain when learned advantages are reliable for policy extraction.
+\end{inparaenum}
