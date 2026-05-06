@@ -1,5 +1,0 @@
-agent,n,r_ess_mean,p_ess_mean,sig_ess_mean,r_saturation_mass_mean,p_saturation_mass_mean,sig_saturation_mass_mean,r_fraction_clipped_mean,p_fraction_clipped_mean,sig_fraction_clipped_mean,r_top5_mass_mean,p_top5_mass_mean,sig_top5_mass_mean,r_entropy_mean,p_entropy_mean,sig_entropy_mean
-CRL,320,-0.544,0.0,***,0.231,0.0,***,-0.251,0.0,***,0.25,0.0,***,-0.411,0.0,***
-GCIQL,320,0.219,0.0001,***,-0.163,0.0035,**,-0.018,0.7439,n.s.,-0.146,0.0091,**,0.24,0.0,***
-GCIVL,320,0.211,0.0001,***,0.219,0.0001,***,0.269,0.0,***,-0.228,0.0,***,0.233,0.0,***
-QRL,320,0.011,0.8428,n.s.,-0.044,0.4342,n.s.,-0.003,0.9581,n.s.,0.025,0.6539,n.s.,0.08,0.1532,n.s.
