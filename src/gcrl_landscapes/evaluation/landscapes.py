@@ -76,9 +76,9 @@ def mobility_plot(
         grid_length: Side length of the prediction grid (``grid_length**2`` points).
     """
     clipped_df = df.copy()
-    clipped_df["mean_normalized_goal_distance_return"] = (
-        clipped_df["mean_normalized_goal_distance_return"].clip(0, 1)
-    )
+    clipped_df["mean_normalized_goal_distance_return"] = clipped_df[
+        "mean_normalized_goal_distance_return"
+    ].clip(0, 1)
 
     # Resolve HP names and axis bounds from a sample model
     _sample = fit_model(clipped_df, "mean_normalized_goal_distance_return", hp_list)
@@ -122,7 +122,9 @@ def mobility_plot(
     ]
 
     if df_filtered.empty:
-        print(f"mobility_plot: no points above threshold {performance_threshold} — skipping {output_path}")
+        print(
+            f"mobility_plot: no points above threshold {performance_threshold} — skipping {output_path}"
+        )
         return
 
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -170,18 +172,28 @@ def mobility_plot(
         cx = phase_df[hp_list[0]].median()
         cy = phase_df[hp_list[1]].median()
         ax.scatter(
-            cx, cy,
+            cx,
+            cy,
             s=750 if by_col == "phase_num" else 1500,
-            c=[color], edgecolors="white", linewidths=1,
-            zorder=100, marker="o", alpha=0.75,
+            c=[color],
+            edgecolors="white",
+            linewidths=1,
+            zorder=100,
+            marker="o",
+            alpha=0.75,
         )
         texts.append(
             ax.annotate(
                 str(phase),
-                xy=(cx, cy), xytext=(cx, cy),
-                fontsize=20, fontweight="bold",
-                ha="center", va="center",
-                color="white", zorder=101, alpha=1,
+                xy=(cx, cy),
+                xytext=(cx, cy),
+                fontsize=20,
+                fontweight="bold",
+                ha="center",
+                va="center",
+                color="white",
+                zorder=101,
+                alpha=1,
             )
         )
         centroids.append((cx, cy))
@@ -246,9 +258,9 @@ def optimum_share_table(
         Series keyed ``"1->2"``, ``"2->3"``, … with float Jaccard values.
     """
     clipped_df = df.copy()
-    clipped_df["mean_normalized_goal_distance_return"] = (
-        clipped_df["mean_normalized_goal_distance_return"].clip(0, 1)
-    )
+    clipped_df["mean_normalized_goal_distance_return"] = clipped_df[
+        "mean_normalized_goal_distance_return"
+    ].clip(0, 1)
 
     # Sample model to establish HP axis names
     sample_model = fit_model(
@@ -393,7 +405,7 @@ def plot_mobility_for_experiment(
     for (agent_name, dataset), group in results_df.groupby(
         ["hp.agent_name", "dataset_condensed"]
     ):
-        for threshold in [0.95, 0.90]:
+        for threshold in [0.95, 0.90, 0.85, 0.80]:
             threshold_pct = int(threshold * 100)
             # Filename: agent has no hyphens, so first hyphen after "mobility-" is safe
             output_path = (
@@ -444,10 +456,10 @@ def grid_mobility_plot(plots_folder: Path) -> None:
             for png in sorted(threshold_dir.glob("mobility-*.png")):
                 # mobility-{agent}-{dataset...}.png
                 # Agent names are single lowercase words (no hyphens)
-                rest = png.stem[len("mobility-"):]  # e.g. "hiql-antmaze-medium-..."
+                rest = png.stem[len("mobility-") :]  # e.g. "hiql-antmaze-medium-..."
                 hyphen_idx = rest.index("-")
                 agent = rest[:hyphen_idx]
-                dataset = rest[hyphen_idx + 1:]
+                dataset = rest[hyphen_idx + 1 :]
                 rows.append(
                     {
                         "threshold": threshold,
@@ -479,9 +491,7 @@ def grid_mobility_plot(plots_folder: Path) -> None:
         # Hide unused axes
         for ax in list(grid)[n:]:
             ax.axis("off")
-        plt.suptitle(
-            f"{agent.upper()} — mobility (≥{threshold}% optimal)", fontsize=10
-        )
+        plt.suptitle(f"{agent.upper()} — mobility (≥{threshold}% optimal)", fontsize=10)
         plt.savefig(
             grid_dir / f"mobility-grid-{agent}-{threshold}.png", bbox_inches="tight"
         )

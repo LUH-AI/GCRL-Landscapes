@@ -181,8 +181,9 @@ def merge_experiments(
                 if "datasets" in run_info["arguments"]
                 else run_info["arguments"]["dataset"],
                 constant_dataset=len(set(run_info["arguments"]["datasets"])) == 1,
-                hps=lambda x: [frozenset(run_info["arguments"]["hyperparameters"])]
-                * len(x),
+                hps=lambda x: (
+                    [frozenset(run_info["arguments"]["hyperparameters"])] * len(x)
+                ),
             )
             for run_info, result, train_log in results.values()
         ]
@@ -194,8 +195,9 @@ def merge_experiments(
                 if "datasets" in run_info["arguments"]
                 else run_info["arguments"]["dataset"],
                 constant_dataset=len(set(run_info["arguments"]["datasets"])) == 1,
-                hps=lambda x: [frozenset(run_info["arguments"]["hyperparameters"])]
-                * len(x),
+                hps=lambda x: (
+                    [frozenset(run_info["arguments"]["hyperparameters"])] * len(x)
+                ),
             )
             for run_info, result, train_log in results.values()
         ]
