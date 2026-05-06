@@ -1,0 +1,397 @@
+\section{Experiments}
+\label{sec:experiments}
+
+We evaluate whether offline GCRL methods differ not only in final tuned performance but in the \emph{extractability} of their learned signals under a shared AWR policy extractor.
+Following the protocol in \cref{sec:method}, we evaluate GCIQL, GCIVL, QRL, and CRL on static OGBench datasets. Our central object of study is the phase-resolved response surface over the matched \((\eta,\alpha)\) hyperparameter space.
+The learning rate controls how the value, distance, or reachability signal is learned; the AWR temperature controls how aggressively that signal is converted into a weighted behavioral cloning update.
+Thus, the \((\eta,\alpha)\) landscape provides a controlled view of the interaction between value learning and policy extraction.
+
+We organize our analysis around four questions:
+\begin{inparaenum}[(i)]
+    \item Do value-learning schemes induce different trainability landscapes under the same AWR extractor?
+    \item What actor-facing winner-set geometry does each method produce?
+    \item Why can CRL be stable despite having fewer positive advantages than progress-based methods?
+    \item Can we define a common extractability diagnostic that is fair across diverse advantage semantics?
+\end{inparaenum}
+
+\subsection{Experimental Setup}
+\label{sec:experiments:setup}
+
+\paragraph{Datasets.}
+Our main experiments use static OGBench datasets. We focus primarily on AntMaze, where the methods show clear qualitative differences in landscape geometry, and include Cube and Scene as additional task families to test whether the observed phenomena persist outside locomotion.
+
+% TODO : Specify exact dataset list after finalizing runs.
+% Example:
+% Main: antmaze-medium-navigate-v0, antmaze-medium-stitch-v0, antmaze-medium-explore-v0.
+% Additional: cube-single-play-v0, scene
+
+\paragraph{Hyperparameter configurations.}
+For each algorithm and dataset, we evaluate a fixed set of configurations \(C \subset \Lambda_{\eta}\times\Lambda_{\alpha}\). The learning rate is sampled on a logarithmic scale and the AWR temperature on a linear scale using a scrambled Sobol design. Unless stated otherwise, all reported statistics aggregate over multiple random seeds. For landscape visualization, we fit Independent Gaussian Process Regressors (IGPR), but all quantitative metrics are computed from raw evaluations.
+
+% TODO: Fill in final sweep details.
+% Example:
+% We evaluate 64 configurations per landscape and 5 random seeds per configuration.
+% Learning-rate range: [ ... ]; alpha range: [ ... ].
+
+\paragraph{Evaluation metrics.}
+We evaluate downstream behavior using success rate and normalized goal-distance return. We use success rate for checkpoint selection and normalized goal-distance return to visualize response surfaces. However, we do not use goal-distance return as a universal oracle for advantage quality, because advantages are not only based on the position in e.g. the maze and because the methods learn different semantic signals. In particular, CRL estimates discounted reachability rather than distance progress.
+
+\subsection{Trainability Landscapes under shared AWR}
+\label{sec:experiments:landscapes}
+
+We first ask whether different value-learning schemes induce different \((\eta,\alpha)\) response surfaces when policy extraction is fixed. For each algorithm and training phase, we visualize top-performing regions in the learning-rate--AWR-temperature plane.
+
+% \begin{figure}[t]
+%   \centering
+%   \begin{minipage}[c]{0.66\textwidth}
+%     \centering
+%     \begin{tabular}{@{}cc@{}}
+%       \includegraphics[width=0.48\linewidth]{figures/awr-mobility/antmaze-medium/mobility-gciql-antmaze-medium.png}
+%       &
+%       \includegraphics[width=0.48\linewidth]{figures/awr-mobility/antmaze-medium/mobility-gcivl-antmaze-medium.png}
+%       \\
+%       \footnotesize (a) GCIQL & \footnotesize (b) GCIVL \\ [4pt]
+%       \includegraphics[width=0.48\linewidth]{figures/awr-mobility/antmaze-medium/mobility-crl-antmaze-medium.png}
+%       &
+%       \includegraphics[width=0.48\linewidth]{figures/awr-mobility/antmaze-medium/mobility-qrl-antmaze-medium.png}
+%       \\
+%       \footnotesize (c) CRL & \footnotesize (d) QRL
+%     \end{tabular}
+%   \end{minipage}\hfill
+%   \begin{minipage}[c]{0.32\textwidth}
+%     \captionsetup{
+%       type=figure,
+%       justification=raggedright,
+%       singlelinecheck=false,
+%       font=small
+%     }
+%     \caption{\textbf{Trainability landscapes on AntMaze Medium.}
+%     We visualize the top-10\% regions in the learning-rate \((\eta)\)--AWR-temperature \((\alpha)\) plane under a shared AWR extractor.
+%     CRL and QRL exhibit broad near-optimal regions, indicating that many configurations can be extracted into competent policies.
+%     GCIVL has a broad moderate-performance basin but a narrower top-performance region.
+%     GCIQL is sharply constrained, with good configurations concentrated in a low-\(\alpha\) band and only small additional high-\(\alpha\) regions.
+%     }
+%     \label{fig:mobility:phases_vs_quality-antmaze}
+%   \end{minipage}
+% \end{figure}
+
+% \begin{table}[h]
+%   \centering
+%   \small
+%   \begin{tabular}{ll cccc}
+%     \toprule
+%     \textbf{Phase} & \textbf{Metric} & \textbf{CRL} & \textbf{GCIQL} & \textbf{GCIVL} & \textbf{QRL} \\
+%     \midrule
+%     \multirow{5}{*}{All Phases}
+%     & $\rho_{0.9}$            & $0.51 \pm 0.31$ & $0.04 \pm 0.02$ & $0.11 \pm 0.09$ & $0.52 \pm 0.23$ \\
+%     & $\rho_{0.8}$            & $0.63 \pm 0.34$ & $0.07 \pm 0.05$ & $0.50 \pm 0.20$ & $0.62 \pm 0.27$ \\
+%     & Mean($R_{\text{dist}}$) & $0.55 \pm 0.21$ & $0.41 \pm 0.06$ & $0.52 \pm 0.10$ & $0.63 \pm 0.13$ \\
+%     & Success                 & $0.53 \pm 0.25$ & $0.28 \pm 0.09$ & $0.43 \pm 0.14$ & $0.56 \pm 0.18$ \\
+%     & Max($R_{\text{dist}}$)  & 0.84            & 0.71            & 0.78            & 0.84            \\
+%     \midrule
+%     \multirow{5}{*}{Last Phase}
+%     & $\rho_{0.9}$            & 0.69            & 0.05            & 0.02            & 0.70            \\
+%     & $\rho_{0.8}$            & 0.80            & 0.09            & 0.48            & 0.77            \\
+%     & Mean($R_{\text{dist}}$) & 0.66            & 0.45            & 0.56            & 0.70            \\
+%     & Success                 & 0.67            & 0.34            & 0.49            & 0.66            \\
+%     & Max($R_{\text{dist}}$)  & 0.81            & 0.71            & 0.78            & 0.83            \\
+%     \bottomrule
+%   \end{tabular}
+%   \vspace{0.5em}
+%   \caption{
+%     \textbf{Near-optimal mass and performance across offline GCRL algorithms on AntMaze Medium.}
+%     For each algorithm, we evaluate a fixed set of hyperparameter configurations \(C\) in the learning-rate--AWR-temperature plane.
+%     \(\rho_{0.9}\) and \(\rho_{0.8}\) denote the fraction of configurations achieving at least \(90\%\) or \(80\%\) of the best observed normalized goal-distance return in each phase.
+%     Larger values indicate broader, easier-to-tune landscapes.
+%     \textbf{Mean(\(R_{\text{dist}}\))} and \textbf{Success} report the average normalized goal-distance return and binary success rate across evaluated configurations.
+%     \textbf{Max(\(R_{\text{dist}}\))} reports the best observed configuration.
+%     The \textbf{All Phases} block reports mean \(\pm\) standard deviation across phases, while the \textbf{Last Phase} block reports the final training phase.
+%   }
+%   \label{tab:landscapes:extractability_metrics}
+% \end{table}
+
+\begin{table}[h]
+  \centering
+  \small
+  \setlength{\tabcolsep}{3.5pt}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{l ccccc ccccc}
+    \toprule
+    & \multicolumn{5}{c}{All Phases} & \multicolumn{5}{c}{Last Phase} \\
+    \cmidrule(lr){2-6} \cmidrule(lr){7-11}
+    Algorithm
+    & $\rho_{0.9}$ & $\rho_{0.8}$ & Mean($R_{\text{dist}}$) & Success & Max($R_{\text{dist}}$)
+    & $\rho_{0.9}$ & $\rho_{0.8}$ & Mean($R_{\text{dist}}$) & Success & Max($R_{\text{dist}}$) \\
+    \midrule
+    CRL   & $0.51 \pm 0.31$ & $0.63 \pm 0.34$ & $0.55 \pm 0.21$ & $0.53 \pm 0.25$ & 0.84
+          & 0.69 & 0.80 & 0.66 & 0.67 & 0.81 \\
+    GCIQL & $0.04 \pm 0.02$ & $0.07 \pm 0.05$ & $0.41 \pm 0.06$ & $0.28 \pm 0.09$ & 0.71
+          & 0.05 & 0.09 & 0.45 & 0.34 & 0.71 \\
+    GCIVL & $0.11 \pm 0.09$ & $0.50 \pm 0.20$ & $0.52 \pm 0.10$ & $0.43 \pm 0.14$ & 0.78
+          & 0.02 & 0.48 & 0.56 & 0.49 & 0.78 \\
+    QRL   & $0.52 \pm 0.23$ & $0.62 \pm 0.27$ & $0.63 \pm 0.13$ & $0.56 \pm 0.18$ & 0.84
+          & 0.70 & 0.77 & 0.70 & 0.66 & 0.83 \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \vspace{0.5em}
+  \caption{
+    \textbf{Near-optimal mass and performance across offline GCRL algorithms on AntMaze Medium.}
+    For each algorithm, we evaluate a fixed set of hyperparameter configurations \(C\) in the learning-rate--AWR-temperature plane.
+    \(\rho_{0.9}\) and \(\rho_{0.8}\) denote the fraction of configurations achieving at least \(90\%\) or \(80\%\) of the best observed normalized goal-distance return in each phase.
+    Larger values indicate broader, easier-to-tune landscapes.
+    \textbf{Mean(\(R_{\text{dist}}\))} and \textbf{Success} report the average normalized goal-distance return and binary success rate across evaluated configurations.
+    \textbf{Max(\(R_{\text{dist}}\))} reports the best observed configuration.
+    The \textbf{All Phases} block reports mean \(\pm\) standard deviation across phases, while the \textbf{Last Phase} block reports the final training phase.
+  }
+  \label{tab:landscapes:extractability_metrics}
+\end{table}
+
+\paragraph{Landscape geometry reveals trainability differences hidden by peak performance.}
+The visual landscapes in \cref{fig:mobility:phases_vs_quality-antmaze} align closely with the quantitative metrics in \cref{tab:landscapes:extractability_metrics}. Peak performance alone suggests that several methods are comparable: CRL and QRL both reach a maximum normalized return of \(0.84\), and GCIVL reaches \(0.78\). However, the response surfaces reveal large differences in how easily these peak values are obtained.
+
+CRL and QRL exhibit the broadest near-optimal regions, reflected quantitatively by their high \(\varepsilon\)-optimality mass ($\rho_{0.9}\approx 0.5$ across phases, surging to $0.70$ in the final phase). Thus, both methods are not only high-performing but comparatively easy to tune within the sampled \((\eta,\alpha)\) space.
+GCIVL shows a wide basin of acceptable performance ($\rho_{0.8} = 0.50$), but a much narrower peak region that collapses in the final phase ($\rho_{0.9} = 0.02$).
+Finally, GCIQL is the most constrained. Its near-optimal region is concentrated in a narrow low-\(\alpha\) band, yielding the lowest \(\rho_{0.9}\) and mean success rate across phases.
+This indicates that trainability is not determined by peak value-learning performance alone, but by whether the actor-facing advantage induces a broad and reliable region of effective AWR extraction.
+
+% \begin{takeawaybox}
+% \textbf{Takeaway (Landscapes).}
+% Peak performance hides large trainability differences.
+% CRL and QRL reach high performance across broad regions of the \((\eta,\alpha)\) space.
+% GCIVL has a broad moderate-performance basin but a narrow top-performance region.
+% GCIQL is sharply constrained, indicating strong sensitivity to the interaction between learning rate and AWR temperature.
+% \end{takeawaybox}
+
+\subsection{AWR Winner-Set Geometry}
+\label{sec:experiments:awr_geometry}
+
+To understand why the landscapes differ, we inspect the actor-facing distribution induced by AWR using the region definitions (downweighted, active, saturated) established in \cref{sec:method}. Because the actor update depends on the weights, not the sample counts, we measure the normalized Effective Sample Size (ESS) to track actor-update concentration.
+
+% TODO FIGURE PLACEHOLDER: Advantage distributions and weight distributions.
+%  label: fig:adv_weight_distributions
+%  file: figures/diagnostics/adv_weight_distributions.pdf
+%
+% \begin{figure*}[t]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/diagnostics/adv_weight_distributions.pdf}
+%   \caption{
+%   \textbf{Advantage and AWR weight distributions.}
+%   We compare raw advantages, unclipped AWR weights, and clipped AWR weights across algorithms.
+%   The distributions show that modest differences in advantage geometry become large differences in AWR selection after exponentiation.
+%   }
+%   \label{fig:adv_weight_distributions}
+% \end{figure*}
+
+\begin{table}[h]
+  \centering
+  \small
+  \setlength{\tabcolsep}{4pt}
+  \resizebox{\textwidth}{!}{%
+  \begin{tabular}{l ccc ccc ccc ccc}
+    \toprule
+    & \multicolumn{3}{c}{\textbf{Phase 1}} & \multicolumn{3}{c}{\textbf{Phase 2}} & \multicolumn{3}{c}{\textbf{Phase 3}} & \multicolumn{3}{c}{\textbf{Phase 4}} \\
+    \cmidrule(lr){2-4} \cmidrule(lr){5-7} \cmidrule(lr){8-10} \cmidrule(lr){11-13}
+    \textbf{Algorithm} & \textbf{ESS} & \textbf{Corr} & \textbf{\(p\)-val} & \textbf{ESS} & \textbf{Corr} & \textbf{\(p\)-val} & \textbf{ESS} & \textbf{Corr} & \textbf{\(p\)-val} & \textbf{ESS} & \textbf{Corr} & \textbf{\(p\)-val} \\
+    \midrule
+    CRL   & $0.38 \pm 0.34$ & -0.43 & $<0.01$ & $0.37 \pm 0.31$ & -0.89 & $<0.01$ & $0.30 \pm 0.24$ & -0.83 & $<0.01$ & $0.32 \pm 0.26$ & -0.86 & $<0.01$ \\
+    GCIQL & $0.16 \pm 0.14$ &  0.27 & $<0.01$ & $0.15 \pm 0.11$ &  0.10 &  0.08   & $0.15 \pm 0.12$ &  0.06 &  0.30   & $0.14 \pm 0.12$ &  0.10 &  0.07   \\
+    GCIVL & $0.46 \pm 0.13$ &  0.14 &  0.01   & $0.49 \pm 0.14$ &  0.26 & $<0.01$ & $0.49 \pm 0.14$ & -0.01 &  0.89   & $0.49 \pm 0.14$ &  0.02 &  0.74   \\
+    QRL   & $0.55 \pm 0.10$ &  0.14 &  0.01   & $0.57 \pm 0.11$ &  0.00 &  0.97   & $0.57 \pm 0.11$ &  0.05 &  0.39   & $0.57 \pm 0.11$ &  0.05 &  0.38   \\
+    \bottomrule
+  \end{tabular}%
+  }
+  \vspace{0.5em}
+  \caption{
+    \textbf{Effective sample size (ESS) and its correlation with normalized return on AntMaze Medium.}
+    ESS is computed from the clipped AWR weights, as used during training, for each configuration and phase. The \textbf{Corr} column reports the Pearson correlation between ESS and normalized goal-distance return. Low ESS indicates concentrated actor updates; high ESS indicates diffuse weighted behavioral cloning.
+  }
+  \label{tab:ess}
+\end{table}
+
+\paragraph{Observation: Concentration has different meanings across algorithms.}
+The ESS statistics in \cref{tab:ess} show that identical actor-side quantities carry varying implications depending on advantage semantics. GCIVL and QRL maintain high ESS throughout training (\(0.46\)--\(0.57\)), meaning their actor updates remain diffuse. This aligns with the broad positive-support nature of progress-based methods.
+
+CRL exhibits lower ESS (\(0.30\)--\(0.38\)), indicating selective actor updates. However, this concentration is highly beneficial: in phases 2--4, ESS is strongly negatively correlated with normalized return (\(r \approx -0.85\)). Lower ESS predicts better performance, suggesting successful CRL configurations concentrate AWR on a useful subset of transitions. GCIQL also has low ESS (\(0.14\)--\(0.16\)), but this concentration does not reliably predict return (correlations are weak and mostly insignificant).
+Both CRL and GCIQL concentrate AWR weights, but only CRL's concentration is consistently associated with higher return.
+The next diagnostic asks whether this difference can be explained by the semantics of the selected advantage signal.
+
+% \begin{takeawaybox}
+% \textbf{Takeaway (ESS).}
+% AWR concentration has different meanings across algorithms.
+% GCIVL and QRL maintain high ESS, indicating diffuse extraction from broad positive support.
+% CRL has lower ESS, but lower ESS strongly correlates with higher return, suggesting useful selective extraction.
+% GCIQL also has low ESS, but ESS is only weakly related to return, indicating that concentration alone is not sufficient; the selected samples must be semantically reliable.
+% \end{takeawaybox}
+
+\subsection{Why is CRL Stable? Selective Reachability Extraction}
+\label{sec:experiments:crl}
+
+On AntMaze Medium, CRL exhibits stable landscapes despite lacking the broad positive-advantage support of progress-based methods.
+The CRL critic is trained to distinguish future goals from random goals, estimating a discounted reachability ratio rather than Euclidean distance.
+Consequently, under AWR, CRL can be interpreted as selecting dataset actions according to a multiplicative increase in empirical goal reachability.
+
+\paragraph{Interpretation: Safe hard selection.}
+The strong negative ESS-return correlation for CRL suggests that AWR concentration is effective when the high-weight samples correspond to reachability-lift transitions.
+High-weight samples are not necessarily those reducing Euclidean distance the most, but those maximizing the goal's likelihood under the dataset's trajectory distribution.
+Thus, low ESS is not inherently pathological; for CRL, it enables selective imitation of a behavior-supported, goal-relevant subset of transitions.
+
+% \begin{takeawaybox}
+% \textbf{Takeaway (CRL).}
+% CRL is stable not because it assigns positive advantages broadly, but because its reachability signal makes selective AWR weighting useful.
+% Its stability is better explained by reliable hard selection than by distance correlation or positive mass.
+% \end{takeawaybox}
+
+\subsection{A Common Extractability Diagnostic}
+\label{sec:experiments:extractability}
+
+Because goal-distance return is a biased oracle for reachability- or Bellman-based methods, we apply the future-vs-random advantage separation diagnostic (\cref{sec:method}). We compute the \textbf{FR-AUC} and \textbf{Extractability Index (EI)} to determine if advantages properly rank reachable future goals over random goals. All results below are averaged over ten independent diagnostic batches.
+
+\begin{table}[h]
+  \centering
+  \small
+  \setlength{\tabcolsep}{4.5pt}
+  \begin{tabular}{lcccc}
+    \toprule
+    \textbf{Agent}
+    & \textbf{FR-AUC}
+    & \textbf{Gap Mean}
+    & \textbf{Gap Std}
+    & \textbf{Extractability Index} \\
+    \midrule
+    CRL   & $0.530 \pm 0.038$ & $ 0.169 \pm 0.471$ & $0.076 \pm 0.050$ & $ 0.074 \pm 0.105$ \\
+    GCIQL & $0.471 \pm 0.020$ & $-0.102 \pm 0.060$ & $0.071 \pm 0.020$ & $-0.069 \pm 0.039$ \\
+    GCIVL & $0.564 \pm 0.044$ & $ 0.143 \pm 0.008$ & $0.057 \pm 0.012$ & $ 0.119 \pm 0.012$ \\
+    QRL   & $0.546 \pm 0.017$ & $ 0.358 \pm 0.050$ & $0.233 \pm 0.058$ & $ 0.194 \pm 0.008$ \\
+    \bottomrule
+  \end{tabular}
+  \vspace{0.5em}
+  \caption{
+    \textbf{Future-random advantage separation on AntMaze Medium.}
+    Evaluating whether the actor-facing advantage assigns higher scores to geometrically sampled future goals ($g^+$) than random goals ($g^-$). Values report mean \(\pm\) standard deviation over ten diagnostic batches.
+  }
+  \label{tab:afr}
+\end{table}
+
+\paragraph{Future-random gaps separate useful selectivity from unreliable concentration.}
+QRL and GCIVL produce positive future-random gaps, with FR-AUC values above chance and positive EI scores.
+Their advantages rank dataset-reachable future goals above random goals more often than chance.
+This aligns with their broad positive support and high ESS.
+CRL produces a weaker, higher-variance signal, but its mean gap and extractability index remain positive.
+This supports the interpretation that CRL's stability does not rely on broad positive support, but on selectively weighting transitions with useful reachability-lift signal.
+Conversely, GCIQL's logged actor-facing advantage generates a \emph{negative} future-random gap with an FR-AUC below chance.
+AWR concentrates heavily on a \(Q-V\) tail that is poorly aligned with the future-random reachability diagnostic, which is consistent with fragile extraction in the \((\eta,\alpha)\) landscape.
+
+% TODO FIGURE PLACEHOLDER: Future-vs-random advantage separation.
+%  label: fig:fr_auc_ei
+%  file: figures/diagnostics/future_random_extractability.pdf
+%
+% \begin{figure*}[t]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/diagnostics/future_random_extractability.pdf}
+%   \caption{
+%   \textbf{Future-vs-random advantage separation.}
+%   We measure whether each method's advantage ranks geometrically sampled future goals above random goals.
+%   This diagnostic provides a common extractability signal across distance-, value-, Bellman-, and reachability-based methods.
+%   }
+%   \label{fig:fr_auc_ei}
+% \end{figure*}
+
+% \begin{takeawaybox}
+% \textbf{Takeaway (Future-Random Gap).}
+% The future-random gap separates the semantic quality of the actor-facing advantage from its raw magnitude.
+% On AntMaze Medium, QRL and GCIVL produce clearly positive future-random gaps, CRL produces a weaker but positive reachability gap, and GCIQL produces a negative gap.
+% This explains why CRL can benefit from selective AWR weighting, while GCIQL's sparse \(Q-V\) tail remains difficult to extract reliably.
+% \end{takeawaybox}
+
+% \subsection{Temperature Sensitivity of AWR Extraction}
+% \label{sec:experiments:alpha_sensitivity}
+
+% We track temperature sensitivity using the multiplier curves defined in \cref{sec:method}.
+% In our logged AWR statistics, GCIVL and QRL exhibit broader positive support and therefore enter the saturated region more quickly as \(\alpha\) increases. GCIQL saturates more slowly due to its sparse positive support, but this tail remains semantically unreliable.
+% CRL avoids both extremes: it bypasses the extremely sparse GCIQL setting while avoiding the rapid, fully diffuse saturation of GCIVL and QRL, validating its selective extraction regime.
+
+% TODO FIGURE PLACEHOLDER: alpha sensitivity curves.
+%  label: fig:alpha_sensitivity
+%  file: figures/diagnostics/alpha_sensitivity.pdf
+%
+% \begin{figure*}[t]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/diagnostics/alpha_sensitivity.pdf}
+%   \caption{
+%   \textbf{AWR temperature sensitivity.}
+%   We rescale \(z=\alpha A\) by a multiplier \(k\) and track how the active and saturated fractions change.
+%   Steep curves indicate that small changes in \(\alpha\) substantially alter the actor update.
+%   }
+%   \label{fig:alpha_sensitivity}
+% \end{figure*}
+
+% \begin{takeawaybox}
+% \textbf{Takeaway (Temperature Sensitivity).}
+% AWR temperature sensitivity depends on the distribution of \(z=\alpha A\), not merely on raw advantage variance.
+% CRL's stable landscapes are consistent with a selective temperature response in which lower ESS can be beneficial when the selected samples are semantically meaningful.
+% \end{takeawaybox}
+
+% \subsection{Residual GCIQL Bimodality}
+% \label{sec:experiments:gciql}
+
+% Coarse actor-side diagnostics do not fully separate the two high-performing GCIQL regions observed in its landscape. GCIQL relies on a bootstrapped cross-objective margin where \(Q\) (Bellman regression) and \(V\) (expectile regression) are trained independently. The learning rate dictates the calibration of this margin, while \(\alpha\) dictates the commitment to its positive tail. Because this \(Q-V\) margin is poorly aligned with future-random reachability on AntMaze Medium (\cref{tab:afr}), the AWR extractor is forced to rely on a sparse, unreliable signal, yielding a sharply fractured, narrow landscape.
+
+% TODO FIGURE PLACEHOLDER: GCIQL basin analysis.
+%  label: fig:gciql_basin_analysis
+%  file: figures/diagnostics/gciql_basin_analysis.pdf
+%
+% \begin{figure*}[t]
+%   \centering
+%   \includegraphics[width=\textwidth]{figures/diagnostics/gciql_basin_analysis.pdf}
+%   \caption{
+%   \textbf{GCIQL basin analysis.}
+%   We compare the two high-performing GCIQL regions in the \((\eta,\alpha)\) plane.
+%   Coarse AWR region statistics do not fully explain the split, suggesting that the residual bimodality arises from critic-side calibration of the \(Q-V\) margin.
+%   }
+%   \label{fig:gciql_basin_analysis}
+% \end{figure*}
+
+% OPTIONAL TODO FIGURE PLACEHOLDER: Critic reliability metrics for GCIQL.
+%  label: fig:gciql_critic_reliability
+%  file: figures/diagnostics/gciql_critic_reliability.pdf
+%
+% Metrics to include if logged:
+% - twin-Q disagreement: E[|Q_1-Q_2|]
+% - Bellman residual: E[|Q - (r + gamma V')|]
+% - positive-margin reliability: E[(Q-V)_+ / (|Q_1-Q_2| + eps)]
+
+% \begin{takeawaybox}
+% \textbf{Takeaway (GCIQL).}
+% GCIQL's future-random gap shows that its logged actor-facing \(Q-V\) margin is poorly aligned with reachability on AntMaze Medium.
+% Its landscape remains narrow because AWR concentrates on a sparse margin whose reliability depends on critic calibration and learning rate.
+% \end{takeawaybox}
+
+% \subsection{Summary of Findings}
+% \label{sec:experiments:summary}
+
+% Our experiments support three conclusions. First, offline GCRL methods differ substantially in trainability, visible in the geometry of the \((\eta,\alpha)\) landscape rather than final return alone. Second, AWR winner-set geometry reveals two valid routes to extractability: diffuse extraction via broad positive support (GCIVL, QRL) or reliable concentration via selective extraction (CRL). Third, the semantics of the actor-facing advantage dictate whether this concentration is useful. The future-random gap diagnostic confirms that while CRL benefits from selective AWR weighting, GCIQL's concentration appears to rely on a \(Q-V\) tail that is poorly aligned with our future-random reachability diagnostic.
+
+% \begin{takeawaybox}
+% \textbf{Overall Takeaway.}
+% The difficulty of tuning offline GCRL is governed by \emph{advantage extractability}: whether the learned value or representation signal induces a reliable winner set for behavioral policy extraction.
+% Final return alone does not reveal this property.
+% \end{takeawaybox}
+
+\begin{table}[h]
+    \begin{tabular}{lrr}
+    \toprule
+    Agent & Seed Spearman $r$ & Oracle $r$ \\
+    \midrule
+    CRL   & 0.760 & 0.091 \\
+    GCIQL & 0.754 & 0.071 \\
+    GCIVL & 0.902 & 0.122 \\
+    QRL   & 0.954 & 0.420 \\
+    \bottomrule
+    \end{tabular}
+    \vspace{0.5em}
+    \caption{\textbf{Spearman rank correlation of actor advantages} across random seeds (Seed Spearman $r$) and with the euclidean maze-distance advantage (Oracle $r$) on AntMaze Medium. Seed $r$ reflects advantage ordering stability across runs (QRL most stable); Oracle $r$ measures geometric alignment (all agents low, QRL highest at 0.42).}
+    \label{tab:adv_corr}
+\end{table}
+
+\texttodo{Analyze \cref{tab:adv_corr} and put it into perspective. Maybe add rank correlation across configs}

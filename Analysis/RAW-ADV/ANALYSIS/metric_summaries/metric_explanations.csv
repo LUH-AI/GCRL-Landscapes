@@ -1,0 +1,12 @@
+metric,category,explanation
+fr_auc,Goal discrimination,Pr(A+ > A-) — probability that the true goal scores higher than a random goal. Random baseline = 0.5; perfect = 1.0.
+gap_mean,Goal discrimination,Mean of (A+ - A-) across all 256x255 off-diagonal pairs. How far above random the true goal is in raw advantage units.
+mrr,Goal discrimination,Mean Reciprocal Rank — 1/rank of the true goal when all 256 goals are ranked by advantage averaged over rows. Perfect = 1.0; random ≈ 0.004.
+prec_at_1,Goal discrimination,Fraction of observations where the true goal is ranked #1 out of 256.
+prec_at_5,Goal discrimination,Fraction of observations where the true goal is in the top 5 out of 256.
+extractability_index,Goal discrimination,gap_mean / gap_std — signal-to-noise ratio of the advantage margin. High = true goal reliably outscores random ones; low = margin is noisy.
+ess,AWR weight concentration,Effective Sample Size = (sum(w))^2 / (N * sum(w^2)) normalised to [0-1]. High = weights spread across many samples; low = a few samples dominate the update.
+saturation_mass,AWR weight concentration,Fraction of total weight held by clipped samples (w = 100). High = update is driven by a few extreme-advantage transitions.
+fraction_clipped,AWR weight concentration,Fraction of samples that hit the clip ceiling w = 100. How often individual weights are at their maximum.
+top5_mass,AWR weight concentration,Weight fraction held by the top 5% of samples. Captures concentration even when clipping is not the dominant issue.
+entropy,AWR weight concentration,Shannon entropy of the normalised weight distribution -sum(p * log(p)). High = uniform weights (good coverage); low = collapsed onto a few transitions.

@@ -1,0 +1,57 @@
+\section{Analysis Protocol and Experimental Setup}
+\label{sec:method}
+
+\texttodo{Add in the correlation with our oracle, the distance function and the advantages for all algorithms}
+
+We study how offline GCRL value-learning objectives interact with behavioral policy extraction through phase-resolved \emph{trainability landscapes}.
+The matched hyperparameter space is \(\Lambda=\Lambda_{\eta}\times\Lambda_{\alpha}\), where \(\eta\) is the optimizer learning rate and \(\alpha\) is the AWR temperature.
+Thus, \(\eta\) primarily affects how the value, distance, or reachability signal is learned, while \(\alpha\) controls how strongly the actor-facing advantage is extracted into a policy.
+
+\paragraph{Datasets and phased response surfaces.}
+Our main experiments use static OGBench datasets, focusing on AntMaze for long-horizon locomotion and Cube/Scene for manipulation-oriented goal reaching.
+Following \citet{mohan-automlconf23a}, training is divided into phases.
+At each phase boundary \(t\), all configurations \(\lambda\in C\subset\Lambda_{\eta}\times\Lambda_{\alpha}\) are evaluated, yielding a response surface \(f_t:C\to\mathbb{R}\).
+The next phase is initialized from a shared reference checkpoint selected from the previous phase, so within-phase comparisons are not confounded by incomparable training histories.
+We visualize response surfaces with Independent Gaussian Process Regressors (IGPRs), but compute all quantitative metrics from raw evaluations.
+
+\paragraph{Evaluation and landscape breadth.}
+We evaluate downstream behavior with OGBench's success rate and normalized goal-distance return,
+\[
+    R_{\mathrm{dist}}(s_T,g)=1-\|s_T-g\|_2/\|s_0-g\|_2.
+\]
+Success rate is used for checkpoint selection, while \(R_{\mathrm{dist}}\) is used for landscape visualization and geometry analysis.
+We do not treat \(R_{\mathrm{dist}}\) as an oracle for advantage quality, since the algorithms expose actor-facing advantages with different semantics.
+To measure landscape breadth, we compute the \(\varepsilon\)-optimality mass
+\[
+    \rho_{\varepsilon}(t) = |C|^{-1} \left| \left\{ \lambda\in C: f_t(\lambda)\ge \varepsilon\max_{\lambda'\in C}f_t(\lambda') \right\} \right|.
+\]
+We report \(\rho_{0.9}\) and \(\rho_{0.8}\), which respectively measure robustness of the near-peak region and the broader moderate-performance basin.
+
+\paragraph{AWR concentration diagnostics.}
+To explain why some landscapes are broad while others are sharp, we inspect the actor-side distribution induced by AWR.
+For a logged batch, let \(A_i=A_{\mathrm{alg}}(s_i,a_i,g_i)\), \(z_i=\alpha A_i\), and \(w_i=\min\{\exp(z_i),w_{\max}\}\).
+We partition samples into downweighted, active-unsaturated, and saturated regions using \(z_i<0\), \(0\le z_i\le \log w_{\max}\), and \(z_i>\log w_{\max}\), and track both sample fractions \((p_-,p_{\mathrm{mid}},p_{\mathrm{sat}})\) and normalized weight masses \((W_-,W_{\mathrm{mid}},W_{\mathrm{sat}})\).
+We also measure the normalized effective sample size,
+\[
+    \mathrm{ESS} = \frac{(\sum_i w_i)^2}{B\sum_i w_i^2},
+\]
+where high ESS indicates diffuse weighted cloning and low ESS indicates concentrated actor updates.
+We interpret ESS jointly with return and advantage semantics, since concentration is useful only when the selected samples are reliable actor-facing winners.
+
+\paragraph{Future-vs-random advantage diagnostics.}
+To compare advantage semantics across methods, we use a fixed diagnostic goal table.
+For each anchor transition \((s_i,a_i)\), we sample one future goal \(g_i^+\sim p_{\mathcal D}^{\mathrm{geom}}(\cdot\mid s_i,a_i)\) and \(K=32\) random goals \(g_{ij}^-\sim p_{\mathcal D}^{\mathrm{rand}}\), reusing the same table across algorithms, configurations, seeds, and phases whenever possible.
+We compute
+\[
+    \Delta A_{ij}^{\mathrm{FR}} = A_{\mathrm{alg}}(s_i,a_i,g_i^+) - A_{\mathrm{alg}}(s_i,a_i,g_{ij}^-).
+\]
+This tests whether the actor-facing advantage ranks a dataset-reachable future goal above a random goal for the same anchor transition.
+Before clipping, AWR amplifies this gap through
+\[
+    w_{\alpha}(s_i,a_i,g_i^+)/ w_{\alpha}(s_i,a_i,g_{ij}^-) = \exp(\alpha\Delta A_{ij}^{\mathrm{FR}}).
+\]
+We summarize future-vs-random separation with \(\mathrm{FR\text{-}AUC}=\Pr(\Delta A^{\mathrm{FR}}>0)\) and
+\[
+    \mathrm{EI} = \mathbb{E}[\Delta A^{\mathrm{FR}}]/ \bigl(\mathrm{Std}(\Delta A^{\mathrm{FR}})+\epsilon\bigr).
+\]
+FR-AUC measures whether the gap has the correct sign more often than chance, while EI measures the signal-to-noise ratio of the gap.

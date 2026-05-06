@@ -10,3 +10,11 @@ temp_*/
 tables/
 convergence/
 .worktrees/
+.parquet
+
+# Large RAW-ADV data files — not for version control
+Analysis/RAW-ADV/ENVS/**/*.parquet
+Analysis/RAW-ADV/ENVS/**/*.npz
+Analysis/RAW-ADV/ENVS/**/.*.parquet.*
+Analysis/RAW-ADV/ENVS/**/awr_alpha_sweep.csv
+Analysis/RAW-ADV/Landscape-Plots/combined/*.pdf
