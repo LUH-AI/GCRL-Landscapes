@@ -1,0 +1,12 @@
+# Inputs (rsynced from luis — see README.md "Fetching the data from Luis")
+data/zips/*.zip
+data/parquets/**/*.parquet
+data/eval_stats/*.csv
+data/configurations/*
+
+# Generated outputs
+outputs/*.csv
+
+# Python caches
+__pycache__/
+*.pyc
