@@ -1,0 +1,26 @@
+defaults:
+  - defaults
+  - hydra/sweeper/search_space/mqe
+  - hydra/sweeper/search_space/ddpgbc
+  - smac
+  - launcher
+  - _self_
+  - override hydra/sweeper: HyperSMAC
+  - override hydra/launcher: submitit_slurm
+
+agent_name: "mqe"
+lr: 3e-4
+batch_size: 256
+latent_dim: 512
+discount: 0.995
+components: 8
+const_std: true
+value_p_trajgoal: 1.0
+value_geom_sample: true
+actor_p_trajgoal: 1.0
+actor_p_curgoalshare: 1.0
+actor_geom_sample: false
+alpha: 0.1
+actor_loss: "ddpgbc"
+
+seed: 0

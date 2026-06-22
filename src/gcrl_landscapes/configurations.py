@@ -7,6 +7,7 @@ import ogbench.impls.agents.gciql
 import ogbench.impls.agents.gcivl
 import ogbench.impls.agents.cmd
 import ogbench.impls.agents.gcbc
+import ogbench.impls.agents.mqe
 import ogbench.impls.agents.qrl
 import ogbench.impls.agents.hiql
 import ogbench.impls.agents.sac
@@ -189,6 +190,9 @@ def get_adapted_default_config(
         "hiql": lambda: _adapt_base_config(
             ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
+        "mqe": lambda: _adapt_base_config(
+            ogbench.impls.agents.mqe.get_config().to_dict(), env, actor_loss, normalize_advantages
+        ),
         "qrl": lambda: _adapt_base_config(
             ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
@@ -265,6 +269,13 @@ def generate_configurations(
         "QRL": lambda n: _generate_configurations(
             _adapt_base_config(
                 ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ),
+            n,
+            hyperparameters,
+        ),
+        "MQE": lambda n: _generate_configurations(
+            _adapt_base_config(
+                ogbench.impls.agents.mqe.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
