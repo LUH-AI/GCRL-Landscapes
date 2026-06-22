@@ -28,7 +28,7 @@ import pandas as pd
 import toml
 
 # Agent name prefixes to recognise as valid agent directories.
-_AGENT_PATTERN = re.compile(r"^(CRL|QRL|GCIQL|GCIVL|CMD|GCBC|HIQL|SAC)_")
+_AGENT_PATTERN = re.compile(r"^(CRL|QRL|GCIQL|GCIVL|CMD|GCBC|HIQL|MQE|SAC)_")
 
 _CHECKPOINT_FILENAME = "params_{phase}.pkl"
 

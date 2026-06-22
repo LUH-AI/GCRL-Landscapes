@@ -38,7 +38,7 @@ from gcrl_landscapes.util.datasets import AGENT_CLASSES, create_env_and_dataset
 BATCH_SIZE = 256
 
 # Agents that use AWR actor loss and for which we can compute advantages
-_AWR_AGENTS = {"GCIQL", "CRL", "GCIVL", "QRL", "HIQL"}
+_AWR_AGENTS = {"GCIQL", "CRL", "GCIVL", "QRL", "HIQL", "MQE"}
 
 
 def _sample_fixed_batch(dataset: Any, seed: int = 0) -> dict:
@@ -114,6 +114,32 @@ def _batch_compute_gcivl(
         v = (v1 + v2) / 2
         nv = (nv1 + nv2) / 2
         return (nv - v).reshape(BATCH_SIZE, BATCH_SIZE)
+
+    return np.array(jax.jit(jax.vmap(single))(batched_params))
+
+
+def _batch_compute_mqe(
+    ref_agent: Any,
+    batched_params: Any,
+    obs_rep: jnp.ndarray,
+    act_rep: jnp.ndarray,
+    goals_rep: jnp.ndarray,
+) -> np.ndarray:
+    """Returns (B, N, N) advantages for a batch of B param sets.
+
+    advantage[i,j] = d(psi(s_i), psi(g_j)) - d(phi(s_i,a_i), psi(g_j))
+    i.e. how much closer action a_i brings s_i to g_j vs. the action-free baseline.
+    Ensemble mean is used for both distance terms.
+    """
+
+    def single(params: Any) -> jnp.ndarray:
+        phi_sa = ref_agent.network.select("phi")(obs_rep, act_rep, params=params)
+        psi_s = ref_agent.network.select("psi")(obs_rep, params=params)
+        psi_g = ref_agent.network.select("psi")(goals_rep, params=params)
+        d_sa_g = ref_agent.distance(phi_sa, psi_g)  # (ensemble, N*N)
+        d_s_g = ref_agent.distance(psi_s, psi_g)    # (ensemble, N*N)
+        adv = d_s_g.mean(axis=0) - d_sa_g.mean(axis=0)
+        return adv.reshape(BATCH_SIZE, BATCH_SIZE)
 
     return np.array(jax.jit(jax.vmap(single))(batched_params))
 
@@ -266,6 +292,14 @@ def _process_chunk_frames(
             for i, row in enumerate(rows_chunk):
                 _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
 
+        elif agent_name == "MQE":
+            act_rep = jnp.repeat(jnp.array(batch["actions"]), N, axis=0)
+            adv_batch = _batch_compute_mqe(
+                ref_agent, batched_params, obs_rep, act_rep, goals_rep
+            )
+            for i, row in enumerate(rows_chunk):
+                _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
+
         elif agent_name == "QRL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
             adv_batch = _batch_compute_qrl(
@@ -386,7 +420,7 @@ def generate_advantages(
                             f"Failed to construct agent for {row['checkpoint_path']}: {exc}"
                         )
                         continue
-                    if config.get("actor_loss", "awr") != "awr":
+                    if config.get("actor_loss", "awr") != "awr" and config.get("agent_name") != "mqe":
                         continue
                     chunk.append((row, agent, val_ds))
                     n_constructed += 1

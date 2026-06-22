@@ -10,4 +10,5 @@ sbatch \
   --partition="${CLUSTER_SETUP_PARTITION}" \
   ${CLUSTER_RESERVATION:+--reservation="${CLUSTER_RESERVATION}"} \
   --export=ALL,CLUSTER="${CLUSTER:-luh}" \
+  --workdir="${SCRIPT_DIR}" \
   "${SCRIPT_DIR}/train_all.sh"
