@@ -30,6 +30,7 @@ SUPPORTED_AGENTS = [
     "GCBC",
     "GCIQL",
     "GCIVL",
+    "MQE",
     "QRL",
     "HIQL",
     "SAC",
