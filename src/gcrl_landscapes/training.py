@@ -90,7 +90,7 @@ def train(
         seed,
         example_batch["observations"],
         example_batch["actions"],
-        config,
+        dict(config),
     )
     if agent_path:
         agent = restore_agent(agent, agent_path)
