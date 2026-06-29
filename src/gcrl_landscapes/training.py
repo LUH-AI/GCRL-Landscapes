@@ -434,34 +434,36 @@ def get_metrics(agent, batch):
 
     result: dict = {}
 
-    # --- Phase 1: gradient metrics ---
-    # Compute raw_grads, extract all grad metrics as scalars, then free the device buffer
-    # before allocating the equally-sized update array (both ~256 MB; holding both = OOM).
-    raw_grads = get_grads_standard(agent, batch)
-    total_grads = hiql_combine(raw_grads) if agent_name == 'hiql' else raw_grads
-    available = set(total_grads.keys())
+    # --- Phase 1 & 2: gradient and update metrics ---
+    # MQE's loss is batch-level (samples a stochastic mask over the full batch), so
+    # per-sample gradient computation via chunked_vmap is incompatible. Skip for MQE.
+    if agent_name != 'mqe':
+        # Compute raw_grads, extract all grad metrics as scalars, then free the device buffer
+        # before allocating the equally-sized update array (both ~256 MB; holding both = OOM).
+        raw_grads = get_grads_standard(agent, batch)
+        total_grads = hiql_combine(raw_grads) if agent_name == 'hiql' else raw_grads
+        available = set(total_grads.keys())
 
-    for module_key, name in MODULE_GROUPS:
-        if module_key in available:
-            result.update(grad_group_metrics(name, total_grads[module_key]))
-    if "modules_critic" in available and "modules_value" in available:
-        result.update(grad_group_metrics("critic_value", {"critic": total_grads["modules_critic"], "value": total_grads["modules_value"]}))
+        for module_key, name in MODULE_GROUPS:
+            if module_key in available:
+                result.update(grad_group_metrics(name, total_grads[module_key]))
+        if "modules_critic" in available and "modules_value" in available:
+            result.update(grad_group_metrics("critic_value", {"critic": total_grads["modules_critic"], "value": total_grads["modules_value"]}))
 
-    del raw_grads, total_grads  # reclaim ~256 MB before allocating updates
+        del raw_grads, total_grads  # reclaim ~256 MB before allocating updates
 
-    # --- Phase 2: update metrics ---
-    # get_updates_standard re-derives per-sample grads internally (32-sample chunks),
-    # so no full grad array needs to live alongside the update array.
-    raw_updates = get_updates_standard(agent, batch)
-    total_updates = hiql_combine(raw_updates) if agent_name == 'hiql' else raw_updates
+        # get_updates_standard re-derives per-sample grads internally (32-sample chunks),
+        # so no full grad array needs to live alongside the update array.
+        raw_updates = get_updates_standard(agent, batch)
+        total_updates = hiql_combine(raw_updates) if agent_name == 'hiql' else raw_updates
 
-    for module_key, name in MODULE_GROUPS:
-        if module_key in available:
-            result.update(update_group_metrics(name, total_updates[module_key]))
-    if "modules_critic" in available and "modules_value" in available:
-        result.update(update_group_metrics("critic_value", {"critic": total_updates["modules_critic"], "value": total_updates["modules_value"]}))
+        for module_key, name in MODULE_GROUPS:
+            if module_key in available:
+                result.update(update_group_metrics(name, total_updates[module_key]))
+        if "modules_critic" in available and "modules_value" in available:
+            result.update(update_group_metrics("critic_value", {"critic": total_updates["modules_critic"], "value": total_updates["modules_value"]}))
 
-    del raw_updates, total_updates
+        del raw_updates, total_updates
 
     # --- Other metrics ---
     agent_modules = agent.network.model_def.modules.keys()
