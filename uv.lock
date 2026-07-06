@@ -1764,7 +1764,7 @@ wheels = [
 [[package]]
 name = "ogbench"
 version = "1.2.0"
-source = { git = "https://github.com/CrunchyFlakes/ogbench?branch=master#98dd91d7d8d1694c42bdd59a5f69259be71fddea" }
+source = { git = "https://github.com/CrunchyFlakes/ogbench?branch=master#c47fbd928a2f11632554d4748bcf0d849369f154" }
 dependencies = [
     { name = "distrax", marker = "sys_platform == 'linux'" },
     { name = "dm-control", marker = "sys_platform == 'linux'" },
