@@ -31,7 +31,7 @@ import numpy as np
 import pandas as pd
 import pyarrow as pa
 import pyarrow.parquet as pq
-from ml_collections import FrozenConfigDict
+from ml_collections import ConfigDict
 
 from gcrl_landscapes.util.datasets import AGENT_CLASSES, create_env_and_dataset
 
@@ -56,7 +56,8 @@ def _load_raw_checkpoint(checkpoint_path: Path) -> dict:
 
 def _construct_agent(row: pd.Series, raw_ckpt: dict, dataset_cache: dict) -> tuple:
     """Construct agent from cached dataset + raw checkpoint dict. Main thread only."""
-    config = FrozenConfigDict(json.loads(Path(row["config_path"]).read_text()))
+    # ConfigDict (not FrozenConfigDict): OGBench agents (e.g., MQE) mutate config during create().
+    config = ConfigDict(json.loads(Path(row["config_path"]).read_text()))
     key = (row["dataset"], row["agent"])
     if key not in dataset_cache:
         env, train_ds, val_ds = create_env_and_dataset(
