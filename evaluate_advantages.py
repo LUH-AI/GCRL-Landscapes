@@ -67,6 +67,54 @@ for col in ADV_COLS:
     merged_training_df[col] = merged_training_df[col].apply(literal_lists_to_numpy)
 
 # %%
+# eval_step -> phase_num mapping. Used across multiple sections below regardless of
+# whether ADV_COLS is populated (e.g. the oracle advantage computation needs it too),
+# so it is computed unconditionally rather than nested inside an `if ADV_COLS` guard.
+phase_map = pd.DataFrame(
+    columns=["hp.agent_name", "dataset", "config_index", "eval_step", "phase_num"]
+)
+phase_map_simple = pd.DataFrame(
+    columns=["hp.agent_name", "dataset", "eval_step", "phase_num"]
+)
+if merged_results_df is not None:
+    phase_map = merged_results_df[
+        ["hp.agent_name", "dataset", "config_index", "eval_step", "phase_num"]
+    ].drop_duplicates()
+
+    _phase_boundaries = (
+        phase_map.groupby(["hp.agent_name", "dataset", "eval_step"])["phase_num"]
+        .first()
+        .reset_index()
+        .sort_values(["hp.agent_name", "dataset", "eval_step"])
+    )
+    _all_train_steps = (
+        merged_training_df[["hp.agent_name", "dataset", "eval_step"]]
+        .drop_duplicates()
+        .sort_values(["hp.agent_name", "dataset", "eval_step"])
+    )
+    _parts = []
+    for (_agent, _dataset), _grp in _all_train_steps.groupby(["hp.agent_name", "dataset"]):
+        _bounds = _phase_boundaries[
+            (_phase_boundaries["hp.agent_name"] == _agent)
+            & (_phase_boundaries["dataset"] == _dataset)
+        ].sort_values("eval_step")
+        if _bounds.empty:
+            continue
+        _parts.append(
+            pd.merge_asof(
+                _grp.sort_values("eval_step"),
+                _bounds[["eval_step", "phase_num"]],
+                on="eval_step",
+                direction="forward",
+            )
+        )
+    phase_map_simple = (
+        pd.concat(_parts, ignore_index=True).dropna(subset=["phase_num"])
+        if _parts
+        else pd.DataFrame(columns=["hp.agent_name", "dataset", "eval_step", "phase_num"])
+    )
+
+# %%
 # Filter to end of training only
 end_of_training_df = merged_training_df[
     merged_training_df["eval_step"]
@@ -438,10 +486,6 @@ if ADV_COLS and merged_results_df is not None:
 # limited to those phase-boundary steps — this is a structural property of the zip format,
 # not a filtering bug.
 if ADV_COLS and merged_results_df is not None:
-    phase_map = merged_results_df[
-        ["hp.agent_name", "dataset", "config_index", "eval_step", "phase_num"]
-    ].drop_duplicates()
-
     rows_all = []
     for _, row in merged_training_df.iterrows():
         for adv_col in ADV_COLS:
@@ -749,42 +793,6 @@ if ADV_COLS and merged_results_df is not None:
 # Measures how consistent the relative ordering of batch samples is across different configs/seeds
 if ADV_COLS and merged_results_df is not None:
     from scipy.stats import spearmanr as _spearmanr, kendalltau as _kendalltau
-
-    # Assign a phase_num to every eval_step in merged_training_df via forward merge_asof:
-    # each eval_step maps to the phase whose end-boundary is >= that step.
-    # This covers intermediate (non-boundary) eval_steps, not just phase-boundary ones.
-    _phase_boundaries = (
-        phase_map.groupby(["hp.agent_name", "dataset", "eval_step"])["phase_num"]
-        .first()
-        .reset_index()
-        .sort_values(["hp.agent_name", "dataset", "eval_step"])
-    )
-    _all_train_steps = (
-        merged_training_df[["hp.agent_name", "dataset", "eval_step"]]
-        .drop_duplicates()
-        .sort_values(["hp.agent_name", "dataset", "eval_step"])
-    )
-    _parts = []
-    for (_agent, _dataset), _grp in _all_train_steps.groupby(["hp.agent_name", "dataset"]):
-        _bounds = _phase_boundaries[
-            (_phase_boundaries["hp.agent_name"] == _agent)
-            & (_phase_boundaries["dataset"] == _dataset)
-        ].sort_values("eval_step")
-        if _bounds.empty:
-            continue
-        _parts.append(
-            pd.merge_asof(
-                _grp.sort_values("eval_step"),
-                _bounds[["eval_step", "phase_num"]],
-                on="eval_step",
-                direction="forward",
-            )
-        )
-    phase_map_simple = (
-        pd.concat(_parts, ignore_index=True).dropna(subset=["phase_num"])
-        if _parts
-        else pd.DataFrame(columns=["hp.agent_name", "dataset", "eval_step", "phase_num"])
-    )
 
     spearman_records = []
 
