@@ -207,6 +207,7 @@ def _build_rows(
     row: pd.Series,
     actor_name: str,
     adv_matrix: np.ndarray,
+    actor_loss: str = "awr",
     batch_idx: int = 0,
 ) -> pd.DataFrame:
     """Flatten NxN advantage matrix into a per-(obs_idx, goal_idx) DataFrame.
@@ -231,6 +232,7 @@ def _build_rows(
             "phase": _const_cat(row["phase"]),
             "seed": _const_cat(row["seed"]),
             "configuration": _const_cat(row["configuration"]),
+            "actor_loss": _const_cat(actor_loss),
             "actor": _const_cat(actor_name),
             "batch_idx": _const_cat(batch_idx),
             "obs_idx": pd.Categorical(obs_idxs),
@@ -267,6 +269,7 @@ def _process_chunk_frames(
     """
     ref_agent = chunk[0][1]
     rows_chunk = [c[0] for c in chunk]
+    actor_losses = [c[3] for c in chunk]
 
     N = BATCH_SIZE
     obs_rep = jnp.repeat(jnp.array(batch["observations"]), N, axis=0)
@@ -284,7 +287,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, act_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
+                _emit_df(_build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx), writer, frames)
 
         elif agent_name == "GCIVL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -292,7 +295,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
+                _emit_df(_build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx), writer, frames)
 
         elif agent_name == "MQE":
             act_rep = jnp.repeat(jnp.array(batch["actions"]), N, axis=0)
@@ -300,7 +303,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, act_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
+                _emit_df(_build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx), writer, frames)
 
         elif agent_name == "QRL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -308,7 +311,7 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i], batch_idx), writer, frames)
+                _emit_df(_build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx), writer, frames)
 
         elif agent_name == "HIQL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -320,7 +323,7 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    _emit_df(_build_rows(row, "low_actor", adv_low_batch[i], batch_idx), writer, frames)
+                    _emit_df(_build_rows(row, "low_actor", adv_low_batch[i], actor_losses[i], batch_idx), writer, frames)
             if has_high:
                 targets_rep = jnp.repeat(
                     jnp.array(batch["high_actor_targets"]), N, axis=0
@@ -330,7 +333,7 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    _emit_df(_build_rows(row, "high_actor", adv_high_batch[i], batch_idx), writer, frames)
+                    _emit_df(_build_rows(row, "high_actor", adv_high_batch[i], actor_losses[i], batch_idx), writer, frames)
 
     except Exception as exc:
         for row in rows_chunk:
@@ -422,9 +425,10 @@ def generate_advantages(
                             f"Failed to construct agent for {row['checkpoint_path']}: {exc}"
                         )
                         continue
-                    if config.get("actor_loss", "awr") != "awr" and config.get("agent_name") != "mqe":
+                    actor_loss = config.get("actor_loss", "awr")
+                    if actor_loss not in ("awr", "ddpgbc") and config.get("agent_name") != "mqe":
                         continue
-                    chunk.append((row, agent, val_ds))
+                    chunk.append((row, agent, val_ds, actor_loss))
                     n_constructed += 1
 
                 if not chunk:
@@ -451,6 +455,7 @@ def generate_advantages(
                         first_df = _build_rows(
                             good[0][0], "actor",
                             np.zeros((BATCH_SIZE, BATCH_SIZE), dtype=np.float32),
+                            good[0][3],
                             batch_idx=0,
                         )
                         schema = pa.Schema.from_pandas(first_df, preserve_index=False)
