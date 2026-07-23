@@ -335,6 +335,23 @@ def _ensemble_td_advantage(agent, obs, next_obs, goals):
     return nv - v, v, nv
 
 
+def _mqe_advantage(agent, batch):
+    """adv = q - v  — used by MQE.
+
+    Mirrors MQEAgent.actor_loss's AWR branch (ogbench/impls/agents/mqe.py):
+    v = min over ensemble of -distance(psi(s), psi(g)),
+    q = min over ensemble of -distance(phi(s,a), psi(g)).
+    """
+    psi_s = agent.network.select('psi')(batch['observations'])
+    psi_g = agent.network.select('psi')(batch['actor_goals'])
+    phi = agent.network.select('phi')(batch['observations'], batch['actions'])
+    v1, v2 = -agent.distance(psi_s, psi_g)
+    v = jax.numpy.minimum(v1, v2)
+    q1, q2 = -agent.distance(phi, psi_g)
+    q = jax.numpy.minimum(q1, q2)
+    return q - v, v, q
+
+
 def get_advantage_metrics(agent, batch) -> dict:
     """Compute per-sample advantage values on a fixed batch for logging."""
     if agent.config.get('actor_loss') != 'awr':
@@ -378,6 +395,12 @@ def get_advantage_metrics(agent, batch) -> dict:
         result['advantage/high_actor'] = adv_high.tolist()
         result['value/high_actor_v'] = v_high.tolist()
         result['value/high_actor_nv'] = nv_high.tolist()
+
+    elif agent_name == 'mqe':
+        adv, v, q = _mqe_advantage(agent, batch)
+        result['advantage/actor'] = adv.tolist()
+        result['value/actor_v'] = v.tolist()
+        result['value/actor_q'] = q.tolist()
 
     # GCBC / SAC / CMD / CRL-ddpgbc: no advantage → empty dict
     return result

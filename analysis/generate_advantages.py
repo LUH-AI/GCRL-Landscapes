@@ -128,19 +128,20 @@ def _batch_compute_mqe(
 ) -> np.ndarray:
     """Returns (B, N, N) advantages for a batch of B param sets.
 
-    advantage[i,j] = d(psi(s_i), psi(g_j)) - d(phi(s_i,a_i), psi(g_j))
-    i.e. how much closer action a_i brings s_i to g_j vs. the action-free baseline.
-    Ensemble mean is used for both distance terms.
+    advantage[i,j] = q(s_i,a_i,g_j) - v(s_i,g_j), mirroring MQEAgent.actor_loss's
+    AWR branch (ogbench/impls/agents/mqe.py): v = min over ensemble of
+    -distance(psi(s), psi(g)), q = min over ensemble of -distance(phi(s,a), psi(g)).
     """
 
     def single(params: Any) -> jnp.ndarray:
         phi_sa = ref_agent.network.select("phi")(obs_rep, act_rep, params=params)
         psi_s = ref_agent.network.select("psi")(obs_rep, params=params)
         psi_g = ref_agent.network.select("psi")(goals_rep, params=params)
-        d_sa_g = ref_agent.distance(phi_sa, psi_g)  # (ensemble, N*N)
-        d_s_g = ref_agent.distance(psi_s, psi_g)    # (ensemble, N*N)
-        adv = d_s_g.mean(axis=0) - d_sa_g.mean(axis=0)
-        return adv.reshape(BATCH_SIZE, BATCH_SIZE)
+        v1, v2 = -ref_agent.distance(psi_s, psi_g)
+        v = jnp.minimum(v1, v2)
+        q1, q2 = -ref_agent.distance(phi_sa, psi_g)
+        q = jnp.minimum(q1, q2)
+        return (q - v).reshape(BATCH_SIZE, BATCH_SIZE)
 
     return np.array(jax.jit(jax.vmap(single))(batched_params))
 
