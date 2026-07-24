@@ -11,6 +11,7 @@ import ogbench.impls.agents.mqe
 import ogbench.impls.agents.qrl
 import ogbench.impls.agents.hiql
 import ogbench.impls.agents.sac
+from .agents import fql
 import warnings
 import numpy as np
 import logging
@@ -30,6 +31,9 @@ AWR_TEMPERATURE_UPPER = 30.0
 
 DDPGBC_BC_COEFF_LOWER = 0.0
 DDPGBC_BC_COEFF_UPPER = 1.0
+
+FQL_DISTILL_WEIGHT_LOWER = 1.0
+FQL_DISTILL_WEIGHT_UPPER = 300.0
 
 EPS_QRL_LOWER = 0.0
 EPS_QRL_UPPER = 1.0
@@ -51,7 +55,9 @@ SUPPORTED_HPS = set(
 )
 
 
-def get_bounds(hp_name: str, agent: str, actor_loss: str | None = None) -> tuple[float, float, bool]:
+def get_bounds(
+    hp_name: str, agent: str, actor_loss: str | None = None
+) -> tuple[float, float, bool]:
     """Get boundaries for hyperparameter-name and agent
 
     Args:
@@ -74,6 +80,10 @@ def get_bounds(hp_name: str, agent: str, actor_loss: str | None = None) -> tuple
     elif hp_name.lower() == "alpha":
         if actor_loss == "ddpgbc":
             return DDPGBC_BC_COEFF_LOWER, DDPGBC_BC_COEFF_UPPER, False
+        if actor_loss == "fql" or agent.lower() == "fql":
+            # FQL's alpha is the distillation weight, a different quantity
+            # from the AWR temperature or the DDPG+BC coefficient.
+            return FQL_DISTILL_WEIGHT_LOWER, FQL_DISTILL_WEIGHT_UPPER, True
         return AWR_TEMPERATURE_LOWER, AWR_TEMPERATURE_UPPER, False
     elif hp_name.lower() == "low_alpha":
         return AWR_TEMPERATURE_LOWER, AWR_TEMPERATURE_UPPER, False
@@ -169,35 +179,68 @@ def get_config_space(agent: str) -> ConfigurationSpace:
 
 
 def get_adapted_default_config(
-    agent: str, env: str, actor_loss: str | None = None, normalize_advantages: bool = False
+    agent: str,
+    env: str,
+    actor_loss: str | None = None,
+    normalize_advantages: bool = False,
 ) -> FrozenConfigDict:
     agent_config_generators = {
         "crl": lambda: _adapt_base_config(
-            ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.crl.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
         ),
         "cmd": lambda: _adapt_base_config(
-            ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.cmd.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
         ),
         "gcbc": lambda: _adapt_base_config(
-            ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.gcbc.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
         ),
         "gciql": lambda: _adapt_base_config(
-            ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.gciql.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
         ),
         "gcivl": lambda: _adapt_base_config(
-            ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.gcivl.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
+        ),
+        "fql": lambda: _adapt_base_config(
+            fql.get_config().to_dict(), env, actor_loss, normalize_advantages
         ),
         "hiql": lambda: _adapt_base_config(
-            ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.hiql.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
         ),
         "mqe": lambda: _adapt_base_config(
-            ogbench.impls.agents.mqe.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.mqe.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
         ),
         "qrl": lambda: _adapt_base_config(
-            ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.qrl.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
         ),
         "sac": lambda: _adapt_base_config(
-            ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss, normalize_advantages
+            ogbench.impls.agents.sac.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
         ),
     }
     return FrozenConfigDict(initial_dictionary=agent_config_generators[agent.lower()]())
@@ -221,25 +264,37 @@ def generate_configurations(
     agent_config_generators = {
         "CRL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.crl.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.crl.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             ),
             n,
             hyperparameters,
         ),
         "CMD": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.cmd.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.cmd.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             ),
             n,
             hyperparameters,
         ),
         "GCBC": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.gcbc.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             )
             if "discount" not in hyperparameters
             else _adapt_base_config(
-                ogbench.impls.agents.gcbc.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.gcbc.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             )
             | {"actor_geom_sample": True},
             n,
@@ -247,42 +302,67 @@ def generate_configurations(
         ),
         "GCIQL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.gciql.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.gciql.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             ),
             n,
             hyperparameters,
         ),
         "GCIVL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.gcivl.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.gcivl.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
+            ),
+            n,
+            hyperparameters,
+        ),
+        "FQL": lambda n: _generate_configurations(
+            _adapt_base_config(
+                fql.get_config().to_dict(), env, actor_loss, normalize_advantages
             ),
             n,
             hyperparameters,
         ),
         "HIQL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.hiql.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.hiql.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             ),
             n,
             hyperparameters,
         ),
         "QRL": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.qrl.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.qrl.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             ),
             n,
             hyperparameters,
         ),
         "MQE": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.mqe.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.mqe.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             ),
             n,
             hyperparameters,
         ),
         "SAC": lambda n: _generate_configurations(
             _adapt_base_config(
-                ogbench.impls.agents.sac.get_config().to_dict(), env, actor_loss, normalize_advantages
+                ogbench.impls.agents.sac.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
             ),
             n,
             hyperparameters,
@@ -340,20 +420,28 @@ def _generate_configurations(base_config: dict, n: int, hyperparameters: set[str
     actor_p_randomgoals = list(
         np.ones(len(actor_p_trajgoals)) - np.array(actor_p_trajgoals)
     )
-    # Set alpha hyperparameter (AWR temperature or ddpgbc bc coefficient)
+    # Set alpha hyperparameter (AWR temperature, FQL distillation weight, or
+    # ddpgbc bc coefficient)
     ## may be unused if algorithm uses ddpgbc
-    awr_temperatures = (
-        _scale_to_range(
+    if "alpha" in hyperparameters and actor_loss == "fql":
+        # FQL's alpha is the distillation weight with its own log-scale range.
+        awr_temperatures = _scale_to_range(
+            random_values_per_hp.pop(),
+            FQL_DISTILL_WEIGHT_LOWER,
+            FQL_DISTILL_WEIGHT_UPPER,
+            True,
+        )
+    elif "alpha" in hyperparameters and actor_loss != "ddpgbc":
+        awr_temperatures = _scale_to_range(
             random_values_per_hp.pop(),
             AWR_TEMPERATURE_LOWER,
             AWR_TEMPERATURE_UPPER,
             False,
         )
-        if "alpha" in hyperparameters and actor_loss != "ddpgbc"
-        else _generate_dummy_list(
+    else:
+        awr_temperatures = _generate_dummy_list(
             n, base_config["alpha"] if "alpha" in base_config else None
         )
-    )
     awr_temperatures_low_level_policy = (
         _scale_to_range(
             random_values_per_hp.pop(),
@@ -499,11 +587,16 @@ def _generate_dummy_list(n: int, val: object) -> list[object]:
     return [val] * n
 
 
-def _adapt_base_config(config: dict, env: str, actor_loss: str | None, normalize_advantages: bool = False) -> dict:
+def _adapt_base_config(
+    config: dict, env: str, actor_loss: str | None, normalize_advantages: bool = False
+) -> dict:
     visual = "visual" in env or "powderworld" in env
     discrete = "powderworld" in env
     # [TODO: name GCBCs loss properly. For now it says AWR]
-    if not actor_loss:
+    if config.get("agent_name", "").lower() == "fql":
+        # FQL has its own actor objective; never overwrite it with awr/ddpgbc.
+        awr = ddpgbc = False
+    elif not actor_loss:
         awr = config["agent_name"].lower() in ["gciql", "gcivl", "hiql", "gcbc"] or (
             discrete or config.get("actor_loss", "") == "awr" or actor_loss == "awr"
         )
@@ -519,7 +612,14 @@ def _adapt_base_config(config: dict, env: str, actor_loss: str | None, normalize
         ("alpha", 3.0, awr),
         ("actor_loss", "ddpgbc", ddpgbc),
         ("low_actor_rep_grad", True, hiql_grad_propagation),
-        ("normalize_advantages", True, normalize_advantages and "normalize_advantages" in config),
+        (
+            "normalize_advantages",
+            True,
+            normalize_advantages and "normalize_advantages" in config,
+        ),
+        # Rebuttal-experiment knobs; defaults preserve the original behavior.
+        ("n_step", 1, "n_step" not in config),
+        ("rejection_sampling_n", 0, "rejection_sampling_n" not in config),
     ]
     return config | {
         key: value for key, value, condition in key_value_pairs if condition
