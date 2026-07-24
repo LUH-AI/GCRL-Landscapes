@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 SUPPORTED_AGENTS = [
     "CRL",
     "CMD",
+    "FQL",
     "GCBC",
     "GCIQL",
     "GCIVL",
@@ -281,10 +282,10 @@ def run_config(
         MQEAgent,
         QRLAgent,
         HIQLAgent,
-        GCIQLAgent,
-        GCIVLAgent,
         SACAgent,
     )
+    from .agents import FQLAgent, NStepGCIQLAgent, NStepGCIVLAgent
+    from .util.datasets import NStepGCDataset
     import jax
     from .util.misc import jax_has_gpu
 
@@ -296,9 +297,11 @@ def run_config(
     AGENT_CLASSES = {
         "CRL": CRLAgent,
         "CMD": CMDAgent,
+        "FQL": FQLAgent,
         "GCBC": GCBCAgent,
-        "GCIQL": GCIQLAgent,
-        "GCIVL": GCIVLAgent,
+        # n-step subclasses fall back to base behavior when n_step <= 1.
+        "GCIQL": NStepGCIQLAgent,
+        "GCIVL": NStepGCIVLAgent,
         "MQE": MQEAgent,
         "QRL": QRLAgent,
         "HIQL": HIQLAgent,
@@ -307,6 +310,7 @@ def run_config(
     DATASET_CLASSES = {
         "CRL": GCDataset,
         "CMD": GCDataset,
+        "FQL": GCDataset,
         "GCBC": GCDataset,
         "GCIQL": GCDataset,
         "GCIVL": GCDataset,
@@ -370,9 +374,13 @@ def run_config(
         configuration = FrozenConfigDict(json.loads(f.read()))
 
     def dataset_constructor(dataset_raw):
-        return DATASET_CLASSES[setup["agent"]](
-            Dataset.create(**dataset_raw), configuration
-        )
+        dataset_class = DATASET_CLASSES[setup["agent"]]
+        if int(configuration.get("n_step", 1)) > 1:
+            assert setup["agent"] in ("GCIQL", "GCIVL"), (
+                f"n_step > 1 is only supported for GCIQL and GCIVL, got {setup['agent']}"
+            )
+            dataset_class = NStepGCDataset
+        return dataset_class(Dataset.create(**dataset_raw), configuration)
 
     ## mix in explore and cache it if wanted
     explore_mix_match = re.fullmatch(
