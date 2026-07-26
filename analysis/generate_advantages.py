@@ -38,7 +38,7 @@ from gcrl_landscapes.util.datasets import AGENT_CLASSES, create_env_and_dataset
 BATCH_SIZE = 256
 
 # Agents that use AWR actor loss and for which we can compute advantages
-_AWR_AGENTS = {"GCIQL", "CRL", "GCIVL", "QRL", "HIQL", "MQE"}
+_AWR_AGENTS = {"GCIQL", "CRL", "GCIVL", "QRL", "HIQL", "MQE", "FQL"}
 
 
 def _sample_fixed_batch(dataset: Any, seed: int = 0) -> dict:
@@ -281,13 +281,17 @@ def _process_chunk_frames(
     )
 
     try:
-        if agent_name in ("GCIQL", "CRL"):
+        if agent_name in ("GCIQL", "CRL", "FQL"):
             act_rep = jnp.repeat(jnp.array(batch["actions"]), N, axis=0)
             adv_batch = _batch_compute_gciql_crl(
                 ref_agent, batched_params, obs_rep, act_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx), writer, frames)
+                _emit_df(
+                    _build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx),
+                    writer,
+                    frames,
+                )
 
         elif agent_name == "GCIVL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -295,7 +299,11 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx), writer, frames)
+                _emit_df(
+                    _build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx),
+                    writer,
+                    frames,
+                )
 
         elif agent_name == "MQE":
             act_rep = jnp.repeat(jnp.array(batch["actions"]), N, axis=0)
@@ -303,7 +311,11 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, act_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx), writer, frames)
+                _emit_df(
+                    _build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx),
+                    writer,
+                    frames,
+                )
 
         elif agent_name == "QRL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -311,7 +323,11 @@ def _process_chunk_frames(
                 ref_agent, batched_params, obs_rep, nobs_rep, goals_rep
             )
             for i, row in enumerate(rows_chunk):
-                _emit_df(_build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx), writer, frames)
+                _emit_df(
+                    _build_rows(row, "actor", adv_batch[i], actor_losses[i], batch_idx),
+                    writer,
+                    frames,
+                )
 
         elif agent_name == "HIQL":
             nobs_rep = jnp.repeat(jnp.array(batch["next_observations"]), N, axis=0)
@@ -323,7 +339,17 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, nobs_rep, low_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    _emit_df(_build_rows(row, "low_actor", adv_low_batch[i], actor_losses[i], batch_idx), writer, frames)
+                    _emit_df(
+                        _build_rows(
+                            row,
+                            "low_actor",
+                            adv_low_batch[i],
+                            actor_losses[i],
+                            batch_idx,
+                        ),
+                        writer,
+                        frames,
+                    )
             if has_high:
                 targets_rep = jnp.repeat(
                     jnp.array(batch["high_actor_targets"]), N, axis=0
@@ -333,7 +359,17 @@ def _process_chunk_frames(
                     ref_agent, batched_params, obs_rep, targets_rep, high_goals_rep
                 )
                 for i, row in enumerate(rows_chunk):
-                    _emit_df(_build_rows(row, "high_actor", adv_high_batch[i], actor_losses[i], batch_idx), writer, frames)
+                    _emit_df(
+                        _build_rows(
+                            row,
+                            "high_actor",
+                            adv_high_batch[i],
+                            actor_losses[i],
+                            batch_idx,
+                        ),
+                        writer,
+                        frames,
+                    )
 
     except Exception as exc:
         for row in rows_chunk:
@@ -371,10 +407,13 @@ def generate_advantages(
     for idx, row in eligible:
         by_agent_dataset[(row["agent"], row["dataset"])].append((idx, row))
 
-    total_chunks = sum(
-        math.ceil(len(group_rows) / chunk_size)
-        for group_rows in by_agent_dataset.values()
-    ) * n_batches
+    total_chunks = (
+        sum(
+            math.ceil(len(group_rows) / chunk_size)
+            for group_rows in by_agent_dataset.values()
+        )
+        * n_batches
+    )
 
     dataset_cache: dict = {}
     frames: list[pd.DataFrame] | None = None if output_path is not None else []
@@ -408,7 +447,9 @@ def generate_advantages(
                         try:
                             raw_ckpts[idx] = future.result()
                         except Exception as exc:
-                            warnings.warn(f"Failed to read checkpoint for row {idx}: {exc}")
+                            warnings.warn(
+                                f"Failed to read checkpoint for row {idx}: {exc}"
+                            )
 
                 # Sequential construction (JAX, main thread); free raw pkl immediately
                 chunk: list[tuple] = []
@@ -426,7 +467,10 @@ def generate_advantages(
                         )
                         continue
                     actor_loss = config.get("actor_loss", "awr")
-                    if actor_loss not in ("awr", "ddpgbc") and config.get("agent_name") != "mqe":
+                    if (
+                        actor_loss not in ("awr", "ddpgbc", "fql")
+                        and config.get("agent_name") != "mqe"
+                    ):
                         continue
                     chunk.append((row, agent, val_ds, actor_loss))
                     n_constructed += 1
@@ -440,7 +484,9 @@ def generate_advantages(
                     ref_shape = _param_shape_key(chunk[0][1].network.params)
 
                 good = [
-                    c for c in chunk if _param_shape_key(c[1].network.params) == ref_shape
+                    c
+                    for c in chunk
+                    if _param_shape_key(c[1].network.params) == ref_shape
                 ]
                 skipped = len(chunk) - len(good)
                 if skipped:
@@ -453,7 +499,8 @@ def generate_advantages(
                     # Lazily open writer on first successful batch to infer schema
                     if output_path is not None and writer is None:
                         first_df = _build_rows(
-                            good[0][0], "actor",
+                            good[0][0],
+                            "actor",
                             np.zeros((BATCH_SIZE, BATCH_SIZE), dtype=np.float32),
                             good[0][3],
                             batch_idx=0,
@@ -466,7 +513,9 @@ def generate_advantages(
                     val_ds = good[0][2]
                     for b_idx in range(n_batches):
                         batch = _sample_fixed_batch(val_ds, seed=b_idx)
-                        _process_chunk_frames(agent_name, good, batch, b_idx, writer, frames)
+                        _process_chunk_frames(
+                            agent_name, good, batch, b_idx, writer, frames
+                        )
                         outer_iter.update(1)
                         outer_iter.set_postfix(n=n_constructed, refresh=False)
 

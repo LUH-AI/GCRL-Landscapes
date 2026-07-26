@@ -1,0 +1,38 @@
+{
+  "_comment": "Registry of result campaigns. Every campaign entry declares where its raw zip lives, which agents/variant it contains, and where its derived eval-stats CSV and advantage parquet land. paper-metrics/scripts/_common.py reads this file; the module-level ENVS/AGENTS/ZIP_NAMES constants are derived from `default_campaign`, so the paper tables keep reproducing unchanged. To onboard incoming results (DDPG+BC, n-step TD, FQL, rejection sampling), add a campaign entry, drop the zip in data/zips/, build its eval stats with scripts/build_eval_stats.py --variant <tag>, and pass campaign=<name> to the loaders.",
+  "default_campaign": "awr-fixed-batch",
+  "campaigns": {
+    "awr-fixed-batch": {
+      "variant": "awr",
+      "agents": ["CRL", "GCIQL", "GCIVL", "QRL"],
+      "dir_suffix": "64c_lr-alpha",
+      "hyperparameters": ["lr", "alpha"],
+      "envs": {
+        "antmaze-medium": {
+          "dataset_tag": "antmaze-medium-navigate-v0",
+          "zip": "2026-04-26-logs-advantage-antmaze-medium-fixed-batch.zip",
+          "eval_stats": "antmaze-medium.csv",
+          "parquet": "antmaze-medium/advantages.parquet"
+        },
+        "antmaze-large": {
+          "dataset_tag": "antmaze-large-navigate-v0",
+          "zip": "2026-04-30-logs-advantage-antmaze-large-single-fixed-batch.zip",
+          "eval_stats": "antmaze-large.csv",
+          "parquet": "antmaze-large/advantages.parquet"
+        },
+        "cube": {
+          "dataset_tag": "cube-single-play-v0",
+          "zip": "2026-04-27-logs-advantage-cube-single-fixed-batch.zip",
+          "eval_stats": "cube.csv",
+          "parquet": "cube/advantages.parquet"
+        },
+        "scene": {
+          "dataset_tag": "scene-play-v0",
+          "zip": "2026-05-03-logs-advantage-scene-single-fixed-batch.zip",
+          "eval_stats": "scene.csv",
+          "parquet": "scene/advantages.parquet"
+        }
+      }
+    }
+  }
+}

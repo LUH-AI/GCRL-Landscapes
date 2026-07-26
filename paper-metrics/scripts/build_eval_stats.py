@@ -39,7 +39,7 @@ from pathlib import Path
 
 import pandas as pd
 
-AGENTS = ["CRL", "GCIQL", "GCIVL", "QRL"]
+DEFAULT_AGENTS = "CRL,GCIQL,GCIVL,QRL"
 
 
 def main() -> None:
@@ -57,11 +57,31 @@ def main() -> None:
         help="Env tag used in directory names (e.g. antmaze-large-navigate-v0)",
     )
     parser.add_argument("--out", type=Path, required=True, help="Output CSV path")
+    parser.add_argument(
+        "--agents",
+        type=str,
+        default=DEFAULT_AGENTS,
+        help="Comma-separated agent-directory prefixes (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--dir-suffix",
+        type=str,
+        default="64c_lr-alpha",
+        help="Suffix of the agent directories (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--variant",
+        type=str,
+        default=None,
+        help="Optional variant tag (e.g. ddpgbc, nstep3, fql, rs32); when "
+        "given, an extra 'variant' column is written so campaigns can be "
+        "concatenated without ambiguity",
+    )
     args = parser.parse_args()
 
     rows = []
-    for agent in AGENTS:
-        agent_dir = args.logs / f"{agent}_{args.env}_64c_lr-alpha"
+    for agent in [a.strip() for a in args.agents.split(",") if a.strip()]:
+        agent_dir = args.logs / f"{agent}_{args.env}_{args.dir_suffix}"
         if not agent_dir.exists():
             print(f"  [skip] {agent_dir.name} not found")
             continue
@@ -142,6 +162,8 @@ def main() -> None:
                     )
 
     df = pd.DataFrame(rows)
+    if args.variant:
+        df["variant"] = args.variant
     args.out.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(args.out, index=False)
     print(f"\nSaved {len(df)} rows → {args.out}")
