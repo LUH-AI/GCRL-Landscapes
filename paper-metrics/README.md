@@ -285,3 +285,42 @@ If a CSV under `outputs/` disagrees with the paper:
 - `compute_ess_table.py` is incompatible with newer pandas (uses
   `include_groups`). `t3_antmaze_ess.py` does not use it; it computes ESS
   directly via `compute_merged_df`.
+
+## Extending the benchmark to incoming results
+
+Campaigns are declared in `data/manifest.json`; the paper's AWR fixed-batch
+sweep is the `default_campaign`, and all constants in `scripts/_common.py`
+derive from it, so existing tables never change. To onboard a new result
+family (DDPG+BC, n-step TD, FQL, rejection sampling, ...):
+
+1. Drop the campaign zip(s) in `data/zips/`. The expected layout is the
+   same as the existing zips: `<AGENT>_<dataset>_<suffix>/` with
+   `configurations/configuration_*.json` and
+   `run_logs/configuration_*/phase_*/seed_*/eval_log.csv`.
+2. Add a campaign entry to `data/manifest.json`: agents, dir suffix,
+   per-env dataset tag / zip / eval_stats filename / parquet path.
+3. Build its eval stats with a variant tag so rows are self-describing:
+
+   ```bash
+   python scripts/build_eval_stats.py \
+       --logs /tmp/trees/<unzipped-tree> --env <dataset-tag> \
+       --agents GCIQL,CRL,QRL --dir-suffix 32c_lr-alpha \
+       --variant ddpgbc \
+       --out data/eval_stats/<env>-ddpgbc.csv
+   ```
+
+4. Eval-stats-driven analyses (t1-style landscape tables, rl1/rl2/rl4/rl5)
+   run on the new campaign via `load_all_eval_stats(campaign="<name>")` —
+   no script edits.
+5. Advantage-side analyses additionally need the campaign's
+   `advantages.parquet`, generated on the cluster by
+   `analysis/catalog_checkpoints.py` + `analysis/generate_advantages.py`
+   against the checkpoint tree. Supported there: AWR and DDPG+BC variants
+   of GCIQL/CRL/GCIVL/QRL/HIQL, MQE, n-step GCIQL/GCIVL (same class names),
+   and FQL (GCIQL-identical critic). The parquet's `actor_loss` column
+   distinguishes extractor families.
+
+Semantic caution when comparing across campaigns: `alpha` is the AWR
+temperature in the default campaign, a BC coefficient under DDPG+BC, and a
+distillation weight under FQL — same column name, different quantity. Keep
+the `variant` column in any concatenated table.

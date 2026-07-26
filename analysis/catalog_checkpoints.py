@@ -28,7 +28,7 @@ import pandas as pd
 import toml
 
 # Agent name prefixes to recognise as valid agent directories.
-_AGENT_PATTERN = re.compile(r"^(CRL|QRL|GCIQL|GCIVL|CMD|GCBC|HIQL|MQE|SAC)_")
+_AGENT_PATTERN = re.compile(r"^(CRL|QRL|GCIQL|GCIVL|CMD|FQL|GCBC|HIQL|MQE|SAC)_")
 
 _CHECKPOINT_FILENAME = "params_{phase}.pkl"
 
@@ -166,7 +166,9 @@ def catalog_checkpoints(logdir: pathlib.Path) -> pd.DataFrame:
                 )
                 if checkpoint_path.is_file():
                     config_path = str(
-                        agent_dir / "configurations" / f"configuration_{config_idx}.json"
+                        agent_dir
+                        / "configurations"
+                        / f"configuration_{config_idx}.json"
                     )
                     rows.append(
                         {
