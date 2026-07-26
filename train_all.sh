@@ -86,6 +86,8 @@ declare -a -r environments=(
 #   export JAX_COMPILATION_CACHE_DIR="${BIGWORK}/jax_cache"
 # fi
 
+declare -a submitted_job_ids=()
+
 for environment in "${environments[@]}"; do
   echo "Starting jobs for ${environment}"
   for agent in "${agents[@]}"; do
@@ -105,7 +107,7 @@ for environment in "${environments[@]}"; do
       --final_step_is_phase \
       --actor_loss "$actorloss" \
       $([ "$normalizeadvantages" = "true" ] && echo "--normalize_advantages")
-    python -m gcrl_landscapes.main submit \
+    submit_output=$(python -m gcrl_landscapes.main submit \
       --logdir "$full_log_dir" \
       --n_seeds "$nseeds" \
       --tasks_per_node_total "$taskspernodetotal" \
@@ -115,13 +117,15 @@ for environment in "${environments[@]}"; do
       --partition "$CLUSTER_PARTITION" \
       ${CLUSTER_RESERVATION:+--reservation "$CLUSTER_RESERVATION"} \
       ${CLUSTER_GRES:+--gres "$CLUSTER_GRES"} \
-      --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}"
+      --min_per_mill_steps "${agent_min_per_mill_steps[${agent}]}")
+    echo "$submit_output"
+    job_id=$(echo "$submit_output" | grep -oP 'SUBMITTED_ARRAY_ID=\K\d+')
+    submitted_job_ids+=("$job_id")
   done
 done
 
-# Automatically zip and plot after all runs done
-# Currently this waits for all jobs belonging to user and not only the ones submitted here
-dependencies=$(squeue --me -l -r | tail -n +3 | tr -s ' ' | cut -d ' ' -f2 | cut -d '_' -f1 | sort | uniq | paste -s -d':')
+# Automatically zip and plot after all runs done, depending only on the jobs submitted here
+dependencies=$(IFS=:; echo "${submitted_job_ids[*]}")
 sbatch \
   --partition="$CLUSTER_SETUP_PARTITION" \
   ${CLUSTER_RESERVATION:+--reservation="$CLUSTER_RESERVATION"} \

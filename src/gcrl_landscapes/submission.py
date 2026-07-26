@@ -540,9 +540,6 @@ def submit(args: argparse.Namespace) -> None:
             run_config_chunked_arguments_wrapper, chunked_tasks_parallel
         )
 
-        if len(phase_indices) == 1:
-            break
-
         # parse job array number/array id without subtaskid
         array_id_match = re.fullmatch(r"^(?P<array_id>\d+)_\d+$", jobs[0].job_id)
         if not array_id_match:
@@ -551,6 +548,10 @@ def submit(args: argparse.Namespace) -> None:
             )
         array_id = int(array_id_match.groupdict()["array_id"])
 
+        if len(phase_indices) == 1:
+            break
+
+    print(f"SUBMITTED_ARRAY_ID={array_id}")
     return
 
 
