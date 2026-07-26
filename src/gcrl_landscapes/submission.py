@@ -68,11 +68,24 @@ def run_setup(args: argparse.Namespace) -> None:
     logging.basicConfig(filename=args.logdir / "log.txt", level=logging.INFO)
     logging.info("Set up for later running")
 
+    if args.n_step > 1 and args.agent not in ("GCIQL", "GCIVL"):
+        raise ValueError(
+            f"--n_step > 1 only supported for GCIQL/GCIVL, got {args.agent}"
+        )
+    if args.rejection_sampling_n == 1:
+        raise ValueError("--rejection_sampling_n must be 0 or >1")
+    if args.rejection_sampling_n > 1 and args.agent not in ("GCIQL", "CRL", "FQL"):
+        raise ValueError(
+            f"--rejection_sampling_n only supported for GCIQL/CRL/FQL, got {args.agent}"
+        )
+
     adapted_default_config = get_adapted_default_config(
         args.agent,
         args.datasets[0],  # Here we assume that all datasets are of the same kind
         args.actor_loss,
         args.normalize_advantages,
+        n_step=args.n_step,
+        rejection_sampling_n=args.rejection_sampling_n,
     )
 
     if len(args.datasets) == 1:
@@ -132,6 +145,8 @@ def run_setup(args: argparse.Namespace) -> None:
             ],  # Here we assume that all datasets are of the same kind
             actor_loss=args.actor_loss,
             normalize_advantages=args.normalize_advantages,
+            n_step=args.n_step,
+            rejection_sampling_n=args.rejection_sampling_n,
         )
     else:
         configurations = [adapted_default_config]

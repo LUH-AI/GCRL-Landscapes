@@ -11,6 +11,7 @@ import jax.numpy as jnp
 
 from gcrl_landscapes.agents import FQLAgent, NStepGCIQLAgent, NStepGCIVLAgent
 from gcrl_landscapes.agents import fql as fql_module
+from gcrl_landscapes.configurations import generate_configurations
 from gcrl_landscapes.evaluate import RejectionSamplingAgent
 from gcrl_landscapes.util.datasets import NStepGCDataset
 
@@ -184,9 +185,31 @@ def test_rejection_sampling():
     print("Rejection sampling (GCIQL + FQL): OK")
 
 
+def test_generate_configurations_threads_n_step_and_rejection_sampling():
+    configs = generate_configurations(
+        n=2,
+        agent="GCIQL",
+        hyperparameters={"lr", "alpha"},
+        env="antmaze-medium-navigate-v0",
+        n_step=3,
+    )
+    assert all(config["n_step"] == 3 for config in configs)
+
+    configs = generate_configurations(
+        n=2,
+        agent="GCIQL",
+        hyperparameters={"lr", "alpha"},
+        env="antmaze-medium-navigate-v0",
+        rejection_sampling_n=8,
+    )
+    assert all(config["rejection_sampling_n"] == 8 for config in configs)
+    print("generate_configurations n_step/rejection_sampling_n threading: OK")
+
+
 if __name__ == "__main__":
     test_fql_create_update_sample()
     test_nstep_agents()
     test_nstep_dataset_math()
     test_rejection_sampling()
+    test_generate_configurations_threads_n_step_and_rejection_sampling()
     print("all static tests passed")
