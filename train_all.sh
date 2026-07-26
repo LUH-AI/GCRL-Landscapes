@@ -19,6 +19,8 @@ logdir="./logs"
 hyperparameters="lr alpha"
 actorloss="ddpgbc"
 normalizeadvantages="false"
+nstep="1"
+rejectionsamplingn="0"
 numconfigurations="64"
 convergencezip="./convergence.zip"
 phasepercentages="25 50 75 100"
@@ -106,6 +108,8 @@ for environment in "${environments[@]}"; do
       --logdir "$full_log_dir" \
       --final_step_is_phase \
       --actor_loss "$actorloss" \
+      --n_step "$nstep" \
+      --rejection_sampling_n "$rejectionsamplingn" \
       $([ "$normalizeadvantages" = "true" ] && echo "--normalize_advantages")
     submit_output=$(python -m gcrl_landscapes.main submit \
       --logdir "$full_log_dir" \

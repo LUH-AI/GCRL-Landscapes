@@ -183,6 +183,8 @@ def get_adapted_default_config(
     env: str,
     actor_loss: str | None = None,
     normalize_advantages: bool = False,
+    n_step: int = 1,
+    rejection_sampling_n: int = 0,
 ) -> FrozenConfigDict:
     agent_config_generators = {
         "crl": lambda: _adapt_base_config(
@@ -190,57 +192,80 @@ def get_adapted_default_config(
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "cmd": lambda: _adapt_base_config(
             ogbench.impls.agents.cmd.get_config().to_dict(),
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "gcbc": lambda: _adapt_base_config(
             ogbench.impls.agents.gcbc.get_config().to_dict(),
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "gciql": lambda: _adapt_base_config(
             ogbench.impls.agents.gciql.get_config().to_dict(),
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "gcivl": lambda: _adapt_base_config(
             ogbench.impls.agents.gcivl.get_config().to_dict(),
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "fql": lambda: _adapt_base_config(
-            fql.get_config().to_dict(), env, actor_loss, normalize_advantages
+            fql.get_config().to_dict(),
+            env,
+            actor_loss,
+            normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "hiql": lambda: _adapt_base_config(
             ogbench.impls.agents.hiql.get_config().to_dict(),
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "mqe": lambda: _adapt_base_config(
             ogbench.impls.agents.mqe.get_config().to_dict(),
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "qrl": lambda: _adapt_base_config(
             ogbench.impls.agents.qrl.get_config().to_dict(),
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
         "sac": lambda: _adapt_base_config(
             ogbench.impls.agents.sac.get_config().to_dict(),
             env,
             actor_loss,
             normalize_advantages,
+            n_step,
+            rejection_sampling_n,
         ),
     }
     return FrozenConfigDict(initial_dictionary=agent_config_generators[agent.lower()]())
@@ -254,6 +279,8 @@ def generate_configurations(
     seed: int = 0,
     actor_loss: str | None = None,
     normalize_advantages: bool = False,
+    n_step: int = 1,
+    rejection_sampling_n: int = 0,
 ) -> list[FrozenConfigDict]:
     logger.info(f"Generating {n} configurations for {agent} using {hyperparameters}")
     np.random.seed(seed)
@@ -268,6 +295,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
@@ -278,6 +307,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
@@ -288,6 +319,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             )
             if "discount" not in hyperparameters
             else _adapt_base_config(
@@ -295,6 +328,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             )
             | {"actor_geom_sample": True},
             n,
@@ -306,6 +341,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
@@ -316,13 +353,20 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
         ),
         "FQL": lambda n: _generate_configurations(
             _adapt_base_config(
-                fql.get_config().to_dict(), env, actor_loss, normalize_advantages
+                fql.get_config().to_dict(),
+                env,
+                actor_loss,
+                normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
@@ -333,6 +377,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
@@ -343,6 +389,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
@@ -353,6 +401,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
@@ -363,6 +413,8 @@ def generate_configurations(
                 env,
                 actor_loss,
                 normalize_advantages,
+                n_step,
+                rejection_sampling_n,
             ),
             n,
             hyperparameters,
@@ -588,7 +640,12 @@ def _generate_dummy_list(n: int, val: object) -> list[object]:
 
 
 def _adapt_base_config(
-    config: dict, env: str, actor_loss: str | None, normalize_advantages: bool = False
+    config: dict,
+    env: str,
+    actor_loss: str | None,
+    normalize_advantages: bool = False,
+    n_step: int = 1,
+    rejection_sampling_n: int = 0,
 ) -> dict:
     visual = "visual" in env or "powderworld" in env
     discrete = "powderworld" in env
@@ -618,8 +675,12 @@ def _adapt_base_config(
             normalize_advantages and "normalize_advantages" in config,
         ),
         # Rebuttal-experiment knobs; defaults preserve the original behavior.
-        ("n_step", 1, "n_step" not in config),
-        ("rejection_sampling_n", 0, "rejection_sampling_n" not in config),
+        ("n_step", n_step, "n_step" not in config),
+        (
+            "rejection_sampling_n",
+            rejection_sampling_n,
+            "rejection_sampling_n" not in config,
+        ),
     ]
     return config | {
         key: value for key, value, condition in key_value_pairs if condition

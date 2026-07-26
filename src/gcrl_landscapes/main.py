@@ -114,6 +114,18 @@ if __name__ == "__main__":
         default=False,
         help="Enable advantage normalization before AWR weighting. May be ignored by some algorithms",
     )
+    setup_subparser.add_argument(
+        "--n_step",
+        type=int,
+        default=1,
+        help="n-step TD target horizon for GCIQL/GCIVL. Ignored by other agents.",
+    )
+    setup_subparser.add_argument(
+        "--rejection_sampling_n",
+        type=int,
+        default=0,
+        help="Number of candidates for eval-time rejection sampling (0 = disabled). Only GCIQL/CRL/FQL.",
+    )
     setup_subparser.set_defaults(func=run_setup)
 
     # Setup slurm parsing
