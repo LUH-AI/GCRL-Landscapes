@@ -16,6 +16,7 @@
 #   ./reproduce_all.sh           # all 10 scripts
 #   ./reproduce_all.sh main      # only main-paper tables (t1, t2, t3, t4)
 #   ./reproduce_all.sh appendix  # only robustness-appendix tables (a2..a7)
+#   ./reproduce_all.sh rebuttal  # rebuttal analyses rl1..rl8 + E-figures
 
 set -euo pipefail
 
@@ -60,8 +61,22 @@ case "${mode}" in
 esac
 
 case "${mode}" in
-    main|appendix|all) ;;
-    *) echo "Unknown mode '${mode}'. Use 'main', 'appendix', or 'all'." >&2; exit 1 ;;
+    rebuttal)
+        run "RL1  absolute-threshold breadth"        rl1_abs_breadth.py
+        run "RL2  restricted-domain re-analysis"     rl2_restricted_domain.py
+        run "RL3  realized selectivity"              rl3_realized_selectivity.py
+        run "RL4  epsilon sensitivity"               rl4_eps_sensitivity.py
+        run "RL5  phase-mobility null"               rl5_phase_mobility_null.py
+        run "RL6  filtered future-association"       rl6_filtered_fr.py
+        run "RL7  antmaze diagnostic scatters"       rl7_diagnostic_scatter_antmaze.py
+        run "RL8  lagged/partial ESS"                rl8_lagged_partial_ess.py
+        run "E-figures  supplementary figures"       rl_supplementary_figures.py
+        ;;
+esac
+
+case "${mode}" in
+    main|appendix|all|rebuttal) ;;
+    *) echo "Unknown mode '${mode}'. Use 'main', 'appendix', 'all', or 'rebuttal'." >&2; exit 1 ;;
 esac
 
 echo
