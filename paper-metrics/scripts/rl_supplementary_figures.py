@@ -25,10 +25,10 @@ import pandas as pd
 from _common import AGENTS, ENVS, OUTPUTS
 
 AGENT_COLOR = {
-    "CRL": "#0072B2",
-    "GCIQL": "#E69F00",
-    "GCIVL": "#009E73",
-    "QRL": "#D55E00",
+    "CRL": "#0173b2",
+    "GCIQL": "#de8f05",
+    "GCIVL": "#029e73",
+    "QRL": "#d55e00",
 }
 AGENT_MARKER = {"CRL": "o", "GCIQL": "s", "GCIVL": "^", "QRL": "D"}
 AGENT_STYLE = {"CRL": "-", "GCIQL": "--", "GCIVL": "-.", "QRL": ":"}
@@ -43,7 +43,7 @@ ENV_LABEL = {
 def _save(fig, name: str) -> None:
     for ext in ("png", "pdf"):
         p = OUTPUTS / f"{name}.{ext}"
-        fig.savefig(p, dpi=200, bbox_inches="tight")
+        fig.savefig(p, dpi=300, bbox_inches="tight")
         print(f"  → {p}")
     plt.close(fig)
 
@@ -222,7 +222,7 @@ def fig_e5() -> None:
         fmt="o",
         ms=7,
         capsize=3,
-        color="#0072B2",
+        color="#0173b2",
         lw=1.4,
         label="observed (seed CI)",
     )
@@ -236,7 +236,7 @@ def fig_e5() -> None:
     # No whiskers here: the within-config seed bootstrap is attenuation-biased
     # for correlation statistics, so those intervals understate the point
     # estimate; the permutation band on the left panel carries the inference.
-    ax2.scatter(x, df["spearman_obs"], marker="s", s=48, color="#009E73")
+    ax2.scatter(x, df["spearman_obs"], marker="s", s=48, color="#029e73")
     ax2.axhline(0, color="0.4", ls="--", lw=1)
     ax2.set_xticks(x, [ENV_LABEL[e] for e in df["env"]], fontsize=9)
     ax2.set_ylabel("adjacent-phase Spearman (full ranking)", fontsize=9)

@@ -40,7 +40,7 @@ RAW_ADV_ENVS = Path(
 )
 
 AGENTS = ["CRL", "GCIQL", "GCIVL", "QRL"]
-COLORS = {"CRL": "#1f77b4", "GCIQL": "#ff7f0e", "GCIVL": "#2ca02c", "QRL": "#d62728"}
+COLORS = {"CRL": "#0173b2", "GCIQL": "#de8f05", "GCIVL": "#029e73", "QRL": "#d55e00"}
 ENVS = ["antmaze-medium", "antmaze-large"]
 METRICS = ["fr_auc", "gap_mean", "mrr", "ess", "top5_mass"]
 METRIC_LABELS = {
