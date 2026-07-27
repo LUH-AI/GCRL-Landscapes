@@ -45,10 +45,10 @@ RAW_ADV_ENVS = Path(
 
 # Okabe-Ito (CVD-safe), fixed agent order; line styles as secondary encoding
 AGENT_COLOR = {
-    "CRL": "#0072B2",
-    "GCIQL": "#E69F00",
-    "GCIVL": "#009E73",
-    "QRL": "#D55E00",
+    "CRL": "#0173b2",
+    "GCIQL": "#de8f05",
+    "GCIVL": "#029e73",
+    "QRL": "#d55e00",
 }
 AGENT_STYLE = {"CRL": "-", "GCIQL": "--", "GCIVL": "-.", "QRL": ":"}
 
@@ -114,7 +114,7 @@ def plot_curves() -> None:
     fig.tight_layout()
     for ext in ("png", "pdf"):
         p = OUTPUTS / f"rl3_selectivity_curves.{ext}"
-        fig.savefig(p, dpi=200, bbox_inches="tight")
+        fig.savefig(p, dpi=300, bbox_inches="tight")
         print(f"  → {p}")
     plt.close(fig)
 
