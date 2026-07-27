@@ -85,8 +85,11 @@ def mobility_plot(
     _sample.fit()
     hp_name_x = _sample.hp_names[0].removeprefix("hp.")
     hp_name_y = _sample.hp_names[1].removeprefix("hp.")
-    x_lower, x_upper, x_log = get_bounds(hp_name_x, agent_name)
-    y_lower, y_upper, y_log = get_bounds(hp_name_y, agent_name)
+    actor_loss = (
+        clipped_df["hp.actor_loss"].iloc[0] if "hp.actor_loss" in clipped_df.columns else None
+    )
+    x_lower, x_upper, x_log = get_bounds(hp_name_x, agent_name, actor_loss)
+    y_lower, y_upper, y_log = get_bounds(hp_name_y, agent_name, actor_loss)
 
     # Build Sobol-space prediction grid
     x_grid = np.linspace(0, 1, grid_length)
