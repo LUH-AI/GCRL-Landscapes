@@ -24,35 +24,86 @@ class RejectionSamplingAgent:
     never does worse than greedy decoding under a perfect critic. FQL's
     one-step policy is sampled with independent input noises. The training-time
     agent is untouched; this only changes action selection at evaluation.
+
+    If `proposal_agent` is given, candidates are drawn from its actor instead of
+    `agent`'s own actor (e.g. sampling from a separately trained BC policy), while
+    scoring still uses `agent`'s critic (min(Q1, Q2)). This is "SfBC-style"
+    rejection sampling from a fixed proposal distribution.
     """
 
-    def __init__(self, agent, num_samples: int):
+    def __init__(self, agent, num_samples: int, proposal_agent=None):
         assert num_samples > 1, "rejection sampling needs at least 2 candidates"
         self.agent = agent
         self.num_samples = int(num_samples)
         self.config = agent.config
+        self.proposal_agent = proposal_agent if proposal_agent is not None else agent
 
     def sample_actions(self, observations, goals=None, seed=None, temperature=1.0):
         agent = self.agent
+        proposal_agent = self.proposal_agent
         if goals is None:
-            return agent.sample_actions(
+            return proposal_agent.sample_actions(
                 observations, goals=goals, seed=seed, temperature=temperature
             )
         n = self.num_samples
         obs_r = jnp.repeat(jnp.asarray(observations)[None], n, axis=0)
         goals_r = jnp.repeat(jnp.asarray(goals)[None], n, axis=0)
-        if agent.config["agent_name"] == "fql":
-            noise = jax.random.normal(seed, (n, agent.config["action_dim"]))
+        if proposal_agent.config["agent_name"] == "fql":
+            noise = jax.random.normal(seed, (n, proposal_agent.config["action_dim"]))
             candidates = jnp.clip(
-                agent.network.select("actor_onestep")(obs_r, goals_r, noise), -1, 1
+                proposal_agent.network.select("actor_onestep")(obs_r, goals_r, noise),
+                -1,
+                1,
             )
         else:
-            dist = agent.network.select("actor")(obs_r, goals_r, temperature=1.0)
+            dist = proposal_agent.network.select("actor")(
+                obs_r, goals_r, temperature=1.0
+            )
             candidates = jnp.clip(dist.sample(seed=seed), -1, 1)
             candidates = candidates.at[0].set(jnp.clip(dist.mode()[0], -1, 1))
         q1, q2 = agent.network.select("critic")(obs_r, goals_r, candidates)
         q = jnp.minimum(q1, q2)
         return candidates[jnp.argmax(q)]
+
+
+def _build_proposal_agent(config: ConfigDict, env: gym.Env):
+    """Construct and restore the rejection-sampling proposal agent.
+
+    Built the same way the main agent is built (from the env's observation/action
+    space and the shared configuration), then restored from
+    `config["rejection_proposal_ckpt"]` via the repo's standard checkpoint-restore
+    path (`util.data.restore_agent`, same pkl format `training.train` uses).
+    """
+    from .util.data import restore_agent
+    from .util.datasets import AGENT_CLASSES
+
+    proposal_agent_name = config["rejection_proposal_agent"]
+    agent_class = AGENT_CLASSES[proposal_agent_name.upper()]
+
+    ex_observations = np.asarray(env.observation_space.sample())[None]
+    if config["discrete"]:
+        ex_actions = np.full((1,), env.action_space.n - 1)
+    else:
+        ex_actions = np.asarray(env.action_space.sample())[None]
+
+    proposal_agent = agent_class.create(
+        0,
+        ex_observations,
+        ex_actions,
+        dict(config) | {"agent_name": proposal_agent_name.lower()},
+    )
+    proposal_agent = restore_agent(proposal_agent, config["rejection_proposal_ckpt"])
+
+    proposal_action = np.asarray(
+        proposal_agent.sample_actions(
+            ex_observations[0], goals=ex_observations[0], seed=jax.random.PRNGKey(0)
+        )
+    )
+    assert proposal_action.shape == env.action_space.shape, (
+        f"proposal agent action shape {proposal_action.shape} does not match "
+        f"env action space {env.action_space.shape}"
+    )
+    return proposal_agent
 
 
 def evaluate_wrapper(
@@ -67,7 +118,11 @@ def evaluate_wrapper(
         assert config["agent_name"] in ("gciql", "crl", "fql"), (
             f"rejection sampling needs a double-Q critic; got {config['agent_name']}"
         )
-        agent = RejectionSamplingAgent(agent, n_rejection)
+        proposal_ckpt = config.get("rejection_proposal_ckpt", None)
+        proposal_agent = _build_proposal_agent(config, env) if proposal_ckpt else None
+        agent = RejectionSamplingAgent(
+            agent, n_rejection, proposal_agent=proposal_agent
+        )
     task_infos = (
         env.unwrapped.task_infos
         if hasattr(env.unwrapped, "task_infos")

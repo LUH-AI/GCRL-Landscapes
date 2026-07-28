@@ -13,10 +13,13 @@ from gcrl_landscapes.agents import FQLAgent, NStepGCIQLAgent, NStepGCIVLAgent
 from gcrl_landscapes.agents import fql as fql_module
 from gcrl_landscapes.configurations import generate_configurations
 from gcrl_landscapes.evaluate import RejectionSamplingAgent
+from gcrl_landscapes.training import restore_frozen_params
 from gcrl_landscapes.util.datasets import NStepGCDataset
 
+import ogbench.impls.agents.gcbc as gcbc_module
 import ogbench.impls.agents.gciql as gciql_module
 import ogbench.impls.agents.gcivl as gcivl_module
+from ogbench.impls.agents import GCBCAgent
 from ogbench.impls.utils.datasets import Dataset
 
 OBS_DIM = 11
@@ -206,10 +209,107 @@ def test_generate_configurations_threads_n_step_and_rejection_sampling():
     print("generate_configurations n_step/rejection_sampling_n threading: OK")
 
 
+def test_generate_configurations_threads_freeze_value_discount_expectile():
+    configs = generate_configurations(
+        n=2,
+        agent="GCIQL",
+        hyperparameters={"lr", "alpha"},
+        env="antmaze-medium-navigate-v0",
+        freeze_value=True,
+        discount=0.5,
+        expectile=0.7,
+        rejection_proposal_ckpt="/tmp/proposal/params_100.pkl",
+        rejection_proposal_agent="GCBC",
+    )
+    assert all(config["freeze_value"] is True for config in configs)
+    assert all(config["discount"] == 0.5 for config in configs)
+    assert all(config["expectile"] == 0.7 for config in configs)
+    assert all(
+        config["rejection_proposal_ckpt"] == "/tmp/proposal/params_100.pkl"
+        for config in configs
+    )
+    assert all(config["rejection_proposal_agent"] == "GCBC" for config in configs)
+
+    default_configs = generate_configurations(
+        n=2,
+        agent="CRL",
+        hyperparameters={"lr", "alpha"},
+        env="antmaze-medium-navigate-v0",
+    )
+    assert all(config["freeze_value"] is False for config in default_configs)
+    assert all(config["rejection_proposal_ckpt"] is None for config in default_configs)
+    print("generate_configurations freeze_value/discount/expectile threading: OK")
+
+
+def test_restore_frozen_params():
+    # Fake a top-level params tree mimicking ogbench's ModuleDict naming: a
+    # value/critic/target_critic subtree (frozen) plus an actor subtree (trainable).
+    frozen_snapshot = {
+        "modules_value": {"kernel": jnp.zeros((4, 4)), "bias": jnp.zeros((4,))},
+        "modules_critic": {"kernel": jnp.ones((4, 4))},
+        "modules_target_critic": {"kernel": jnp.full((4, 4), 2.0)},
+        "modules_actor": {"kernel": jnp.full((4, 4), 3.0)},
+    }
+    # Simulate a fake "post-update" step: every leaf shifted by +1.
+    updated_params = jax.tree.map(lambda x: x + 1.0, frozen_snapshot)
+
+    restored = restore_frozen_params(updated_params, frozen_snapshot)
+
+    for key in ("modules_value", "modules_critic", "modules_target_critic"):
+        for leaf_key in frozen_snapshot[key]:
+            np.testing.assert_array_equal(
+                np.asarray(restored[key][leaf_key]),
+                np.asarray(frozen_snapshot[key][leaf_key]),
+            )
+
+    np.testing.assert_array_equal(
+        np.asarray(restored["modules_actor"]["kernel"]),
+        np.asarray(updated_params["modules_actor"]["kernel"]),
+    )
+    assert not np.array_equal(
+        np.asarray(restored["modules_actor"]["kernel"]),
+        np.asarray(frozen_snapshot["modules_actor"]["kernel"]),
+    )
+    print("restore_frozen_params freeze/restore semantics: OK")
+
+
+def test_rejection_sampling_with_proposal_agent():
+    rng = np.random.default_rng(3)
+    ex_obs = rng.normal(size=(BATCH, OBS_DIM)).astype(np.float32)
+    ex_act = rng.uniform(-1, 1, size=(BATCH, ACT_DIM)).astype(np.float32)
+
+    # Wrapped agent: GCIQL, provides the double-Q critic used for scoring.
+    gciql_config = gciql_module.get_config().to_dict()
+    gciql_config["actor_loss"] = "awr"
+    gciql_agent = NStepGCIQLAgent.create(0, ex_obs, ex_act, gciql_config)
+
+    # Proposal agent: separately "trained" GCBC agent, only its actor is used.
+    gcbc_config = gcbc_module.get_config().to_dict()
+    gcbc_agent = GCBCAgent.create(0, ex_obs, ex_act, gcbc_config)
+
+    wrapper = RejectionSamplingAgent(
+        gciql_agent, num_samples=8, proposal_agent=gcbc_agent
+    )
+    assert wrapper.proposal_agent is gcbc_agent
+    action = wrapper.sample_actions(
+        ex_obs[0], goals=ex_obs[1], seed=jax.random.PRNGKey(0)
+    )
+    assert action.shape == (ACT_DIM,)
+    assert jnp.all(jnp.abs(action) <= 1.0)
+
+    # Default (no proposal_agent given): falls back to the wrapped agent's own actor.
+    default_wrapper = RejectionSamplingAgent(gciql_agent, num_samples=8)
+    assert default_wrapper.proposal_agent is gciql_agent
+    print("Rejection sampling with separate proposal agent: OK")
+
+
 if __name__ == "__main__":
     test_fql_create_update_sample()
     test_nstep_agents()
     test_nstep_dataset_math()
     test_rejection_sampling()
     test_generate_configurations_threads_n_step_and_rejection_sampling()
+    test_generate_configurations_threads_freeze_value_discount_expectile()
+    test_restore_frozen_params()
+    test_rejection_sampling_with_proposal_agent()
     print("all static tests passed")

@@ -23,7 +23,39 @@ import os
 from functools import partial
 
 CONST_VAL_BATCH_SIZE = 256
-GRAD_CHUNK_SIZE = 32  # chunk size for chunked_vmap in per-sample grad/update computation
+GRAD_CHUNK_SIZE = (
+    32  # chunk size for chunked_vmap in per-sample grad/update computation
+)
+
+# Top-level `network.params` keys that hold the actor(s). Everything else (value,
+# critic, target networks, ...) is frozen for `freeze_value` runs. HIQL splits its
+# actor into low/high level policies instead of a single "actor" module.
+FREEZE_VALUE_ACTOR_KEYS = frozenset(
+    {"modules_actor", "modules_low_actor", "modules_high_actor"}
+)
+
+
+def restore_frozen_params(params: dict, frozen_snapshot: dict) -> dict:
+    """Restore non-actor parameter subtrees to their `freeze_value` snapshot values.
+
+    Used by `freeze_value` runs: everything except the actor module(s) is pinned to
+    the values it had right after the checkpoint was loaded, so only the actor
+    trains while value/critic/target networks stay frozen.
+
+    Args:
+        params: current (post-update) top-level `network.params` dict
+        frozen_snapshot: top-level params dict snapshotted right after checkpoint load
+
+    Returns:
+        params dict with non-actor entries replaced by their frozen snapshot values
+    """
+    return {
+        key: frozen_snapshot[key]
+        if key in frozen_snapshot and key not in FREEZE_VALUE_ACTOR_KEYS
+        else value
+        for key, value in params.items()
+    }
+
 
 def train(
     agent_class: Callable[[Any, gym.Env, int], Any],
@@ -95,6 +127,15 @@ def train(
     if agent_path:
         agent = restore_agent(agent, agent_path)
 
+    # For `freeze_value` runs starting from a checkpoint: snapshot every non-actor
+    # param subtree so it can be restored after each update, leaving only the
+    # actor free to train.
+    frozen_params_snapshot = (
+        dict(agent.network.params)
+        if config.get("freeze_value", False) and agent_path
+        else None
+    )
+
     metrics: ResultsPerStep[EvaluationResult] = ResultsPerStep()
     agent_paths: ResultsPerStep[Path] = ResultsPerStep()
     save_dir = log_dir
@@ -103,7 +144,12 @@ def train(
     eval_logger = CsvLogger(save_dir / "eval_log.csv")
     first_time = time.time()
     last_time = time.time()
-    log_steps = np.linspace(already_trained_steps + 1, max(eval_at_steps + save_at_steps), log_count, dtype=int).tolist()
+    log_steps = np.linspace(
+        already_trained_steps + 1,
+        max(eval_at_steps + save_at_steps),
+        log_count,
+        dtype=int,
+    ).tolist()
     for i in tqdm.tqdm(
         range(already_trained_steps + 1, max(eval_at_steps + save_at_steps) + 1),
         smoothing=0.1,
@@ -112,6 +158,14 @@ def train(
         # Update agent.
         batch = train_dataset.sample(config["batch_size"])
         agent, update_info = agent.update(batch)
+        if frozen_params_snapshot is not None:
+            agent = agent.replace(
+                network=agent.network.replace(
+                    params=restore_frozen_params(
+                        agent.network.params, frozen_params_snapshot
+                    )
+                )
+            )
 
         # Log metrics.
         if i in log_steps:
@@ -122,7 +176,9 @@ def train(
                 train_metrics.update(
                     {f"validation/{k}": v for k, v in val_info.items()}
                 )
-            train_metrics["time/epoch_time"] = (time.time() - last_time) / (log_steps[1] - log_steps[0])
+            train_metrics["time/epoch_time"] = (time.time() - last_time) / (
+                log_steps[1] - log_steps[0]
+            )
             train_metrics["time/total_time"] = time.time() - first_time
             last_time = time.time()
 
@@ -156,9 +212,12 @@ def train(
 
     return EvalTrajectory((metrics, agent_paths))
 
+
 @jax.jit
 def batched_tree_to_batched_vector(tree):
-    flattened_matrices = jax.tree.map(lambda leaf: leaf.reshape((leaf.shape[0], -1)), tree)
+    flattened_matrices = jax.tree.map(
+        lambda leaf: leaf.reshape((leaf.shape[0], -1)), tree
+    )
     return jax.numpy.concatenate(jax.tree.flatten(flattened_matrices)[0], axis=1)
 
 
@@ -175,11 +234,20 @@ def pairwise_seq_map(fun, batch_size, symmetric, x, y):
         y (): tree two
 
     Returns:
-        vector of pairwise similarities containing some duplicates. Use `remove_duplicates` to remove 
+        vector of pairwise similarities containing some duplicates. Use `remove_duplicates` to remove
     """
 
     # We limit the amount of shifts to calculate here due to duplicates. After calling this function we'll filter out the last few remainining duplicate items left over due to vectorization
-    pairwise_fun_results = jax.lax.map(lambda batch_shift: fun(batched_tree_to_batched_vector(x), batched_tree_to_batched_vector(jax.tree.map(lambda tree: jax.numpy.roll(tree, batch_shift, axis=0), y))), jax.numpy.arange(1, 1 + (batch_size // 2 + 1) if symmetric else batch_size), batch_size=1)
+    pairwise_fun_results = jax.lax.map(
+        lambda batch_shift: fun(
+            batched_tree_to_batched_vector(x),
+            batched_tree_to_batched_vector(
+                jax.tree.map(lambda tree: jax.numpy.roll(tree, batch_shift, axis=0), y)
+            ),
+        ),
+        jax.numpy.arange(1, 1 + (batch_size // 2 + 1) if symmetric else batch_size),
+        batch_size=1,
+    )
     return jax.numpy.concatenate(jax.tree.flatten(pairwise_fun_results)[0])
 
 
@@ -194,7 +262,11 @@ def remove_duplicates(pairwise_similarities, batch_size, symmetric):
     Returns:
         pairwise_similarities without duplicates
     """
-    return pairwise_similarities.flatten()[:(batch_size ** 2 - batch_size) // 2] if symmetric else pairwise_similarities
+    return (
+        pairwise_similarities.flatten()[: (batch_size**2 - batch_size) // 2]
+        if symmetric
+        else pairwise_similarities
+    )
 
 
 def chunked_vmap(f, xs, chunk_size):
@@ -212,14 +284,21 @@ def chunked_vmap(f, xs, chunk_size):
 @jax.jit
 def get_grads_standard(agent, batch):
     """Get gradients for QRL/CRL with single actor."""
-    if agent.config.get('agent_name', '').lower() == 'crl':
+    if agent.config.get("agent_name", "").lower() == "crl":
         return chunked_vmap(
-            lambda index: jax.grad(lambda grad_params: crl_total_loss_individual(agent, batch, index, grad_params), has_aux=True)(agent.network.params)[0],
+            lambda index: jax.grad(
+                lambda grad_params: crl_total_loss_individual(
+                    agent, batch, index, grad_params
+                ),
+                has_aux=True,
+            )(agent.network.params)[0],
             jax.numpy.arange(jax.tree_util.tree_leaves(batch)[0].shape[0]),
             GRAD_CHUNK_SIZE,
         )
     return chunked_vmap(
-        lambda sample: jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0],
+        lambda sample: jax.grad(
+            lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True
+        )(agent.network.params)[0],
         batch,
         GRAD_CHUNK_SIZE,
     )
@@ -228,18 +307,27 @@ def get_grads_standard(agent, batch):
 @jax.jit
 def hiql_combine(grads):
     # Flatten both gradient trees and concatenate
-    modules_actor = { "modules_low_actor": grads["modules_low_actor"], "modules_high_actor": grads["modules_high_actor"] }
+    modules_actor = {
+        "modules_low_actor": grads["modules_low_actor"],
+        "modules_high_actor": grads["modules_high_actor"],
+    }
 
-    return {"modules_actor": modules_actor, **{k: v for k, v in grads.items() 
-            if k not in ("modules_low_actor", "modules_high_actor")}}
+    return {
+        "modules_actor": modules_actor,
+        **{
+            k: v
+            for k, v in grads.items()
+            if k not in ("modules_low_actor", "modules_high_actor")
+        },
+    }
 
 
 @jax.jit
 def get_grads(agent, batch):
     """Get gradients for value and actor networks, handling different agent types."""
-    agent_name = agent.config.get('agent_name', '').lower()
+    agent_name = agent.config.get("agent_name", "").lower()
 
-    if agent_name == 'hiql':
+    if agent_name == "hiql":
         return hiql_combine(get_grads_standard(agent, batch))
     else:
         return get_grads_standard(agent, batch)
@@ -247,15 +335,31 @@ def get_grads(agent, batch):
 
 @jax.jit
 def get_updates_standard(agent, batch):
-    if agent.config.get('agent_name', '').lower() == 'crl':
+    if agent.config.get("agent_name", "").lower() == "crl":
         return chunked_vmap(
-            lambda index: agent.network.tx.update(jax.grad(lambda grad_params: crl_total_loss_individual(agent, batch, index, grad_params), has_aux=True)(agent.network.params)[0], agent.network.opt_state, agent.network.params)[0],
+            lambda index: agent.network.tx.update(
+                jax.grad(
+                    lambda grad_params: crl_total_loss_individual(
+                        agent, batch, index, grad_params
+                    ),
+                    has_aux=True,
+                )(agent.network.params)[0],
+                agent.network.opt_state,
+                agent.network.params,
+            )[0],
             jax.numpy.arange(jax.tree_util.tree_leaves(batch)[0].shape[0]),
             GRAD_CHUNK_SIZE,
         )
     else:
         return chunked_vmap(
-            lambda sample: agent.network.tx.update(jax.grad(lambda grad_params: agent.total_loss(sample, grad_params), has_aux=True)(agent.network.params)[0], agent.network.opt_state, agent.network.params)[0],
+            lambda sample: agent.network.tx.update(
+                jax.grad(
+                    lambda grad_params: agent.total_loss(sample, grad_params),
+                    has_aux=True,
+                )(agent.network.params)[0],
+                agent.network.opt_state,
+                agent.network.params,
+            )[0],
             batch,
             GRAD_CHUNK_SIZE,
         )
@@ -263,23 +367,34 @@ def get_updates_standard(agent, batch):
 
 @jax.jit
 def get_updates(agent, batch):
-    agent_name = agent.config.get('agent_name', '').lower()
+    agent_name = agent.config.get("agent_name", "").lower()
 
-    if agent_name == 'hiql':
+    if agent_name == "hiql":
         return hiql_combine(get_updates_standard(agent, batch))
     else:
         return get_updates_standard(agent, batch)
 
 
-
 @jax.jit
 def calc_cossim(grads):
-    return remove_duplicates(pairwise_seq_map(optax.losses.cosine_similarity, CONST_VAL_BATCH_SIZE, True, grads, grads), CONST_VAL_BATCH_SIZE, True)
+    return remove_duplicates(
+        pairwise_seq_map(
+            optax.losses.cosine_similarity, CONST_VAL_BATCH_SIZE, True, grads, grads
+        ),
+        CONST_VAL_BATCH_SIZE,
+        True,
+    )
 
 
 @jax.jit
 def calc_magsim(grads):
-    return remove_duplicates(pairwise_seq_map(gradient_magnitude_similarity, CONST_VAL_BATCH_SIZE, True, grads, grads), CONST_VAL_BATCH_SIZE, True)
+    return remove_duplicates(
+        pairwise_seq_map(
+            gradient_magnitude_similarity, CONST_VAL_BATCH_SIZE, True, grads, grads
+        ),
+        CONST_VAL_BATCH_SIZE,
+        True,
+    )
 
 
 @jax.jit
@@ -311,7 +426,7 @@ def calc_feature_embedding_rank(agent, batch):
 
         return embedding_rank
 
-    if (len(phi.shape) > 2 and phi.shape[0] == 2):
+    if len(phi.shape) > 2 and phi.shape[0] == 2:
         # Ensemble learning -> two embeddings
         return (get_embedding_rank(phi[0]) + get_embedding_rank(phi[1])) / 2
 
@@ -320,16 +435,18 @@ def calc_feature_embedding_rank(agent, batch):
 
 def _qv_advantage(agent, batch):
     """adv = min(Q1, Q2) - V  — used by GCIQL and CRL-AWR."""
-    v = agent.network.select('value')(batch['observations'], batch['actor_goals'])
-    q1, q2 = agent.network.select('critic')(batch['observations'], batch['actor_goals'], batch['actions'])
+    v = agent.network.select("value")(batch["observations"], batch["actor_goals"])
+    q1, q2 = agent.network.select("critic")(
+        batch["observations"], batch["actor_goals"], batch["actions"]
+    )
     q = jax.numpy.minimum(q1, q2)
     return q - v, v, q
 
 
 def _ensemble_td_advantage(agent, obs, next_obs, goals):
     """adv = mean(nV1,nV2) - mean(V1,V2)  — used by GCIVL and HIQL."""
-    v1, v2 = agent.network.select('value')(obs, goals)
-    nv1, nv2 = agent.network.select('value')(next_obs, goals)
+    v1, v2 = agent.network.select("value")(obs, goals)
+    nv1, nv2 = agent.network.select("value")(next_obs, goals)
     v = (v1 + v2) / 2
     nv = (nv1 + nv2) / 2
     return nv - v, v, nv
@@ -342,9 +459,9 @@ def _mqe_advantage(agent, batch):
     v = min over ensemble of -distance(psi(s), psi(g)),
     q = min over ensemble of -distance(phi(s,a), psi(g)).
     """
-    psi_s = agent.network.select('psi')(batch['observations'])
-    psi_g = agent.network.select('psi')(batch['actor_goals'])
-    phi = agent.network.select('phi')(batch['observations'], batch['actions'])
+    psi_s = agent.network.select("psi")(batch["observations"])
+    psi_g = agent.network.select("psi")(batch["actor_goals"])
+    phi = agent.network.select("phi")(batch["observations"], batch["actions"])
     v1, v2 = -agent.distance(psi_s, psi_g)
     v = jax.numpy.minimum(v1, v2)
     q1, q2 = -agent.distance(phi, psi_g)
@@ -354,68 +471,92 @@ def _mqe_advantage(agent, batch):
 
 def get_advantage_metrics(agent, batch) -> dict:
     """Compute per-sample advantage values on a fixed batch for logging."""
-    if agent.config.get('actor_loss') != 'awr':
+    if agent.config.get("actor_loss") != "awr":
         return {}
 
-    agent_name = agent.config.get('agent_name', '').lower()
+    agent_name = agent.config.get("agent_name", "").lower()
     result = {}
 
-    if agent_name in ('gciql', 'crl'):
+    if agent_name in ("gciql", "crl"):
         adv, v, q = _qv_advantage(agent, batch)
-        result['advantage/actor'] = adv.tolist()
-        result['value/actor_v'] = v.tolist()
-        result['value/actor_q'] = q.tolist()
+        result["advantage/actor"] = adv.tolist()
+        result["value/actor_v"] = v.tolist()
+        result["value/actor_q"] = q.tolist()
 
-    elif agent_name == 'gcivl':
+    elif agent_name == "gcivl":
         adv, v, nv = _ensemble_td_advantage(
-            agent, batch['observations'], batch['next_observations'], batch['actor_goals']
+            agent,
+            batch["observations"],
+            batch["next_observations"],
+            batch["actor_goals"],
         )
-        result['advantage/actor'] = adv.tolist()
-        result['value/actor_v'] = v.tolist()
-        result['value/actor_nv'] = nv.tolist()
+        result["advantage/actor"] = adv.tolist()
+        result["value/actor_v"] = v.tolist()
+        result["value/actor_nv"] = nv.tolist()
 
-    elif agent_name == 'qrl':
-        v = -agent.network.select('value')(batch['observations'], batch['actor_goals'])
-        nv = -agent.network.select('value')(batch['next_observations'], batch['actor_goals'])
-        result['advantage/actor'] = (nv - v).tolist()
-        result['value/actor_v'] = v.tolist()
-        result['value/actor_nv'] = nv.tolist()
+    elif agent_name == "qrl":
+        v = -agent.network.select("value")(batch["observations"], batch["actor_goals"])
+        nv = -agent.network.select("value")(
+            batch["next_observations"], batch["actor_goals"]
+        )
+        result["advantage/actor"] = (nv - v).tolist()
+        result["value/actor_v"] = v.tolist()
+        result["value/actor_nv"] = nv.tolist()
 
-    elif agent_name == 'hiql':
+    elif agent_name == "hiql":
         adv_low, v_low, nv_low = _ensemble_td_advantage(
-            agent, batch['observations'], batch['next_observations'], batch['low_actor_goals']
+            agent,
+            batch["observations"],
+            batch["next_observations"],
+            batch["low_actor_goals"],
         )
-        result['advantage/low_actor'] = adv_low.tolist()
-        result['value/low_actor_v'] = v_low.tolist()
-        result['value/low_actor_nv'] = nv_low.tolist()
+        result["advantage/low_actor"] = adv_low.tolist()
+        result["value/low_actor_v"] = v_low.tolist()
+        result["value/low_actor_nv"] = nv_low.tolist()
 
         adv_high, v_high, nv_high = _ensemble_td_advantage(
-            agent, batch['observations'], batch['high_actor_targets'], batch['high_actor_goals']
+            agent,
+            batch["observations"],
+            batch["high_actor_targets"],
+            batch["high_actor_goals"],
         )
-        result['advantage/high_actor'] = adv_high.tolist()
-        result['value/high_actor_v'] = v_high.tolist()
-        result['value/high_actor_nv'] = nv_high.tolist()
+        result["advantage/high_actor"] = adv_high.tolist()
+        result["value/high_actor_v"] = v_high.tolist()
+        result["value/high_actor_nv"] = nv_high.tolist()
 
-    elif agent_name == 'mqe':
+    elif agent_name == "mqe":
         adv, v, q = _mqe_advantage(agent, batch)
-        result['advantage/actor'] = adv.tolist()
-        result['value/actor_v'] = v.tolist()
-        result['value/actor_q'] = q.tolist()
+        result["advantage/actor"] = adv.tolist()
+        result["value/actor_v"] = v.tolist()
+        result["value/actor_q"] = q.tolist()
 
     # GCBC / SAC / CMD / CRL-ddpgbc: no advantage → empty dict
     return result
 
 
 def get_metrics(agent, batch):
-    agent_name = agent.config.get('agent_name', '').lower()
+    agent_name = agent.config.get("agent_name", "").lower()
 
     target_quantiles = np.arange(100) / 100
 
     def get_quantile_dict(values, value_name):
-        return {f"{value_name}_quant{q}": jax.numpy.quantile(values, q) for q in target_quantiles}
+        return {
+            f"{value_name}_quant{q}": jax.numpy.quantile(values, q)
+            for q in target_quantiles
+        }
 
     # We use trajectories as the notion of a task for pairwise metrics. If a sample is from the same trajectory -> filter it
-    same_task = remove_duplicates(np.concatenate([batch["trajectory_final_state_idx"] == np.roll(batch["trajectory_final_state_idx"], shift) for shift in np.arange(1, 1 + (CONST_VAL_BATCH_SIZE // 2 + 1))]), CONST_VAL_BATCH_SIZE, True)
+    same_task = remove_duplicates(
+        np.concatenate(
+            [
+                batch["trajectory_final_state_idx"]
+                == np.roll(batch["trajectory_final_state_idx"], shift)
+                for shift in np.arange(1, 1 + (CONST_VAL_BATCH_SIZE // 2 + 1))
+            ]
+        ),
+        CONST_VAL_BATCH_SIZE,
+        True,
+    )
     filtered = ~same_task
 
     def grad_group_metrics(prefix, grads):
@@ -426,10 +567,18 @@ def get_metrics(agent, batch):
             f"grad/{prefix}_cosine_similarity_mean": jax.numpy.mean(cossim[filtered]),
             f"grad/{prefix}_cosine_similarity_std": jax.numpy.std(cossim[filtered]),
             **get_quantile_dict(cossim[filtered], f"grad/{prefix}_cosine_similarity"),
-            f"grad/{prefix}_cosine_similarity_cvar0.25": jax.numpy.mean(cossim[filtered][cossim[filtered] < jax.numpy.quantile(cossim[filtered], 0.25)]),
-            f"grad/{prefix}_magnitude_similarity_mean": jax.numpy.mean(magsim[filtered]),
+            f"grad/{prefix}_cosine_similarity_cvar0.25": jax.numpy.mean(
+                cossim[filtered][
+                    cossim[filtered] < jax.numpy.quantile(cossim[filtered], 0.25)
+                ]
+            ),
+            f"grad/{prefix}_magnitude_similarity_mean": jax.numpy.mean(
+                magsim[filtered]
+            ),
             f"grad/{prefix}_magnitude_similarity_std": jax.numpy.std(magsim[filtered]),
-            **get_quantile_dict(magsim[filtered], f"grad/{prefix}_magnitude_similarity"),
+            **get_quantile_dict(
+                magsim[filtered], f"grad/{prefix}_magnitude_similarity"
+            ),
             f"grad/{prefix}_scale_mean": jax.numpy.mean(scale),
             f"grad/{prefix}_scale_std": jax.numpy.std(scale),
         }
@@ -439,12 +588,22 @@ def get_metrics(agent, batch):
         u_magsim = calc_magsim(updates)
         u_scale = calc_scale(updates)
         return {
-            f"update/{prefix}_cosine_similarity_mean": jax.numpy.mean(u_cossim[filtered]),
+            f"update/{prefix}_cosine_similarity_mean": jax.numpy.mean(
+                u_cossim[filtered]
+            ),
             f"update/{prefix}_cosine_similarity_std": jax.numpy.std(u_cossim[filtered]),
-            **get_quantile_dict(u_cossim[filtered], f"update/{prefix}_cosine_similarity"),
-            f"update/{prefix}_magnitude_similarity_mean": jax.numpy.mean(u_magsim[filtered]),
-            f"update/{prefix}_magnitude_similarity_std": jax.numpy.std(u_magsim[filtered]),
-            **get_quantile_dict(u_magsim[filtered], f"update/{prefix}_magnitude_similarity"),
+            **get_quantile_dict(
+                u_cossim[filtered], f"update/{prefix}_cosine_similarity"
+            ),
+            f"update/{prefix}_magnitude_similarity_mean": jax.numpy.mean(
+                u_magsim[filtered]
+            ),
+            f"update/{prefix}_magnitude_similarity_std": jax.numpy.std(
+                u_magsim[filtered]
+            ),
+            **get_quantile_dict(
+                u_magsim[filtered], f"update/{prefix}_magnitude_similarity"
+            ),
             f"update/{prefix}_scale_mean": jax.numpy.mean(u_scale),
             f"update/{prefix}_scale_std": jax.numpy.std(u_scale),
         }
@@ -460,42 +619,69 @@ def get_metrics(agent, batch):
     # --- Phase 1 & 2: gradient and update metrics ---
     # MQE's loss is batch-level (samples a stochastic mask over the full batch), so
     # per-sample gradient computation via chunked_vmap is incompatible. Skip for MQE.
-    if agent_name != 'mqe':
+    if agent_name != "mqe":
         # Compute raw_grads, extract all grad metrics as scalars, then free the device buffer
         # before allocating the equally-sized update array (both ~256 MB; holding both = OOM).
         raw_grads = get_grads_standard(agent, batch)
-        total_grads = hiql_combine(raw_grads) if agent_name == 'hiql' else raw_grads
+        total_grads = hiql_combine(raw_grads) if agent_name == "hiql" else raw_grads
         available = set(total_grads.keys())
 
         for module_key, name in MODULE_GROUPS:
             if module_key in available:
                 result.update(grad_group_metrics(name, total_grads[module_key]))
         if "modules_critic" in available and "modules_value" in available:
-            result.update(grad_group_metrics("critic_value", {"critic": total_grads["modules_critic"], "value": total_grads["modules_value"]}))
+            result.update(
+                grad_group_metrics(
+                    "critic_value",
+                    {
+                        "critic": total_grads["modules_critic"],
+                        "value": total_grads["modules_value"],
+                    },
+                )
+            )
 
         del raw_grads, total_grads  # reclaim ~256 MB before allocating updates
 
         # get_updates_standard re-derives per-sample grads internally (32-sample chunks),
         # so no full grad array needs to live alongside the update array.
         raw_updates = get_updates_standard(agent, batch)
-        total_updates = hiql_combine(raw_updates) if agent_name == 'hiql' else raw_updates
+        total_updates = (
+            hiql_combine(raw_updates) if agent_name == "hiql" else raw_updates
+        )
 
         for module_key, name in MODULE_GROUPS:
             if module_key in available:
                 result.update(update_group_metrics(name, total_updates[module_key]))
         if "modules_critic" in available and "modules_value" in available:
-            result.update(update_group_metrics("critic_value", {"critic": total_updates["modules_critic"], "value": total_updates["modules_value"]}))
+            result.update(
+                update_group_metrics(
+                    "critic_value",
+                    {
+                        "critic": total_updates["modules_critic"],
+                        "value": total_updates["modules_value"],
+                    },
+                )
+            )
 
         del raw_updates, total_updates
 
     # --- Other metrics ---
     agent_modules = agent.network.model_def.modules.keys()
-    embedding_rank = calc_feature_embedding_rank(agent, batch) if "value" in agent_modules else None
+    embedding_rank = (
+        calc_feature_embedding_rank(agent, batch) if "value" in agent_modules else None
+    )
 
     if "target_value" in agent_modules:
-        held_out_val_batch_values = agent.network.select("target_value")(batch["observations"], batch["value_goals"], params=agent.network.params)
-        if len(held_out_val_batch_values.shape) == 3 and held_out_val_batch_values.shape[0] == 2:
-            held_out_val_batch_values = held_out_val_batch_values.mean(axis=0).reshape(-1)
+        held_out_val_batch_values = agent.network.select("target_value")(
+            batch["observations"], batch["value_goals"], params=agent.network.params
+        )
+        if (
+            len(held_out_val_batch_values.shape) == 3
+            and held_out_val_batch_values.shape[0] == 2
+        ):
+            held_out_val_batch_values = held_out_val_batch_values.mean(axis=0).reshape(
+                -1
+            )
     else:
         held_out_val_batch_values = None
 

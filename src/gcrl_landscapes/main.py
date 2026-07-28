@@ -126,6 +126,43 @@ if __name__ == "__main__":
         default=0,
         help="Number of candidates for eval-time rejection sampling (0 = disabled). Only GCIQL/CRL/FQL.",
     )
+    setup_subparser.add_argument(
+        "--rejection_proposal_ckpt",
+        type=str,
+        default=None,
+        help="Path to a params_*.pkl checkpoint whose actor proposes candidates for rejection sampling, instead of the wrapped agent's own actor. Requires --rejection_sampling_n > 1.",
+    )
+    setup_subparser.add_argument(
+        "--rejection_proposal_agent",
+        type=str,
+        default=None,
+        choices=SUPPORTED_AGENTS,
+        help="Agent class used to build the rejection-sampling proposal agent from --rejection_proposal_ckpt.",
+    )
+    setup_subparser.add_argument(
+        "--freeze_value",
+        action="store_true",
+        default=False,
+        help="Freeze all non-actor parameters at their loaded checkpoint values while only the actor trains. Requires resuming from a checkpoint.",
+    )
+    setup_subparser.add_argument(
+        "--discount",
+        type=float,
+        default=None,
+        help="Fixed discount factor override applied to every generated configuration. Cannot be combined with sweeping 'discount'.",
+    )
+    setup_subparser.add_argument(
+        "--expectile",
+        type=float,
+        default=None,
+        help="Fixed IQL expectile override applied to every generated configuration. Ignored by agents without an expectile.",
+    )
+    setup_subparser.add_argument(
+        "--single_phase",
+        action="store_true",
+        default=False,
+        help="Collapse the computed phase boundaries into a single phase ending at the final step, so training runs straight through without intermediate checkpoint selection/resets.",
+    )
     setup_subparser.set_defaults(func=run_setup)
 
     # Setup slurm parsing

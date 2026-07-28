@@ -78,6 +78,18 @@ def run_setup(args: argparse.Namespace) -> None:
         raise ValueError(
             f"--rejection_sampling_n only supported for GCIQL/CRL/FQL, got {args.agent}"
         )
+    if (args.rejection_proposal_ckpt is None) != (
+        args.rejection_proposal_agent is None
+    ):
+        raise ValueError(
+            "--rejection_proposal_ckpt and --rejection_proposal_agent must be given together"
+        )
+    if args.rejection_proposal_ckpt is not None and args.rejection_sampling_n <= 1:
+        raise ValueError(
+            "--rejection_proposal_ckpt requires --rejection_sampling_n > 1"
+        )
+    if args.discount is not None and "discount" in args.hyperparameters:
+        raise ValueError("--discount cannot be combined with sweeping 'discount'")
 
     adapted_default_config = get_adapted_default_config(
         args.agent,
@@ -86,6 +98,11 @@ def run_setup(args: argparse.Namespace) -> None:
         args.normalize_advantages,
         n_step=args.n_step,
         rejection_sampling_n=args.rejection_sampling_n,
+        freeze_value=args.freeze_value,
+        discount=args.discount,
+        expectile=args.expectile,
+        rejection_proposal_ckpt=args.rejection_proposal_ckpt,
+        rejection_proposal_agent=args.rejection_proposal_agent,
     )
 
     if len(args.datasets) == 1:
@@ -111,6 +128,11 @@ def run_setup(args: argparse.Namespace) -> None:
             for phase_percentage in args.phase_percentages
         ]
     )
+    if args.single_phase:
+        # Collapse into one phase ending at the final step (same total budget), so
+        # training runs straight through with no intermediate checkpoint selection/resets.
+        phases = [phases[-1]]
+        args.datasets = [args.datasets[-1]]
     # Log metadata to file
     metadata = {
         "arguments": args.__dict__ | {"phases": phases},
@@ -147,6 +169,11 @@ def run_setup(args: argparse.Namespace) -> None:
             normalize_advantages=args.normalize_advantages,
             n_step=args.n_step,
             rejection_sampling_n=args.rejection_sampling_n,
+            freeze_value=args.freeze_value,
+            discount=args.discount,
+            expectile=args.expectile,
+            rejection_proposal_ckpt=args.rejection_proposal_ckpt,
+            rejection_proposal_agent=args.rejection_proposal_agent,
         )
     else:
         configurations = [adapted_default_config]
