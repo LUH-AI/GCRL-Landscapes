@@ -25,6 +25,44 @@ from functools import partial
 CONST_VAL_BATCH_SIZE = 256
 GRAD_CHUNK_SIZE = 32  # chunk size for chunked_vmap in per-sample grad/update computation
 
+# Top-level params subtrees that belong to the policy. Everything else — value,
+# critic, their target copies, and CRL's contrastive encoder pair — is "the
+# learned signal" and is what `freeze_value` holds constant.
+ACTOR_MODULE_PREFIXES = ("modules_actor", "modules_low_actor", "modules_high_actor")
+
+
+def snapshot_frozen_params(agent) -> dict:
+    """Copy every non-actor top-level params subtree of *agent*.
+
+    Taken right after the checkpoint restore, this is the value signal that
+    `freeze_value` pins for the whole run.
+    """
+    return {
+        key: value
+        for key, value in agent.network.params.items()
+        if not key.startswith(ACTOR_MODULE_PREFIXES)
+    }
+
+
+def restore_frozen_params(agent, frozen: dict):
+    """Write the snapshotted non-actor subtrees back over an updated agent.
+
+    Called after every ``agent.update()`` so that only the actor evolves. The
+    optimizer state of the frozen modules keeps accumulating, which is
+    harmless: their parameters are overwritten before they are ever read again.
+    """
+    if not frozen:
+        return agent
+    from flax.core import FrozenDict
+
+    params = agent.network.params
+    # FrozenDict.copy(add_or_replace) vs plain-dict merge — the two container
+    # types take different call signatures, so dispatch explicitly.
+    merged = (
+        params.copy(frozen) if isinstance(params, FrozenDict) else {**params, **frozen}
+    )
+    return agent.replace(network=agent.network.replace(params=merged))
+
 def train(
     agent_class: Callable[[Any, gym.Env, int], Any],
     agent_path: Optional[Path],
@@ -95,6 +133,17 @@ def train(
     if agent_path:
         agent = restore_agent(agent, agent_path)
 
+    # `freeze_value` isolates extraction from value formation: the learned
+    # signal is held at its restored value while actor-side hyperparameters
+    # vary. Only meaningful with a checkpoint — freezing a randomly
+    # initialised critic would pin noise.
+    freeze_value = bool(config.get("freeze_value", False))
+    if freeze_value and not agent_path:
+        raise ValueError(
+            "freeze_value requires a checkpoint to freeze; submit with --agent_path"
+        )
+    frozen_params = snapshot_frozen_params(agent) if freeze_value else {}
+
     metrics: ResultsPerStep[EvaluationResult] = ResultsPerStep()
     agent_paths: ResultsPerStep[Path] = ResultsPerStep()
     save_dir = log_dir
@@ -112,6 +161,8 @@ def train(
         # Update agent.
         batch = train_dataset.sample(config["batch_size"])
         agent, update_info = agent.update(batch)
+        if freeze_value:
+            agent = restore_frozen_params(agent, frozen_params)
 
         # Log metrics.
         if i in log_steps:

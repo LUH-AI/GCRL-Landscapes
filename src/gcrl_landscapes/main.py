@@ -126,6 +126,15 @@ if __name__ == "__main__":
         default=0,
         help="Number of candidates for eval-time rejection sampling (0 = disabled). Only GCIQL/CRL/FQL.",
     )
+    setup_subparser.add_argument(
+        "--freeze_value",
+        action="store_true",
+        default=False,
+        help=(
+            "Hold every non-actor parameter subtree at its restored value, so only "
+            "actor-side hyperparameters vary. Requires submit --agent_path."
+        ),
+    )
     setup_subparser.set_defaults(func=run_setup)
 
     # Setup slurm parsing

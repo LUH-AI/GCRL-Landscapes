@@ -185,6 +185,7 @@ def get_adapted_default_config(
     normalize_advantages: bool = False,
     n_step: int = 1,
     rejection_sampling_n: int = 0,
+    freeze_value: bool = False,
 ) -> FrozenConfigDict:
     agent_config_generators = {
         "crl": lambda: _adapt_base_config(
@@ -194,6 +195,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "cmd": lambda: _adapt_base_config(
             ogbench.impls.agents.cmd.get_config().to_dict(),
@@ -202,6 +204,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "gcbc": lambda: _adapt_base_config(
             ogbench.impls.agents.gcbc.get_config().to_dict(),
@@ -210,6 +213,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "gciql": lambda: _adapt_base_config(
             ogbench.impls.agents.gciql.get_config().to_dict(),
@@ -218,6 +222,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "gcivl": lambda: _adapt_base_config(
             ogbench.impls.agents.gcivl.get_config().to_dict(),
@@ -226,6 +231,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "fql": lambda: _adapt_base_config(
             fql.get_config().to_dict(),
@@ -234,6 +240,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "hiql": lambda: _adapt_base_config(
             ogbench.impls.agents.hiql.get_config().to_dict(),
@@ -242,6 +249,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "mqe": lambda: _adapt_base_config(
             ogbench.impls.agents.mqe.get_config().to_dict(),
@@ -250,6 +258,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "qrl": lambda: _adapt_base_config(
             ogbench.impls.agents.qrl.get_config().to_dict(),
@@ -258,6 +267,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
         "sac": lambda: _adapt_base_config(
             ogbench.impls.agents.sac.get_config().to_dict(),
@@ -266,6 +276,7 @@ def get_adapted_default_config(
             normalize_advantages,
             n_step,
             rejection_sampling_n,
+            freeze_value,
         ),
     }
     return FrozenConfigDict(initial_dictionary=agent_config_generators[agent.lower()]())
@@ -281,6 +292,7 @@ def generate_configurations(
     normalize_advantages: bool = False,
     n_step: int = 1,
     rejection_sampling_n: int = 0,
+    freeze_value: bool = False,
 ) -> list[FrozenConfigDict]:
     logger.info(f"Generating {n} configurations for {agent} using {hyperparameters}")
     np.random.seed(seed)
@@ -297,6 +309,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -309,6 +322,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -321,6 +335,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             )
             if "discount" not in hyperparameters
             else _adapt_base_config(
@@ -330,6 +345,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             )
             | {"actor_geom_sample": True},
             n,
@@ -343,6 +359,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -355,6 +372,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -367,6 +385,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -379,6 +398,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -391,6 +411,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -403,6 +424,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -415,6 +437,7 @@ def generate_configurations(
                 normalize_advantages,
                 n_step,
                 rejection_sampling_n,
+                freeze_value,
             ),
             n,
             hyperparameters,
@@ -646,6 +669,7 @@ def _adapt_base_config(
     normalize_advantages: bool = False,
     n_step: int = 1,
     rejection_sampling_n: int = 0,
+    freeze_value: bool = False,
 ) -> dict:
     visual = "visual" in env or "powderworld" in env
     discrete = "powderworld" in env
@@ -681,6 +705,7 @@ def _adapt_base_config(
             rejection_sampling_n,
             "rejection_sampling_n" not in config,
         ),
+        ("freeze_value", freeze_value, "freeze_value" not in config),
     ]
     return config | {
         key: value for key, value, condition in key_value_pairs if condition

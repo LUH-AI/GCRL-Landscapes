@@ -13,10 +13,17 @@ from gcrl_landscapes.agents import FQLAgent, NStepGCIQLAgent, NStepGCIVLAgent
 from gcrl_landscapes.agents import fql as fql_module
 from gcrl_landscapes.configurations import generate_configurations
 from gcrl_landscapes.evaluate import RejectionSamplingAgent
+from gcrl_landscapes.training import (
+    ACTOR_MODULE_PREFIXES,
+    restore_frozen_params,
+    snapshot_frozen_params,
+)
 from gcrl_landscapes.util.datasets import NStepGCDataset
 
+import ogbench.impls.agents.gcbc as gcbc_module
 import ogbench.impls.agents.gciql as gciql_module
 import ogbench.impls.agents.gcivl as gcivl_module
+from ogbench.impls.agents.gcbc import GCBCAgent
 from ogbench.impls.utils.datasets import Dataset
 
 OBS_DIM = 11
@@ -183,6 +190,94 @@ def test_rejection_sampling():
     assert action.shape == (ACT_DIM,)
     assert jnp.all(jnp.abs(action) <= 1.0)
     print("Rejection sampling (GCIQL + FQL): OK")
+
+
+def test_rejection_sampling_with_separate_proposal():
+    """SfBC-style extraction: candidates from a BC policy, scores from the critic.
+
+    The point of the A6 arm is that no AWR-trained actor participates in action
+    selection, so this asserts the executed action is the arg-max-min-Q element
+    of the *proposal's* candidate set, recomputed independently.
+    """
+    rng = np.random.default_rng(5)
+    ex_obs = rng.normal(size=(BATCH, OBS_DIM)).astype(np.float32)
+    ex_act = rng.uniform(-1, 1, size=(BATCH, ACT_DIM)).astype(np.float32)
+
+    critic_config = gciql_module.get_config().to_dict()
+    critic_config["actor_loss"] = "awr"
+    critic_agent = NStepGCIQLAgent.create(0, ex_obs, ex_act, critic_config)
+
+    # A GCBC policy is the literature's pi_beta; seeded differently so its
+    # actor cannot coincide with the critic agent's own actor.
+    proposal_agent = GCBCAgent.create(7, ex_obs, ex_act, gcbc_module.get_config().to_dict())
+
+    n = 8
+    wrapper = RejectionSamplingAgent(critic_agent, num_samples=n, proposal_agent=proposal_agent)
+    obs, goal, key = ex_obs[0], ex_obs[1], jax.random.PRNGKey(3)
+    action = wrapper.sample_actions(obs, goals=goal, seed=key)
+
+    assert action.shape == (ACT_DIM,)
+    assert jnp.all(jnp.abs(action) <= 1.0)
+
+    # Recompute the candidate set from the PROPOSAL and the scores from the
+    # CRITIC, exactly as the wrapper should have.
+    obs_r = jnp.repeat(jnp.asarray(obs)[None], n, axis=0)
+    goals_r = jnp.repeat(jnp.asarray(goal)[None], n, axis=0)
+    dist = proposal_agent.network.select("actor")(obs_r, goals_r, temperature=1.0)
+    candidates = jnp.clip(dist.sample(seed=key), -1, 1)
+    candidates = candidates.at[0].set(jnp.clip(dist.mode()[0], -1, 1))
+    q1, q2 = critic_agent.network.select("critic")(obs_r, goals_r, candidates)
+    expected = candidates[jnp.argmax(jnp.minimum(q1, q2))]
+    np.testing.assert_allclose(np.asarray(action), np.asarray(expected), rtol=1e-6)
+
+    # And it must differ from what the critic agent's own actor would have
+    # proposed — otherwise the "AWR-free" claim would be untestable here.
+    own = RejectionSamplingAgent(critic_agent, num_samples=n).sample_actions(
+        obs, goals=goal, seed=key
+    )
+    assert not np.allclose(np.asarray(action), np.asarray(own)), (
+        "proposal agent was ignored: candidates still came from the critic's actor"
+    )
+    print("Rejection sampling with separate BC proposal (SfBC): OK")
+
+
+def test_restore_frozen_params():
+    """A4: after an update, every non-actor subtree is bitwise unchanged and the
+    actor has moved. Without this, a 'frozen signal' sweep would silently be an
+    ordinary sweep."""
+    rng = np.random.default_rng(11)
+    ex_obs = rng.normal(size=(BATCH, OBS_DIM)).astype(np.float32)
+    ex_act = rng.uniform(-1, 1, size=(BATCH, ACT_DIM)).astype(np.float32)
+
+    config = gciql_module.get_config().to_dict()
+    config["actor_loss"] = "awr"
+    agent = NStepGCIQLAgent.create(0, ex_obs, ex_act, config)
+
+    frozen = snapshot_frozen_params(agent)
+    assert frozen, "no non-actor subtrees found to freeze"
+    assert not any(k.startswith(ACTOR_MODULE_PREFIXES) for k in frozen), (
+        "actor modules must not be frozen"
+    )
+    assert any("critic" in k or "value" in k for k in frozen), (
+        f"expected critic/value subtrees among {sorted(frozen)}"
+    )
+
+    before = jax.tree_util.tree_map(np.asarray, agent.network.params)
+    updated, _ = agent.update(make_batch(rng))
+    restored = restore_frozen_params(updated, frozen)
+    after = jax.tree_util.tree_map(np.asarray, restored.network.params)
+
+    for key in before:
+        leaves_before = jax.tree_util.tree_leaves(before[key])
+        leaves_after = jax.tree_util.tree_leaves(after[key])
+        moved = any(
+            not np.array_equal(b, a) for b, a in zip(leaves_before, leaves_after)
+        )
+        if key.startswith(ACTOR_MODULE_PREFIXES):
+            assert moved, f"actor subtree {key} did not change — nothing was trained"
+        else:
+            assert not moved, f"frozen subtree {key} changed despite freeze_value"
+    print("restore_frozen_params (critic/value pinned, actor moves): OK")
 
 
 def test_generate_configurations_threads_n_step_and_rejection_sampling():

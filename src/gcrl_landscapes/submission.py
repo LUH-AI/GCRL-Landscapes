@@ -79,6 +79,11 @@ def run_setup(args: argparse.Namespace) -> None:
             f"--rejection_sampling_n only supported for GCIQL/CRL/FQL, got {args.agent}"
         )
 
+    if args.freeze_value and args.agent == "QRL":
+        # QRL's dynamics head is untrained in AWR checkpoints, so there is no
+        # meaningful "frozen signal" to extract from — same scoping as R1.
+        raise ValueError("--freeze_value is not supported for QRL")
+
     adapted_default_config = get_adapted_default_config(
         args.agent,
         args.datasets[0],  # Here we assume that all datasets are of the same kind
@@ -86,6 +91,7 @@ def run_setup(args: argparse.Namespace) -> None:
         args.normalize_advantages,
         n_step=args.n_step,
         rejection_sampling_n=args.rejection_sampling_n,
+        freeze_value=args.freeze_value,
     )
 
     if len(args.datasets) == 1:
@@ -147,6 +153,7 @@ def run_setup(args: argparse.Namespace) -> None:
             normalize_advantages=args.normalize_advantages,
             n_step=args.n_step,
             rejection_sampling_n=args.rejection_sampling_n,
+            freeze_value=args.freeze_value,
         )
     else:
         configurations = [adapted_default_config]
