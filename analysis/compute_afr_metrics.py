@@ -65,6 +65,14 @@ _CKPT_RE = re.compile(
 )
 
 
+# Set from --path-remap. Campaigns record absolute checkpoint paths, which are
+# only valid on the machine that produced them.
+_PATH_REMAP: tuple[str, str] | None = None
+# Every alpha that had to fall back to the default is counted and reported at
+# the end: a silent fallback would corrupt the AWR weights for that checkpoint.
+_ALPHA_FALLBACKS: list[str] = []
+
+
 def _get_alpha(checkpoint_path: str, config_idx: str) -> float:
     """Derive config JSON path from checkpoint_path and extract 'alpha'.
 
@@ -72,17 +80,29 @@ def _get_alpha(checkpoint_path: str, config_idx: str) -> float:
     The corresponding config file lives at:
       cluster-mount/{experiment_root}/configurations/configuration_N.json
 
-    Falls back to 0.5 if the file cannot be read.
+    Falls back to 0.5 if the file cannot be read (and records that it did).
     """
+    if _PATH_REMAP is not None:
+        old, new = _PATH_REMAP
+        if checkpoint_path.startswith(old):
+            checkpoint_path = new + checkpoint_path[len(old) :]
     m = _CKPT_RE.search(checkpoint_path)
     if m:
         agent_dir = m.group("agent_dir")
         idx = m.group("config_idx")
         # Locate the agent dir start in the string to get the experiment root
         prefix_end = checkpoint_path.index(agent_dir) + len(agent_dir)
-        experiment_root = checkpoint_path[:prefix_end]
-        # Strip cluster prefix and route through cluster-mount
-        local_root = CLUSTER_MOUNT / Path(experiment_root).relative_to(CLUSTER_PREFIX)
+        experiment_root = Path(checkpoint_path[:prefix_end])
+        # Running ON the cluster the recorded path is already the real one;
+        # running locally it has to be rewritten through the cluster mount.
+        if experiment_root.is_dir():
+            local_root = experiment_root
+        else:
+            try:
+                local_root = CLUSTER_MOUNT / experiment_root.relative_to(CLUSTER_PREFIX)
+            except ValueError:
+                _ALPHA_FALLBACKS.append(checkpoint_path)
+                return 0.5
         config_path = local_root / "configurations" / f"configuration_{idx}.json"
         try:
             config = json.loads(config_path.read_text())
@@ -91,6 +111,7 @@ def _get_alpha(checkpoint_path: str, config_idx: str) -> float:
                     return float(val)
         except Exception:
             pass
+    _ALPHA_FALLBACKS.append(checkpoint_path)
     return 0.5
 
 
@@ -220,12 +241,29 @@ def main() -> None:
         "If unset, all batches are used.",
     )
     parser.add_argument(
+        "--path-remap",
+        nargs=2,
+        default=None,
+        metavar=("OLD_PREFIX", "NEW_PREFIX"),
+        help=(
+            "Rewrite the checkpoint_path prefix recorded in the parquet before "
+            "resolving each run's configuration JSON. Needed when a campaign was "
+            "produced under a different mount than the one it is analysed on — "
+            "without it the alpha lookup silently falls back to 0.5."
+        ),
+    )
+    parser.add_argument(
         "--config-ids",
         type=Path,
         default=None,
         help="Path to JSON file with {agent: [config_ids]} to filter to.",
     )
     args = parser.parse_args()
+
+    if args.path_remap is not None:
+        global _PATH_REMAP
+        _PATH_REMAP = (args.path_remap[0], args.path_remap[1])
+        print(f"Path remap: {_PATH_REMAP[0]} -> {_PATH_REMAP[1]}")
 
     # Parse batch filter (batch_idx is stored as string in the parquet)
     batch_filter: set[str] | None = None
@@ -256,6 +294,18 @@ def main() -> None:
             print(f"  {i + 1}/{n_groups}  ok={len(results)}  skipped={skipped}")
 
     result_df = pd.DataFrame(results)
+
+    if _ALPHA_FALLBACKS:
+        # The AWR weights (and therefore top_5_pct_mass / saturation_mass) are
+        # computed with alpha; a defaulted alpha makes those columns fiction.
+        unique = sorted(set(_ALPHA_FALLBACKS))
+        raise SystemExit(
+            f"ERROR: alpha could not be resolved for {len(unique)} checkpoint(s); "
+            f"the 0.5 default would corrupt the AWR-weight columns.\n"
+            f"  first: {unique[0]}\n"
+            f"Pass --path-remap OLD_PREFIX NEW_PREFIX if this campaign was produced "
+            f"under a different mount."
+        )
 
     # Filter by batch index if requested
     if batch_filter is not None:
