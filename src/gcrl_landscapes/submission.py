@@ -527,6 +527,7 @@ def submit(args: argparse.Namespace) -> None:
                 "configuration_idx": configuration_idx,
                 "seed": seed,
                 "tasks_per_node_parallel": args.tasks_per_node_parallel,
+                "agent_path": args.agent_path,
             }
             for configuration_idx, seed in product(
                 configuration_indices,
@@ -634,6 +635,7 @@ def run_config_chunked_arguments_wrapper(
             setup["configuration_idx"],
             setup["seed"],
             setup["tasks_per_node_parallel"],
+            agent_path=setup.get("agent_path"),
             clean_checkpoints=first_job_and_task_in_array and seq_idx == 0,
         )
         for seq_idx, setup in enumerate(arguments[r])

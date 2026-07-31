@@ -130,6 +130,10 @@ def train(
     # For `freeze_value` runs starting from a checkpoint: snapshot every non-actor
     # param subtree so it can be restored after each update, leaving only the
     # actor free to train.
+    if config.get("freeze_value", False) and not agent_path:
+        raise ValueError(
+            "freeze_value requires a checkpoint to freeze; submit with --agent_path"
+        )
     frozen_params_snapshot = (
         dict(agent.network.params)
         if config.get("freeze_value", False) and agent_path
