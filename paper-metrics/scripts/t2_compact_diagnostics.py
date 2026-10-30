@@ -22,6 +22,7 @@ Output:
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -31,14 +32,14 @@ import numpy as np
 import pandas as pd
 import pyarrow.parquet as pq
 
-from _common import AGENTS, ENVS, OUTPUTS, alpha_map_from_zip, parquet_path, save_csv
+from _common import OUTPUTS, alpha_map_from_zip, campaign_spec, parquet_path, save_csv
 
 N = 256
 W_MAX = 100.0
 TOP_K = int(np.ceil(0.05 * N))  # = 13, matches Malte's compute_afr_metrics.py
 
 
-def per_matrix_metrics(M: np.ndarray, alpha: float) -> dict:
+def per_matrix_metrics(M: np.ndarray, alpha: float, has_value: bool = True) -> dict:
     A_plus = np.diag(M)
     off = ~np.eye(N, dtype=bool)
     gaps = (A_plus[:, None] - M)[off]
@@ -52,6 +53,13 @@ def per_matrix_metrics(M: np.ndarray, alpha: float) -> dict:
         order = np.argsort(M[i])[::-1]
         rec[i] = 1.0 / (int(np.where(order == i)[0][0]) + 1)
     mrr = float(rec.mean())
+
+    # ESS/Top-5 assume A_plus is a centered advantage (Q - V); without a value
+    # baseline (e.g. CRL under actor_loss='ddpgbc') the AWR weights are meaningless.
+    if not has_value:
+        return dict(
+            fr_auc=fr_auc, gap=gap, mrr=mrr, ess=float("nan"), top5_mass=float("nan")
+        )
 
     # AWR weights (clipped) for ESS and Top-5
     raw = np.exp(np.clip(alpha * A_plus.astype(np.float64), -500, 500))
@@ -68,12 +76,13 @@ def per_matrix_metrics(M: np.ndarray, alpha: float) -> dict:
     return dict(fr_auc=fr_auc, gap=gap, mrr=mrr, ess=ess, top5_mass=top5_mass)
 
 
-def process_env(env: str) -> pd.DataFrame:
+def process_env(env: str, campaign: str | None) -> pd.DataFrame:
+    parquet = parquet_path(env, campaign)
+    if parquet is None or not parquet.exists():
+        print(f"  {env}: no parquet yet, skipping")
+        return pd.DataFrame()
     print(f"  {env}: streaming parquet…")
-    parquet = parquet_path(env)
-    if not parquet.exists():
-        raise FileNotFoundError(parquet)
-    alpha_map = alpha_map_from_zip(env)
+    alpha_map = alpha_map_from_zip(env, campaign)
     if not alpha_map:
         raise RuntimeError(f"No alpha map for {env} — check the zip path.")
 
@@ -90,20 +99,35 @@ def process_env(env: str) -> pd.DataFrame:
         alpha = alpha_map.get((agent, config))
         if alpha is None:
             continue
+        actor_loss = str(df["actor_loss"].iloc[0]) if "actor_loss" in df else "awr"
+        has_value = not (agent == "CRL" and actor_loss != "awr")
         M = np.empty((N, N), dtype=np.float32)
         M[df["obs_idx"].to_numpy(), df["goal_idx"].to_numpy()] = df[
             "advantage"
         ].to_numpy()
-        rec = per_matrix_metrics(M, alpha)
+        rec = per_matrix_metrics(M, alpha, has_value=has_value)
         rec.update(env=env, agent=agent, config=config, seed=seed, batch_idx=b_idx)
         records.append(rec)
     return pd.DataFrame(records)
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--campaign",
+        type=str,
+        default=None,
+        help="Campaign name from data/manifest.json (default: manifest's default_campaign)",
+    )
+    args = parser.parse_args()
+
+    spec = campaign_spec(args.campaign)
+    ENVS = list(spec["envs"].keys())
+    AGENTS = list(spec["agents"])
+
     parts = []
     for env in ENVS:
-        parts.append(process_env(env))
+        parts.append(process_env(env, args.campaign))
     per_matrix = pd.concat(parts, ignore_index=True)
 
     agg = (
@@ -116,7 +140,8 @@ def main() -> None:
     )
 
     # Pull Max Success from t1's output
-    t1_path = OUTPUTS / "t1_final_landscape_ci.csv"
+    t1_name = "t1_final_landscape_ci" + (f"_{args.campaign}" if args.campaign else "")
+    t1_path = OUTPUTS / f"{t1_name}.csv"
     if not t1_path.exists():
         raise FileNotFoundError(
             f"{t1_path} not found — run t1_final_landscape_ci.py first."
@@ -140,7 +165,8 @@ def main() -> None:
         columns=["env_order", "agent_order"]
     )
 
-    save_csv(out, "t2_compact_diagnostics")
+    out_name = "t2_compact_diagnostics" + (f"_{args.campaign}" if args.campaign else "")
+    save_csv(out, out_name)
     print()
     print(out.to_string(index=False))
 

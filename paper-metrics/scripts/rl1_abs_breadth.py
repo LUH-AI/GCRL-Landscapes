@@ -18,6 +18,7 @@ Outputs: outputs/rl1_abs_breadth.csv, outputs/rl1_abs_breadth.tex
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -27,7 +28,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import trim_mean
 
-from _common import AGENTS, ENVS, OUTPUTS, load_all_eval_stats, save_csv
+from _common import OUTPUTS, campaign_spec, load_all_eval_stats, save_csv
 
 THRESHOLDS = [0.25, 0.5]
 N_BOOT = 2000
@@ -63,7 +64,20 @@ def bootstrap_seeds(
 
 
 def main() -> None:
-    df = load_all_eval_stats()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--campaign",
+        type=str,
+        default=None,
+        help="Campaign name from data/manifest.json (default: manifest's default_campaign)",
+    )
+    args = parser.parse_args()
+
+    spec = campaign_spec(args.campaign)
+    ENVS = list(spec["envs"].keys())
+    AGENTS = list(spec["agents"])
+
+    df = load_all_eval_stats(args.campaign)
     last = df[
         df["phase"] == df.groupby(["algo", "env_short"])["phase"].transform("max")
     ]
@@ -95,7 +109,8 @@ def main() -> None:
             rows.append(row)
 
     out = pd.DataFrame(rows)
-    save_csv(out, "rl1_abs_breadth")
+    out_name = "rl1_abs_breadth" + (f"_{args.campaign}" if args.campaign else "")
+    save_csv(out, out_name)
 
     # LaTeX table
     lines = [
@@ -110,7 +125,7 @@ def main() -> None:
             f"{r['rho_abs_0.5']:.2f} & {r['rho_abs_0.5_ci_cfg']} \\\\"
         )
     lines += [r"\bottomrule", r"\end{tabular}"]
-    tex = OUTPUTS / "rl1_abs_breadth.tex"
+    tex = OUTPUTS / f"{out_name}.tex"
     tex.write_text("\n".join(lines) + "\n")
     print(f"  → {tex}")
     print()

@@ -33,6 +33,25 @@
           "parquet": "scene/advantages.parquet"
         }
       }
+    },
+    "ddpgbc": {
+      "variant": "ddpgbc",
+      "agents": ["CRL", "GCIQL", "GCIVL", "QRL"],
+      "dir_suffix": "64c_lr-alpha",
+      "hyperparameters": ["lr", "alpha"],
+      "envs": {
+        "antmaze-medium": {
+          "dataset_tag": "antmaze-medium-navigate-v0",
+          "zip": "2026-07-30-logs_ddpgbc.zip",
+          "eval_stats": "antmaze-medium-ddpgbc.csv",
+          "parquet": "antmaze-medium-ddpgbc/advantages.parquet"
+        },
+        "cube": {
+          "dataset_tag": "cube-single-play-v0",
+          "zip": "2026-07-30-logs_ddpgbc.zip",
+          "eval_stats": "cube-ddpgbc.csv"
+        }
+      }
     }
   }
 }

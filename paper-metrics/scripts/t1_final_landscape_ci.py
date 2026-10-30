@@ -16,6 +16,7 @@ Output:
 
 from __future__ import annotations
 
+import argparse
 import sys
 from pathlib import Path
 
@@ -24,11 +25,24 @@ sys.path.insert(0, str(Path(__file__).parent))
 import pandas as pd
 from scipy.stats import trim_mean
 
-from _common import AGENTS, ENVS, load_all_eval_stats, save_csv
+from _common import campaign_spec, load_all_eval_stats, save_csv
 
 
 def main() -> None:
-    df = load_all_eval_stats()
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--campaign",
+        type=str,
+        default=None,
+        help="Campaign name from data/manifest.json (default: manifest's default_campaign)",
+    )
+    args = parser.parse_args()
+
+    spec = campaign_spec(args.campaign)
+    ENVS = list(spec["envs"].keys())
+    AGENTS = list(spec["agents"])
+
+    df = load_all_eval_stats(args.campaign)
     last = df[
         df["phase"] == df.groupby(["algo", "env_short"])["phase"].transform("max")
     ]
@@ -67,7 +81,8 @@ def main() -> None:
         columns=["env_order", "agent_order"]
     )
 
-    save_csv(out, "t1_final_landscape_ci")
+    out_name = "t1_final_landscape_ci" + (f"_{args.campaign}" if args.campaign else "")
+    save_csv(out, out_name)
     print()
     print(out.to_string(index=False))
 

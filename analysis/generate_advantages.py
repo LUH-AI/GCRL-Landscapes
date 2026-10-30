@@ -86,14 +86,22 @@ def _batch_compute_gciql_crl(
     obs_rep: jnp.ndarray,
     act_rep: jnp.ndarray,
     goals_rep: jnp.ndarray,
+    has_value: bool = True,
 ) -> np.ndarray:
-    """Returns (B, N, N) advantages for a batch of B param sets."""
+    """Returns (B, N, N) advantages for a batch of B param sets.
+
+    CRL only builds a 'value' network when actor_loss == 'awr' (see ogbench's
+    crl.py); for other actor losses (e.g. ddpgbc) there is no V(s,g) to
+    subtract, so *has_value=False* falls back to raw Q as the ranking signal.
+    """
 
     def single(params: Any) -> jnp.ndarray:
         q1, q2 = ref_agent.network.select("critic")(
             obs_rep, goals_rep, act_rep, params=params
         )
         q = jnp.minimum(q1, q2)
+        if not has_value:
+            return q.reshape(BATCH_SIZE, BATCH_SIZE)
         v = ref_agent.network.select("value")(obs_rep, goals_rep, params=params)
         return (q - v).reshape(BATCH_SIZE, BATCH_SIZE)
 
@@ -282,9 +290,10 @@ def _process_chunk_frames(
 
     try:
         if agent_name in ("GCIQL", "CRL", "FQL"):
+            has_value = not (agent_name == "CRL" and actor_losses[0] != "awr")
             act_rep = jnp.repeat(jnp.array(batch["actions"]), N, axis=0)
             adv_batch = _batch_compute_gciql_crl(
-                ref_agent, batched_params, obs_rep, act_rep, goals_rep
+                ref_agent, batched_params, obs_rep, act_rep, goals_rep, has_value=has_value
             )
             for i, row in enumerate(rows_chunk):
                 _emit_df(

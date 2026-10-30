@@ -44,6 +44,8 @@ def concentration(adv: np.ndarray, alpha: float, w_max: float) -> dict:
 def process_env(env: str) -> list[dict]:
     print(f"  {env}: streaming parquet…")
     parquet = parquet_path(env)
+    if parquet is None:
+        raise FileNotFoundError(f"{env}: no advantage parquet configured")
     if not parquet.exists():
         raise FileNotFoundError(parquet)
     alpha_map = alpha_map_from_zip(env)

@@ -62,9 +62,14 @@ def zip_path(env: str, campaign: str | None = None) -> Path:
     return ZIPS / campaign_spec(campaign)["envs"][env]["zip"]
 
 
-def parquet_path(env: str, campaign: str | None = None) -> Path:
-    """Path to the cross-goal advantage matrix parquet for a given env."""
-    return PARQUETS / campaign_spec(campaign)["envs"][env]["parquet"]
+def parquet_path(env: str, campaign: str | None = None) -> Path | None:
+    """Path to the cross-goal advantage matrix parquet for a given env.
+
+    Returns None if the env has no parquet yet (e.g. onboarded for
+    eval-stats-only tables before its advantage matrices were computed).
+    """
+    rel = campaign_spec(campaign)["envs"][env].get("parquet")
+    return PARQUETS / rel if rel else None
 
 
 def eval_stats_path(env: str, campaign: str | None = None) -> Path:

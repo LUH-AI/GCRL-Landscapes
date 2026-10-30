@@ -62,6 +62,8 @@ def ess_at(adv_norm: np.ndarray, alpha_eff: float) -> float:
 def process_env(env: str) -> list[dict]:
     print(f"  {env}: streaming parquet…")
     parquet = parquet_path(env)
+    if parquet is None:
+        raise FileNotFoundError(f"{env}: no advantage parquet configured")
     if not parquet.exists():
         raise FileNotFoundError(parquet)
     alpha_map = alpha_map_from_zip(env)
