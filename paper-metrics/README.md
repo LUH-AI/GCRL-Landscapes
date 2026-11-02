@@ -86,11 +86,6 @@ repository (they total ~23 GB). Steps 1–2 below expect them under
 `data/manifest.json`. The commands further down only *copy* those files from a
 location that you must supply yourself.
 
-No public archive (DOI, Zenodo, Hugging Face dataset) is advertised for these
-artefacts. If you do not have your own copy of the training campaign, request
-them from the authors — open an issue in the project repository or write to the
-maintainer address listed in `pyproject.toml`.
-
 Only the derived `data/eval_stats/<env>.csv` tables are small (~400 KB each);
 step 3 rebuilds them from the zips.
 
