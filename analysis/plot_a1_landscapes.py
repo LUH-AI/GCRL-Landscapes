@@ -35,7 +35,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 
-import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr, trim_mean
 

@@ -7,7 +7,6 @@ written to temporary directories (tmp_path fixture from pytest).
 from pathlib import Path
 
 import pandas as pd
-import pytest
 import toml
 
 from analysis.catalog_checkpoints import catalog_checkpoints
@@ -48,7 +47,9 @@ def build_minimal_agent_dir(tmp_dir: Path, n_seeds: int = 2) -> Path:
     agent_dir.joinpath("info.toml").write_text(
         mkinfo(
             agent="CRL",
-            datasets=["antmaze-medium-navigate-v0", "antmaze-medium-explore-v0"],
+            # The catalog maps the last phase to the last dataset when the dataset
+            # list is shorter than the phase list, so the target dataset comes last.
+            datasets=["antmaze-medium-explore-v0", "antmaze-medium-navigate-v0"],
             phases=[39772, 79545, 119318, 159090],
         )
     )
@@ -102,6 +103,7 @@ class TestCatalogCheckpoints:
         assert df.empty
         assert list(df.columns) == [
             "checkpoint_path",
+            "config_path",
             "agent",
             "dataset",
             "phase",
@@ -126,6 +128,7 @@ class TestCatalogCheckpoints:
         assert len(df) == 2
         assert list(df.columns) == [
             "checkpoint_path",
+            "config_path",
             "agent",
             "dataset",
             "phase",

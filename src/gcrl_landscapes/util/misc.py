@@ -97,9 +97,9 @@ def crl_contrastive_loss_individual(agent, batch, index, grad_params, module_nam
         psi = psi[None, ...]
     logits = jax.numpy.einsum('eik,ejk->ije', phi, psi) / jax.numpy.sqrt(phi.shape[-1])
     # logits.shape is (B, B, e) with one term for positive pair and (B - 1) terms for negative pairs in each row.
-    I = jax.numpy.eye(batch_size)
+    eye_mask = jax.numpy.eye(batch_size)
     contrastive_loss = jax.vmap(
-        lambda _logits: optax.sigmoid_binary_cross_entropy(logits=_logits, labels=I),
+        lambda _logits: optax.sigmoid_binary_cross_entropy(logits=_logits, labels=eye_mask),
         in_axes=-1,
         out_axes=-1,
     )(logits)
@@ -108,15 +108,15 @@ def crl_contrastive_loss_individual(agent, batch, index, grad_params, module_nam
     # Compute additional statistics.
     v = jax.numpy.exp(v)
     logits = jax.numpy.mean(logits, axis=-1)
-    logits_pos = jax.numpy.sum(logits * I) / jax.numpy.sum(I)
-    logits_neg = jax.numpy.sum(logits * (1 - I)) / jax.numpy.sum(1 - I)
+    logits_pos = jax.numpy.sum(logits * eye_mask) / jax.numpy.sum(eye_mask)
+    logits_neg = jax.numpy.sum(logits * (1 - eye_mask)) / jax.numpy.sum(1 - eye_mask)
 
     return contrastive_loss, {
         'contrastive_loss': contrastive_loss,
         'v_mean': v.mean(),
         'v_max': v.max(),
         'v_min': v.min(),
-        'binary_accuracy': jax.numpy.mean((logits > 0) == I),
+        'binary_accuracy': jax.numpy.mean((logits > 0) == eye_mask),
         'logits_pos': logits_pos,
         'logits_neg': logits_neg,
         'logits': logits.mean(),
