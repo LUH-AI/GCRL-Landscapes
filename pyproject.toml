@@ -9,16 +9,21 @@ description = "Hyperparameter-landscape exploration for offline goal-conditioned
 readme = "README.md"
 requires-python = ">=3.10, <3.11"
 license = "MIT"
-keywords = []
+keywords = [
+  "offline reinforcement learning",
+  "goal-conditioned reinforcement learning",
+  "hyperparameter landscapes",
+  "benchmark",
+  "JAX",
+]
 authors = [
   { name = "Jan Malte Töpperwien", email = "m.toepperwien@protonmail.com" },
 ]
 classifiers = [
-  "Development Status :: 4 - Beta",
+  "Development Status :: 5 - Production/Stable",
   "Programming Language :: Python",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
 ]
 dependencies = [
   "gymnasium >= 1.1.1",
@@ -105,3 +110,20 @@ exclude_lines = ["no cov", "if __name__ == .__main__.:", "if TYPE_CHECKING:"]
 
 [tool.ruff]
 extend-exclude = ["src/gcrl_landscapes/plots/triple_gp.py"]
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+
+# The scientific stack ships no (or partial) type information. Silencing it here
+# keeps `mypy src/gcrl_landscapes` useful for our own modules.
+[[tool.mypy.overrides]]
+module = [
+  "ogbench.*",
+  "smac.*",
+  "flax.*",
+  "jax.*",
+  "gpflow.*",
+  "tensorflow.*",
+]
+ignore_missing_imports = true
