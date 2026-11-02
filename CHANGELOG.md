@@ -5,6 +5,67 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.0] - 2026-10-30
+
+First public release, prepared from the `develop` line for publication.
+
+### Added
+- **Agents**: MQE and FQL support in the landscape framework
+- **Training**: N-step returns and rejection sampling, exposed as `setup` CLI options
+- **Paper metrics**: `paper-metrics/` pipeline that reproduces the paper tables and figures from raw results
+- **Analysis**: checkpoint catalog, cross-goal advantage generation and advantage/AFR analysis pipeline
+- **Analysis**: figure-reproduction scripts for the camera-ready plots
+- **Documentation**: full project overview, usage guide and reproduction instructions
+
+### Changed
+- History reunified: the `develop` line is merged onto `main`
+- Version scheme reset to `1.0.0` for the public release
+
+---
+
+## [0.5.2] - 2026-04-29
+
+### Added
+- Advantage and AWR weight distribution analysis, with per-sample advantage logging on the held-out validation batch
+- BFS maze-graph goal distances for locomaze environments and scene-environment support for goal distances
+- DDPGBC actor loss support and a GCIQL HPO config
+- `evaluate.py` replaces the `evaluate.md` notebook and accepts `--zipfiles`
+- `submit_train_all.sh` cluster-aware submission wrapper and a kisski cluster profile
+- Tests for `extract_training_log`
+
+### Changed
+- Held-out validation batch is now identical across evaluations
+- Plots are written as PDF instead of PNG
+- Pin `jax < 0.7.0` and `setuptools < 81`, update `ogbench`
+
+### Fixed
+- Out-of-memory failures in training metrics via `chunked_vmap` and earlier gradient deallocation
+- Alternative advantage/held-out column handling in the tabular and evaluate pipelines
+- Dataset seeding, `MixedDataset` parameter propagation and ambiguous truth value in `_split_indices`
+- Cluster conda activation in Slurm batch jobs
+
+---
+
+## [0.5.1] - 2026-04-08
+
+### Added
+- Cluster profiles, replacing branch-based cluster configuration
+- Reservation support for the `luis` cluster
+
+### Changed
+- Phase boundaries use maximum performance for the phase setting
+
+### Fixed
+- Reservation is passed to Slurm via `additional_parameters`
+- Submission scripts use `SLURM_SUBMIT_DIR` for the cluster config path
+- `evaluate.md` is runnable as a script
+
+### Documentation
+- Rewrote `README.md` with a full project overview and usage guide
+- Added `CLAUDE.md` project guidance
+
+---
+
 ## [0.5.0] - 2026-04-02
 
 ### Added

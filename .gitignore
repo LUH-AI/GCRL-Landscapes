@@ -1,12 +1,51 @@
+# Python environments and bytecode
 .venv/
 __pycache__/
+.pytest_cache/
+
+# MuJoCo
 MUJOCO_LOG.TXT
+
+# Training logs, result tables and convergence data
 logs/
-*.zip
-/plots/
 /log_zips/
-*.png
-temp_*/
 tables/
 convergence/
+temp_*/
+
+# Archives and data dumps
+*.zip
+convergence.zip
+*.parquet
+*.bundle
+
+# Generated plots and figures
+*.png
+/plots/
+/plots*
+/figures/*
+!/figures/make_overview.py
+/analysis/plots/
+
+# Paper metrics precomputed data and outputs
+/paper-metrics/outputs/
+/paper-metrics/data/zips/
+/paper-metrics/data/parquets/
+/paper-metrics/data/eval_stats/
+
+# Local-only experiment directories
+/logs_ddpgbc*/
+/evaluation_10b/*
+!/evaluation_10b/run_all_advantage_evaluation.py
+/icrl-resubmission/
+icrl-resubmission.zip
+
+# Local tooling, session reports and scratch notes
+.pi-lens/
+session-report-*.html
+/wol
+CAMERA_READY_TODO.md
+QWEN.md
+
+# Git worktrees
 .worktrees/
