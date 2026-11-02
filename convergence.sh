@@ -6,7 +6,6 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
 #SBATCH --mem-per-cpu=1G
-#SBATCH --mail-user=m.toepperwien@ai.uni-hannover.de
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 #SBATCH --reservation=ai,tnt
@@ -92,7 +91,7 @@ for environment in "${environments[@]}"; do
 
     python -m gcrl_landscapes.main setup \
       --agent "$agent" \
-      --dataset "$environment" \
+      --datasets "$environment" \
       --n_configurations "$numconfigurations" \
       --phase_percentages $phasepercentages \
       --final_phase $finalphase \

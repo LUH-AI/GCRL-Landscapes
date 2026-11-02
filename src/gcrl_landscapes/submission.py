@@ -522,7 +522,7 @@ def submit(args: argparse.Namespace) -> None:
         )
 
         steps_to_train = (
-            max(setup["eval_steps"]) - already_trained_steps
+            max(setup["extra_eval_steps"] + setup["phases"]) - already_trained_steps
             if not setup["final_step_is_phase"]
             else setup["phases"][phase_idx] - already_trained_steps
         )
@@ -547,8 +547,14 @@ def submit(args: argparse.Namespace) -> None:
             slurm_array_parallelism=50,
             slurm_partition=args.partition,
             slurm_job_name=args.jobname,
-            slurm_mail_user="m.toepperwien@ai.uni-hannover.de",
-            slurm_mail_type="END,FAIL",
+            **(
+                {
+                    "slurm_mail_user": os.environ["SLURM_MAIL_USER"],
+                    "slurm_mail_type": "END,FAIL",
+                }
+                if os.environ.get("SLURM_MAIL_USER")
+                else {}
+            ),
             slurm_additional_parameters=extra_params,
         )
         jobs = executor.map_array(

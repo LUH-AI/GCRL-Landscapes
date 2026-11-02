@@ -1,5 +1,5 @@
 # flake.nix, run with `nix develop`
-# Run with `nix-shell cuda-fhs.nix`
+# Run with `nix-shell shell.nix`
 { pkgs ? import <nixpkgs> {} }:
 let
    # Change according to the driver used: stable, beta
