@@ -203,8 +203,8 @@ def main() -> None:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("Analysis/afr_metrics.csv"),
-        help="Output CSV path (default: Analysis/afr_metrics.csv)",
+        default=Path("analysis/afr_metrics.csv"),
+        help="Output CSV path (default: analysis/afr_metrics.csv)",
     )
     parser.add_argument(
         "--no-aggregate",

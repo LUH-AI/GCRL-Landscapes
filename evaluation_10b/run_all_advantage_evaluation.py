@@ -185,7 +185,7 @@ def run_environment(env: str, cfg: dict) -> dict[str, int]:
     results[f"afr/{env}/all"] = run_afr(
         env,
         parquet,
-        Path(f"Analysis/afr_metrics-{env}-all.csv"),
+        Path(f"analysis/afr_metrics-{env}-all.csv"),
         config_ids_file,
         "all",
     )
@@ -199,7 +199,7 @@ def run_environment(env: str, cfg: dict) -> dict[str, int]:
     results[f"afr/{env}/top_k_{TOP_K}"] = run_afr(
         env,
         parquet,
-        Path(f"Analysis/afr_metrics-{env}-top_k_{TOP_K}.csv"),
+        Path(f"analysis/afr_metrics-{env}-top_k_{TOP_K}.csv"),
         config_ids_file,
         f"top_k_{TOP_K}",
     )
