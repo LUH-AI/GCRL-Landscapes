@@ -61,7 +61,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   "pytest >= 7.4.4",
-  "ruff >= 0.12.5",
+  "ruff >= 0.12.5, <0.13",
   "mypy >= 1.0.0",
   "pre-commit >= 4.2.0",
   "hatch",
