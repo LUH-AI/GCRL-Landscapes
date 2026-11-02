@@ -1,6 +1,7 @@
 #!/bin/bash
 
-#SBATCH --partition=ai,tnt
+# Partition and reservation are passed by the submitting script (train_all.sh or
+# convergence.sh) via sbatch; see configs/cluster/<name>.sh for the defaults.
 #SBATCH --job-name=ZipAndPlot
 #SBATCH --time=05:00:00
 #SBATCH --ntasks=1

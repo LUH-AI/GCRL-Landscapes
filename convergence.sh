@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-#SBATCH --partition=ai,tnt
 #SBATCH --job-name=ConvergenceSetup
 #SBATCH --time=01:00:00
 #SBATCH --ntasks=1
@@ -8,7 +7,6 @@
 #SBATCH --mem-per-cpu=1G
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
-#SBATCH --reservation=ai,tnt
 
 # Load cluster-specific settings. Override with: CLUSTER=pc2 bash convergence.sh
 SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
@@ -21,7 +19,7 @@ numconfigurations="1"
 phasepercentages="100"
 finalphase="1000000"
 numevalepisodes="10"
-extraevalsteps="1000 2500 5000 7500 10000 20000 30000 40000 50000 75000 100000 150000 200000 300000 400000 500000 600000 700000 800000 900000 100000"
+extraevalsteps="1000 2500 5000 7500 10000 20000 30000 40000 50000 75000 100000 150000 200000 300000 400000 500000 600000 700000 800000 900000 1000000"
 nseeds="5"
 taskspernodetotal="5"
 taskspernodeparallel="5"

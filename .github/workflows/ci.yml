@@ -13,15 +13,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.10"
-
-      - name: Install ruff
-        run: python -m pip install --upgrade pip "ruff>=0.12.5"
+      # uvx runs ruff in an isolated environment, so the heavy runtime
+      # dependency set is not installed for the lint job.
+      - uses: astral-sh/setup-uv@v5
 
       - name: Ruff
-        run: ruff check src tests analysis paper-metrics/scripts
+        run: uvx ruff@0.12.12 check src tests analysis paper-metrics/scripts
 
       # NOTE: `ruff format --check` is deliberately not enforced yet. About 20
       # files are not ruff-formatted, so the gate would always fail. Enable it
@@ -33,18 +30,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-python@v5
+      # uv sync honours uv.lock and [tool.uv.sources], which pins ogbench to
+      # CrunchyFlakes/ogbench@master and smac to automl/SMAC3@v2.4.0. A plain
+      # `pip install -e ".[dev]"` silently ignores those sources.
+      - uses: astral-sh/setup-uv@v5
         with:
           python-version: "3.10"
-          cache: pip
+          enable-cache: true
 
       - name: Install package
         # NOTE: the runtime dependency set is heavy (JAX with CUDA wheels,
         # TensorFlow, GPFlow, SMAC, OGBench), so this step takes a few minutes.
         # It runs CPU-only, which is enough: the tests do not need a GPU.
-        run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+        run: uv sync --extra dev
 
       - name: Tests
-        run: python -m pytest -q
+        run: uv run pytest -q

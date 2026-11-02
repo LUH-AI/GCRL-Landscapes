@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cluster profile for LUH (Leibniz University Hannover) — ai,tnt partitions
 #
-# Usage: source configs/cluster/${CLUSTER:-luh}.sh
+# Usage: source configs/cluster/luh.sh   (or set CLUSTER=<name> and let the scripts pick their profile)
 #
 # Defines:
 #   CLUSTER_PARTITION        — GPU compute partition (used by submission.py)

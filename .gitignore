@@ -28,10 +28,17 @@ convergence.zip
 /analysis/plots/
 
 # Paper metrics precomputed data and outputs
-/paper-metrics/outputs/
-/paper-metrics/data/zips/
-/paper-metrics/data/parquets/
-/paper-metrics/data/eval_stats/
+# Ignore the contents but keep the tracked .gitkeep placeholders, so `git add`
+# works without -f. Nested placeholder dirs need the `**/` re-include as well.
+/paper-metrics/outputs/**
+!/paper-metrics/outputs/**/.gitkeep
+/paper-metrics/data/zips/**
+!/paper-metrics/data/zips/**/.gitkeep
+/paper-metrics/data/parquets/**
+!/paper-metrics/data/parquets/**/
+!/paper-metrics/data/parquets/**/.gitkeep
+/paper-metrics/data/eval_stats/**
+!/paper-metrics/data/eval_stats/**/.gitkeep
 
 # Local-only experiment directories
 /logs_ddpgbc*/

@@ -31,9 +31,9 @@ CATALOG="${LOGDIR}/checkpoints.csv"
 PARQUET="${LOGDIR}/advantages.parquet"
 AFR_CSV="${LOGDIR}/afr_metrics.csv"
 
-# --- Safety: chunk-size 4 avoids GCIVL OOM (32 GiB at chunk=32).
+# --- Safety: chunk-size 8 avoids GCIVL OOM (32 GiB at chunk=32).
 # --- Once per-agent chunk-size override is implemented, raise this to 32
-# --- and pass --agent-chunk-size GCIVL=4 instead.
+# --- and pass --agent-chunk-size GCIVL=8 instead.
 CHUNK_SIZE="${CHUNK_SIZE:-8}"
 NUM_BATCHES="${NUM_BATCHES:-10}"
 NUM_WORKERS="${NUM_WORKERS:-4}"

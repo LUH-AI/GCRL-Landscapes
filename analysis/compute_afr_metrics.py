@@ -13,8 +13,6 @@ Metrics computed per checkpoint:
   - extractability_index: gap_mean / (gap_std + eps)
   - adv_plus_mean:        mean of diagonal advantages
   - adv_minus_mean:       mean of off-diagonal advantages
-
-Reference: afr_signal_ogbench_diagnostic.md
 """
 
 import argparse
@@ -54,9 +52,6 @@ _META_COLS = [
 ]
 
 
-CLUSTER_MOUNT = Path("/tmp/cluster-mount")
-CLUSTER_PREFIX = "/bigwork/USERNAME/gcrl/code/"
-
 # Compiled regex to extract agent dir and config index from checkpoint_path
 # e.g. /bigwork/.../CRL_antmaze-large-navigate-v0_64c_lr-alpha/run_logs/configuration_0/phase_926500/seed_0/params_926500.pkl
 _CKPT_RE = re.compile(
@@ -70,27 +65,29 @@ def _get_alpha(checkpoint_path: str, config_idx: str) -> float:
 
     checkpoint_path points to a .pkl inside a run_logs/configuration_N/ subdir.
     The corresponding config file lives at:
-      cluster-mount/{experiment_root}/configurations/configuration_N.json
+      {experiment_root}/configurations/configuration_N.json
+    where experiment_root is the directory that contains run_logs/.
 
-    Falls back to 0.5 if the file cannot be read.
+    Falls back to 0.5 if the config file cannot be read.
     """
-    m = _CKPT_RE.search(checkpoint_path)
-    if m:
+    try:
+        m = _CKPT_RE.search(checkpoint_path)
+        if m is None:
+            return 0.5
         agent_dir = m.group("agent_dir")
         idx = m.group("config_idx")
         # Locate the agent dir start in the string to get the experiment root
         prefix_end = checkpoint_path.index(agent_dir) + len(agent_dir)
         experiment_root = checkpoint_path[:prefix_end]
-        # Strip cluster prefix and route through cluster-mount
-        local_root = CLUSTER_MOUNT / Path(experiment_root).relative_to(CLUSTER_PREFIX)
-        config_path = local_root / "configurations" / f"configuration_{idx}.json"
-        try:
-            config = json.loads(config_path.read_text())
-            for key, val in config.items():
-                if key.lower() == "alpha":
-                    return float(val)
-        except Exception:
-            pass
+        config_path = (
+            Path(experiment_root) / "configurations" / f"configuration_{idx}.json"
+        )
+        config = json.loads(config_path.read_text())
+        for key, val in config.items():
+            if key.lower() == "alpha":
+                return float(val)
+    except Exception:
+        pass
     return 0.5
 
 
@@ -247,7 +244,11 @@ def main() -> None:
     results = []
     skipped = 0
     for i, batch in enumerate(pf.iter_batches()):
-        row = process_batch(batch)
+        try:
+            row = process_batch(batch)
+        except Exception as exc:  # one bad checkpoint must not abort the run
+            print(f"  warning: skipping row group {i}: {exc}")
+            row = None
         if row is not None:
             results.append(row)
         else:

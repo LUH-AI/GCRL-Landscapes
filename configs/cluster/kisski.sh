@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cluster profile for KISSKI (KI Service Center)
 #
-# Usage: source configs/cluster/${CLUSTER:-luh}.sh
+# Usage: source configs/cluster/kisski.sh   (or set CLUSTER=<name> and let the scripts pick their profile)
 #
 # Defines:
 #   CLUSTER_PARTITION        — GPU compute partition (used by submission.py)

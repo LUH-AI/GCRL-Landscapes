@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-#SBATCH --partition=ai,tnt
 #SBATCH --job-name=TrainSetup
 #SBATCH --time=01:00:00
 #SBATCH --ntasks=1
@@ -8,6 +7,13 @@
 #SBATCH --mem-per-cpu=1G
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
+
+# Load cluster-specific settings (partition, reservation, GPU spec, module loading).
+# Override the cluster by setting CLUSTER, e.g.: CLUSTER=pc2 bash profiling_sample.sh
+# This script submits nothing itself; pass the partition when submitting, e.g.:
+#   sbatch --partition="${CLUSTER_SETUP_PARTITION}" profiling_sample.sh
+SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
 
 logdir="./logs"
 hyperparameters="lr alpha"
@@ -20,7 +26,6 @@ numevalepisodes="1"
 nseeds="5"
 taskspernodetotal="16"
 taskspernodeparallel="4"
-partitions="ai,tnt"
 mempercpu="3G"
 
 # module load Miniforge3

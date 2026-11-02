@@ -473,6 +473,9 @@ def submit(args: argparse.Namespace) -> None:
     Args:
         args: Look into main argument parser options or run from commandline for documentation
     """
+    # capture the mail recipient before the slurm environment keys are deleted
+    mail_user = os.environ.get("SLURM_MAIL_USER")
+
     # delete slurm environment keys
     # slurm uses these but we want to provide them only using submitit
     for key in [key for key in os.environ.keys() if "SLURM" in key]:
@@ -549,10 +552,10 @@ def submit(args: argparse.Namespace) -> None:
             slurm_job_name=args.jobname,
             **(
                 {
-                    "slurm_mail_user": os.environ["SLURM_MAIL_USER"],
+                    "slurm_mail_user": mail_user,
                     "slurm_mail_type": "END,FAIL",
                 }
-                if os.environ.get("SLURM_MAIL_USER")
+                if mail_user
                 else {}
             ),
             slurm_additional_parameters=extra_params,

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-#SBATCH --partition=ai,tnt
+# Partition and reservation are passed by hpo.sh via sbatch.
 #SBATCH --job-name=HPO
 #SBATCH --time=5-00:00:00
 #SBATCH --ntasks=1
@@ -12,12 +12,6 @@
 # Load cluster-specific settings. CLUSTER env var is inherited from the submitting shell.
 SCRIPT_DIR="${SLURM_SUBMIT_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
 source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
-
-phases_str=$(printf '%s,' "${phases[@]}")
-phases_str="[${phases_str%?}]"
-datasets_str=$(printf '%s,' "${datasets[@]}")
-datasets_str="[${datasets_str%?}]"
-
 
 if [ -z "$1" ]
   then

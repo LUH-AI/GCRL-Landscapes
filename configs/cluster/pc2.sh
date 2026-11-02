@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Cluster profile for PC2 (Paderborn Center for Parallel Computing)
 #
-# Usage: source configs/cluster/${CLUSTER:-luh}.sh
+# Usage: source configs/cluster/pc2.sh   (or set CLUSTER=<name> and let the scripts pick their profile)
 #
 # Defines:
 #   CLUSTER_PARTITION        — GPU compute partition (used by submission.py)
