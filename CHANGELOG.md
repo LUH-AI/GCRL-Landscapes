@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.0.0] - 2026-10-30
+<!-- TODO: set the release date (also `date-released` in CITATION.cff) and tag
+     v1.0.0 together with the camera-ready submission. -->
+## [1.0.0] - Unreleased
 
 First public release, prepared from the `develop` line for publication.
 
@@ -16,10 +18,22 @@ First public release, prepared from the `develop` line for publication.
 - **Analysis**: checkpoint catalog, cross-goal advantage generation and advantage/AFR analysis pipeline
 - **Analysis**: figure-reproduction scripts for the camera-ready plots
 - **Documentation**: full project overview, usage guide and reproduction instructions
+- **CI**: GitHub Actions workflow with separate ruff lint and pytest jobs on Python 3.10
+- **Packaging**: `dev` optional-dependency extra, recorded in `uv.lock`
 
 ### Changed
 - History reunified: the `develop` line is merged onto `main`
 - Version scheme reset to `1.0.0` for the public release
+- Installation is uv-only (`uv sync --extra dev`): pip ignores `[tool.uv.sources]`
+- `ogbench` is pinned to commit `c47fbd9` of the `CrunchyFlakes/ogbench` fork instead of its `master` branch
+- `ruff` is pinned to the 0.12 series, so CI and pre-commit use the same rule set
+- Removed the unused `configs/cluster/*.yaml` files; the `.sh` profiles are the only cluster configuration
+
+### Fixed
+- `submit` no longer sends mail to a hardcoded address, reads `SLURM_MAIL_USER` before it clears the Slurm environment, and no longer raises `KeyError` on the missing `eval_steps` key
+- `analysis/compute_afr_metrics.py` no longer raises `ValueError` for checkpoints outside the authors' cluster paths
+- `convergence.sh` passes `--datasets` and trains up to the final step
+- pytest finds the `analysis` package, and the catalog test expects the `config_path` column
 
 ---
 

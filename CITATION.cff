@@ -16,9 +16,11 @@ authors:
     affiliation: "Institute of AI, Leibniz University Hannover"
   - family-names: Mohan
     given-names: Aditya
+    email: a.mohan@ai.uni-hannover.de
     affiliation: "Institute of AI, Leibniz University Hannover"
 version: 1.0.0
-date-released: 2026-10-30
+# TODO: add date-released and a preferred-citation for the paper together with
+# the camera-ready submission.
 license: MIT
 repository-code: "https://github.com/LUH-AI/GCRL-Landscapes"
 url: "https://github.com/LUH-AI/GCRL-Landscapes"

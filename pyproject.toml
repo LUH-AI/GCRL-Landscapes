@@ -17,7 +17,8 @@ keywords = [
   "JAX",
 ]
 authors = [
-  { name = "Jan Malte Töpperwien", email = "m.toepperwien@protonmail.com" },
+  { name = "Jan Malte Töpperwien", email = "m.toepperwien@ai.uni-hannover.de" },
+  { name = "Aditya Mohan", email = "a.mohan@ai.uni-hannover.de" },
 ]
 classifiers = [
   "Development Status :: 5 - Production/Stable",
