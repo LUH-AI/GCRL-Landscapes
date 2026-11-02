@@ -9,9 +9,10 @@ the best checkpoint of the previous phase), evaluates every
 computes cross-goal advantage matrices from the trained checkpoints. Agents,
 environments and datasets come from [OGBench](https://github.com/seohongpark/ogbench).
 
-> **Paper:** the paper that accompanies this release is not yet linked here.
+> **Paper:** *Beyond Success Rates: Trainability and Extractability for Offline
+> GCRL* — Jan Malte Töpperwien, Aditya Mohan, Marius Lindauer. NeurIPS 2026.
 > [`CITATION.cff`](CITATION.cff) describes the software (title, authors, version,
-> license), not a publication.
+> license), not the publication.
 
 **License:** MIT — see [`LICENSE`](LICENSE) (Copyright (c) 2026 Institute of AI
 at Leibniz University Hannover).
