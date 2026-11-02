@@ -1,4 +1,4 @@
-"""Reproduce `tab:phase_mobility` from `PAPER/APPENDIX/robustness.tex`.
+"""Reproduce `tab:phase_mobility` (derivation: `PROVENANCE.md` §2).
 
 Per env reports the mean Jaccard overlap and mean centroid drift of the
 top-10% configuration set across adjacent phases, averaged across the 4

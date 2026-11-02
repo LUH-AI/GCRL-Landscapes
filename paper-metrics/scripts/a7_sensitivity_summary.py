@@ -1,4 +1,4 @@
-"""Reproduce `tab:sensitivity_summary` from `PAPER/APPENDIX/robustness.tex`.
+"""Reproduce `tab:sensitivity_summary` (derivation: `PROVENANCE.md` §2).
 
 Per (env, algo) reports four numbers:
   - R^2_eta   : R^2 of OLS(success ~ z(log lr)),  bootstrap-CI half-width as ±

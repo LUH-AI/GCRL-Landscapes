@@ -9,7 +9,9 @@ the best checkpoint of the previous phase), evaluates every
 computes cross-goal advantage matrices from the trained checkpoints. Agents,
 environments and datasets come from [OGBench](https://github.com/seohongpark/ogbench).
 
-> **Paper:** <!-- TODO(paper): insert title, author list, venue and arXiv/DOI link here. -->
+> **Paper:** the paper that accompanies this release is not yet linked here.
+> [`CITATION.cff`](CITATION.cff) describes the software (title, authors, version,
+> license), not a publication.
 
 **License:** MIT — see [`LICENSE`](LICENSE) (Copyright (c) 2026 Institute of AI
 at Leibniz University Hannover).
@@ -163,9 +165,10 @@ define ten agents:
 The n-step variants only change behaviour when the batch carries per-sample
 `discounts`, which `NStepGCDataset` produces for `n_step > 1`; `n_step = 1`
 therefore reproduces the OGBench baseline exactly. MQE and FQL are first-class
-agents: both have their own configuration entry, an advantage formulation in
-`analysis/generate_advantages.py`, and a statically tested implementation
-(`tests/test_new_agents_static.py`). MQE additionally has an HPO config
+agents: both have their own configuration entry and an advantage formulation in
+`analysis/generate_advantages.py`. The static tests in
+`tests/test_new_agents_static.py` cover FQL, the n-step GCIQL/GCIVL targets and
+eval-time rejection sampling; they do not run MQE. MQE additionally has an HPO config
 (`configs/hpo_mqe.yaml`) and search space
 (`configs/hydra/sweeper/search_space/mqe.yaml`); FQL has no dedicated HPO config.
 
@@ -181,7 +184,8 @@ any OGBench dataset name works. The families exercised by the repository:
 | Humanoid maze | `humanoidmaze-medium-navigate-v0`, `humanoidmaze-large-*` | `convergence.sh`, `train_all.sh` (commented) |
 | Point maze | `pointmaze-medium-navigate-v0` | `convergence.sh` |
 | Cube (manipspace) | `cube-single-play-v0`, `cube-double-play-v0` | `analysis/plot_a3_ddpgbc_cube.py`, paper-metrics |
-| Scene (manipspace) | `scene-v0`, `scene-singletask-v0`, `scene-play-v0` | `SUPPORTED_DATASETS`, paper-metrics |
+| Scene (manipspace) | `scene-v0`, `scene-singletask-v0`, `scene-singletask-task1..5-v0` | `SUPPORTED_DATASETS` |
+| Scene (paper campaign) | Scene *play* dataset — the exact name is `DATASET_MAP["scene"]` in `analysis/run_q_vs_distance_all.py` | paper-metrics, `analysis/plot_q_vs_distance.py` |
 | Powderworld | `powderworld-easy-play-v0` | `train_all.sh` (commented); visual + discrete config adaption |
 
 `src/gcrl_landscapes/evaluate.py` imports `HumanoidEnv`, `CubeEnv`, `SceneEnv`
@@ -200,8 +204,11 @@ split into a base dataset (`antmaze-medium-navigate-v0`) and an explore dataset
 
 ## Orchestration scripts
 
-The shell scripts are Slurm drivers around `main.py`. Each one sources a
-cluster profile before doing anything else.
+The shell scripts are Slurm drivers around `main.py`. Every script sources the
+cluster profile at the top of the file — see
+[`CLUSTER` and `configs/cluster/`](#cluster-and-configscluster).
+`profiling_sample.sh` submits nothing: it runs `setup` and one `cProfile` run in
+the foreground.
 
 | Script | Purpose |
 | ------ | ------- |
@@ -224,9 +231,18 @@ sbatch collect_advantages.sh /path/to/logs  # catalog + advantages + AFR
 
 ### `CLUSTER` and `configs/cluster/`
 
-Every script does `source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"`.
-A profile exports `CLUSTER_PARTITION` (GPU partition passed to `submit
---partition`), `CLUSTER_SETUP_PARTITION` (CPU partition for orchestration jobs),
+All eight root scripts — `submit_train_all.sh`, `train_all.sh`, `hpo.sh`,
+`hpo_single.sh`, `convergence.sh`, `zip_and_plot.sh`, `collect_advantages.sh`
+and `profiling_sample.sh` — source the cluster profile before they run any
+command:
+
+```bash
+source "${SCRIPT_DIR}/configs/cluster/${CLUSTER:-luh}.sh"
+```
+
+A profile exports
+`CLUSTER_PARTITION` (GPU partition passed to `submit --partition`),
+`CLUSTER_SETUP_PARTITION` (CPU partition for orchestration jobs),
 `CLUSTER_RESERVATION`, `CLUSTER_GRES` and `CLUSTER_ZIP_CMD`, and defines
 `cluster_load_env` / `cluster_load_plot_env` (module loads, conda activation).
 
@@ -236,8 +252,19 @@ A profile exports `CLUSTER_PARTITION` (GPU partition passed to `submit
 | `pc2` | `gpu` (setup: `normal`) | none | `gpu:h100:1` |
 | `kisski` | `kisski-inference` | none | none |
 
-Each profile also has a YAML twin (`configs/cluster/<name>.yaml`) for the
-Hydra/SMAC launcher (`configs/launcher.yaml`).
+The profiles are plain shell scripts; no other file in the repository reads
+`configs/cluster/`. `submit_train_all.sh`, `hpo.sh`, the `submit` calls of
+`train_all.sh` and `convergence.sh`, and their chained `sbatch` calls pass the
+`CLUSTER_*` partition and reservation on the command line. `zip_and_plot.sh`
+uses `CLUSTER_ZIP_CMD` and `cluster_load_plot_env`, `collect_advantages.sh`
+calls `cluster_load_env`, and `hpo_single.sh` turns `CLUSTER_PARTITION`,
+`CLUSTER_GRES` and `CLUSTER_RESERVATION` into `hydra.launcher.*` overrides.
+`profiling_sample.sh` sources the profile but submits nothing.
+
+A job script that you submit yourself with `sbatch` (`convergence.sh`,
+`zip_and_plot.sh`, `collect_advantages.sh`, `profiling_sample.sh`) takes its
+partition and reservation from the `sbatch` command line, because none of these
+scripts has a `#SBATCH --partition` or `#SBATCH --reservation` line.
 
 `train_all.sh` and `convergence.sh` also default `convergencezip` to
 `./convergence.zip` in the repository root. Provide that archive before
@@ -403,6 +430,13 @@ reproduce the validated reference numbers. The Q-vs-distance scripts read the
 checkpoint/config pairs listed in `analysis/best_checkpoints.json` (or the
 `--checkpoint`/`--config-path` arguments).
 
+Run `analysis/run_q_vs_distance_all.py` from the repository root with a
+directory named `gcrl-cluster/` in it: every `checkpoint` and `config` value in
+`analysis/best_checkpoints.json` starts with `gcrl-cluster/…` and is resolved
+relative to the working directory, and the script also opens
+`analysis/best_checkpoints.json` relative to the working directory. Without
+that directory the run stops at the first missing checkpoint.
+
 ## paper-metrics
 
 [`paper-metrics/`](paper-metrics/README.md) is the self-contained,
@@ -441,24 +475,31 @@ the zips).
 ## Tests and quality gates
 
 ```bash
-pytest tests -q                                  # tests/
+pytest tests -q
 ruff check src tests analysis paper-metrics/scripts
-ruff format src
-hatch run types:check                            # mypy over src/gcrl_landscapes + tests
-pre-commit run --all-files
 ```
+
+`ruff check` and `pytest` are the enforced gates: CI runs
+`ruff check src tests analysis paper-metrics/scripts` and `pytest -q` on
+Python 3.10 — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 `tests/` contains `test_catalog_checkpoints.py` (checkpoint discovery on
 synthetic trees), `test_extract_training_log.py` (optimised CSV extraction in
 `read_results_from_zip`) and `test_new_agents_static.py` (shape/finiteness
 tests for FQL, the n-step targets and rejection sampling; no dataset download
-needed). CI runs `ruff check src tests analysis paper-metrics/scripts` and
-`pytest -q` on Python 3.10 — see
-[`.github/workflows/ci.yml`](.github/workflows/ci.yml); `ruff format --check`
-is not enforced yet.
+needed).
 
-Conventional commits are enforced by the `pre-commit` hook
-(`git-conventional-commits.yaml`).
+Two further checks exist, but neither is a gate:
+
+- `hatch run types:check` (mypy over `src/gcrl_landscapes` and `tests`) is
+  advisory: type checking is not yet enforced in CI, so mypy findings do not
+  block a merge.
+- `ruff format --check` is not part of CI either; the `ruff-format`
+  pre-commit hook rewrites files instead of gating them.
+
+`pre-commit run --all-files` therefore modifies files when it runs
+`ruff-format`; it also checks for large files and whitespace, and it checks the
+commit message (conventional commits via `git-conventional-commits.yaml`).
 
 ## Repository layout
 
@@ -491,7 +532,8 @@ Conventional commits are enforced by the `pre-commit` hook
 
 ## Citation
 
-If you use this code, please cite the paper (see `CITATION.cff`):
+If you use this software, please cite it as described in
+[`CITATION.cff`](CITATION.cff):
 
 ```bibtex
 @software{gcrl_landscapes,

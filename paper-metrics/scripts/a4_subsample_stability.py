@@ -1,4 +1,4 @@
-"""Reproduce `tab:subsample_stability_close_pairs` from `PAPER/APPENDIX/robustness.tex`.
+"""Reproduce `tab:subsample_stability_close_pairs` (derivation: `PROVENANCE.md` §2).
 
 For each (env, algo-pair), report the percentage of bootstrap subsamples in
 which the algorithm ranking matches the full-grid ranking. We list only

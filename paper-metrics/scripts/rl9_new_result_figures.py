@@ -1,9 +1,9 @@
-"""Figures for the cluster rebuttal results R1 (re-extraction), R2
+"""Figures for the additional results R1 (re-extraction), R2
 (consistency probe), and R3 (multi-step TD), in the rliable palette
 (seaborn-colorblind) shared with the E-series figures.
 
-Inputs default to <repo>/PAPER/rebuttal/results/ (override with RESULTS_DIR);
-outputs land in <repo>/PAPER/rebuttal/figures/.
+Inputs default to `paper-metrics/data/rl9/` (override with the `RESULTS_DIR`
+environment variable); outputs land next to them in `.../figures/`.
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ import pandas as pd  # noqa: E402
 from scipy.stats import spearmanr  # noqa: E402
 
 REPO = Path(__file__).resolve().parents[2]
-RESULTS = Path(os.environ.get("RESULTS_DIR", REPO / "PAPER" / "rebuttal" / "results"))
+RESULTS = Path(os.environ.get("RESULTS_DIR", REPO / "paper-metrics" / "data" / "rl9"))
 FIGURES = RESULTS.parent / "figures"
 
 AGENT_COLOR = {

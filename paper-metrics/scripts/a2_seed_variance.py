@@ -1,4 +1,4 @@
-"""Reproduce `tab:seed_variance_summary` from `PAPER/APPENDIX/robustness.tex`.
+"""Reproduce `tab:seed_variance_summary` (derivation: `PROVENANCE.md` §2).
 
 Per env reports min / max / mean (across the 4 algorithms) of the
 mean-per-config seed variance, computed at the final phase using arithmetic

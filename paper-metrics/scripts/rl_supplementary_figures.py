@@ -1,4 +1,4 @@
-"""One figure per remaining rebuttal experiment (E1, E2, E4, E5, E6, E8).
+"""One figure per remaining supplementary analysis (E1, E2, E4, E5, E6, E8).
 
 E3 and E7 already have figures (rl3_selectivity_curves, rl7_diagnostic_scatter_*).
 Style matches rl3: Okabe-Ito palette, fixed agent order, line style / marker as

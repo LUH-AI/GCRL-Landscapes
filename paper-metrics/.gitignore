@@ -1,8 +1,7 @@
-# Inputs (rsynced from the cluster — see README.md "Fetching the data from the cluster")
+# Inputs (not distributed with the repository — see README.md "Data availability")
 data/zips/*.zip
 data/parquets/**/*.parquet
 data/eval_stats/*.csv
-data/configurations/*
 
 # Generated outputs
 outputs/*.csv

@@ -107,7 +107,8 @@ Notes:
 
 ## 3. Evaluate and plot
 
-Package the logs the way `zip_and_plot.sh` does (checkpoints excluded):
+Package the logs with the same exclusions as `zip_and_plot.sh` (no
+checkpoints, no `submitit/`):
 
 ```bash
 zip -r quickstart.zip logs-quickstart -x '*.pkl' -x '*/submitit/*'

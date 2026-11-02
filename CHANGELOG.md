@@ -50,7 +50,7 @@ First public release, prepared from the `develop` line for publication.
 
 ### Added
 - Cluster profiles, replacing branch-based cluster configuration
-- Reservation support for the `luis` cluster
+- Reservation support for the internal training cluster
 
 ### Changed
 - Phase boundaries use maximum performance for the phase setting
@@ -62,7 +62,7 @@ First public release, prepared from the `develop` line for publication.
 
 ### Documentation
 - Rewrote `README.md` with a full project overview and usage guide
-- Added `CLAUDE.md` project guidance
+- Added repository guidance for AI coding assistants
 
 ---
 

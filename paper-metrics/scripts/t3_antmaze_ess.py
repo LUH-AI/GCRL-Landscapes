@@ -1,8 +1,8 @@
 """Reproduce `tab:antmaze_ess_phase4` (main) and `tab:antmaze_ess_full` (appendix).
 
-The typeset numbers were produced by `analysis/advantages/e_ess.py` on the
-antmaze-medium fixed-batch zip (archived stdout:
-`_malte_repro/e_ess_fixed_batch.log`). Its definition:
+The numbers are produced by `analysis/advantages/e_ess.py` on the
+antmaze-medium fixed-batch zip (derivation: `PROVENANCE.md` §2). Its
+definition:
 
   - Per (config, seed, phase): pool the AWR weights w = exp(alpha * A) of
     every `advantage/actor` array logged at an eval step within the phase,
@@ -13,9 +13,9 @@ antmaze-medium fixed-batch zip (archived stdout:
 
 Earlier versions of this script re-implemented the computation and
 reproduced the r's but pooled ~5x more rows into the correlation, deflating
-the p-values by orders of magnitude relative to the paper. To guarantee
-definitional identity we now delegate to the committed `e_ess.py` (exactly
-as t4 delegates to g_spearman/h_oracle) and parse its output.
+the p-values by orders of magnitude relative to the published values. To
+guarantee definitional identity we now delegate to the committed `e_ess.py`
+(exactly as t4 delegates to g_spearman/h_oracle) and parse its output.
 
 Inputs:
   data/zips/2026-04-26-logs-advantage-antmaze-medium-fixed-batch.zip

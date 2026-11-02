@@ -1,4 +1,4 @@
-"""Reproduce `tab:adv_norm_sensitivity` from `PAPER/APPENDIX/robustness.tex`.
+"""Reproduce `tab:adv_norm_sensitivity` (derivation: `PROVENANCE.md` §2).
 
 Per (env, algo, normalisation scheme) reports ESS on diagonal advantages
 after one of four diagnostic transforms:

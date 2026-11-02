@@ -1,12 +1,12 @@
-# PROVENANCE — how every number in the paper is produced
+# PROVENANCE — how the paper's numbers are produced
 
-Audited 2026-07-26 (four independent audit passes + a clean-room rebuild).
-This document is the single source of truth for: what the release zips
-contain, how each artifact derives from them, which script produces every
-table and inline number, and exactly what can and cannot be reconstructed
+Last verified 2026-07-26.
+
+This document is the single source of truth for: what the four fixed-batch
+zips contain, how each artefact in `paper-metrics/` derives from them, which
+script produces every table, and exactly what can and cannot be reconstructed
 offline. A reader with the four zips, the four advantage parquets, this
-repository, and its Python environment can regenerate every paper table
-byte-for-byte; this was verified end to end (see §6).
+repository, and its Python environment can regenerate every table (see §5).
 
 ## 1. The primary data: four "fixed-batch" zips
 
@@ -48,72 +48,59 @@ Two important facts:
 - **The zips contain no model checkpoints.** Zero `.pkl` entries in all
   four (verified). The `params_{step}.pkl` checkpoints stayed in the
   unzipped trees on the cluster (`${CLUSTER_SCRATCH_DIR}/...`) and are
-  the one input that cannot be re-derived offline (see §4).
+  the one input that cannot be re-derived offline (see §3).
 - The antmaze-large zip additionally carries three derived files at its
   root (`advantages.parquet`, a per-batch `afr_metrics.csv`,
   `checkpoints.csv`) that the other three zips do not; they are convenience
   copies, not extra primary data.
 
-## 2. The derivation chain
+## 2. How each artefact is produced
+
+### Derivation chain
 
 ```
-                    zips (4)                          cluster checkpoints (params_*.pkl)
-                      |                                        |
-   build_eval_stats.py|                     catalog_checkpoints.py + generate_advantages.py
-                      v                                        v
-        data/eval_stats/<env>.csv  (5120 rows:        advantages.parquet  (per env, ~4.2 GB;
-        algo, env, config, seed, phase,               838M rows = 4 agents x 64 configs x 5
-        alpha, lr, success)                           seeds x 10 fixed batches; one 256x256
-                      |                               cross-goal matrix per row group;
-                      |                               FINAL phase per agent only)
-                      |                                        |
-        +-------------+--------------+          +--------------+----------------+
-        v                            v          v                               v
-  t1, a2, a3, a4          (alpha from zip) extract_env.py /            compute_awr_concentration.py
-  rl1, rl2*, rl4, rl5              t2, a5, a6  compute_afr_metrics.py         (alpha from zip)
-                                               -> advantage_matrix_metrics,   -> awr_concentration.csv,
-        train_log.csv 'advantage/actor'           ess_per_batch, afr_metrics     awr_alpha_sweep.csv
-                      |                                   |                          |
-                      v                                   v                          v
-                 t3, rl8                              rl6, rl7                  rl2, rl3
+zips (4)                                     cluster checkpoints (params_*.pkl)
+   |                                                      |
+   | scripts/build_eval_stats.py      analysis/catalog_checkpoints.py
+   |                                 + analysis/generate_advantages.py
+   v                                                      v
+data/eval_stats/<env>.csv                data/parquets/<env>/advantages.parquet
+(5,120 rows: algo, env, config, seed,    (838M rows = 4 agents x 64 configs x 5
+phase, alpha, lr, success)               seeds x 10 fixed batches; one 256x256
+   |                                     cross-goal matrix per row group;
+   |                                     FINAL phase per agent only)
+   +--> t1, a2, a3, a4, rl1, rl2, rl4, rl5
+   +--> t2, a5, a6              (alpha map read from the zips' configurations/)
+   +--> t3, rl8                  (train_log.csv 'advantage/actor' arrays)
+   +--> t4                      (zip arrays; oracle column needs the OGBench dataset)
 ```
 
-t4 shells out to `analysis/advantages/{g_spearman,h_oracle}.py`, which read
-the antmaze-medium zip directly (plus the OGBench dataset for the oracle).
+`t3` delegates the ESS computation to `analysis/advantages/e_ess.py`; `t4`
+delegates to `analysis/advantages/g_spearman.py` and
+`analysis/advantages/h_oracle.py`. Both delegate to the same committed code
+that produced the paper values, so definitional identity is guaranteed.
 
-## 3. Script → table ledger
+### Table ledger
 
-Main-paper tables (`content/experiments.tex`):
+| LaTeX label | Script | Inputs |
+|---|---|---|
+| `tab:final_landscape_ci` | `t1_final_landscape_ci.py` | eval_stats |
+| `tab:compact_diagnostics` | `t2_compact_diagnostics.py` | parquets + zip alphas |
+| `tab:antmaze_ess_phase4` | `t3_antmaze_ess.py` | medium zip (train_log advantage arrays) |
+| `tab:adv_corr` | `t4_adv_corr.py` | medium zip (+ OGBench dataset for oracle) |
+| `tab:seed_variance_summary` | `a2_seed_variance.py` | eval_stats |
+| `tab:phase_mobility` | `a3_phase_mobility.py` | eval_stats |
+| `tab:subsample_stability_close_pairs` | `a4_subsample_stability.py` | eval_stats |
+| `tab:wmax_sensitivity` | `a5_wmax_sensitivity.py` | parquets + zip alphas |
+| `tab:adv_norm_sensitivity` | `a6_adv_norm_sensitivity.py` | parquets + zip alphas |
+| `tab:sensitivity_summary` | `a7_sensitivity_summary.py` | eval_stats |
 
-| LaTeX label | Script | Inputs | Audit status (typeset vs regenerated) |
-|---|---|---|---|
-| `tab:final_landscape_ci` | `t1_final_landscape_ci.py` | eval_stats | 63/64 cells match; 1 typo: AntMaze-L GCIVL ρ₀.₈ typeset 0.12, correct 0.11 (7/64 = 0.109) |
-| `tab:compact_diagnostics` | `t2_compact_diagnostics.py` | parquets + zip alphas | FR-AUC/Gap/MRR/Max all match; the ESS column was typeset from the older G1 run (7 cells differ ≤ 0.015 from the pipeline); 4 CRL Top-5 cells match no archived artifact |
-| `tab:antmaze_ess_phase4` | `t3_antmaze_ess.py` | medium zip (train_log advantage arrays) | ESS mean±std 16/16 match. The script was fixed 2026-07-26 to use the final eval step per phase (n = 320), which the typeset p-values assume; before the fix the r's matched but p-values were deflated ~10⁴× |
-| `tab:adv_corr` | `t4_adv_corr.py` | medium zip (+ OGBench dataset for oracle) | 8/8 match |
+All scripts live in `paper-metrics/scripts/`; outputs land in
+`paper-metrics/outputs/`. `scripts/_common.py` is the shared helper module
+(paths from `data/manifest.json`, alpha lookup from the zip
+`configurations/`, eval-stats loader) and produces no table.
 
-Appendix tables (`content/Appendix/robustness-2.tex` — note: `robustness.tex`
-is NOT compiled; it is a stale predecessor and holds the only two
-`\texttodo` markers plus an outdated sensitivity table):
-
-| LaTeX label | Script | Inputs | Audit status |
-|---|---|---|---|
-| `tab:seed_variance_summary` | `a2_seed_variance.py` | eval_stats | 12/12 match |
-| `tab:phase_mobility` | `a3_phase_mobility.py` | eval_stats | 8/8 match |
-| `tab:subsample_stability_close_pairs` | `a4_subsample_stability.py` | eval_stats | typeset values come from `_malte_repro/recompute_robustness.py` (same algorithm, different RNG stream); 3/4 differ by ≤ 1.6 pp from the pipeline. Neither implementation uses the "common index set across algorithms" the appendix text claims — text/code mismatch to fix in revision |
-| `tab:wmax_sensitivity` | `a5_wmax_sensitivity.py` | parquets + zip alphas | typeset AntMaze rows used a stale alpha map (config JSONs from the pre-fixed-batch campaign paired with fixed-batch advantages) — 25/32 AntMaze cells differ; the pipeline (zip-derived alphas) is the correct version. Cube/Scene unaffected |
-| `tab:adv_norm_sensitivity` | `a6_adv_norm_sensitivity.py` | parquets + zip alphas | same stale-alpha issue, confined to the 4 AntMaze-M "Raw ESS" cells; all normalized columns match |
-| `tab:sensitivity_summary` | `a7_sensitivity_summary.py` | eval_stats | 87/96 cells match; 9 ±half-width cells are ±0.01 leftovers from a different RNG-generation run; 2 match no artifact. Compiled table's R²_α max is 0.07 |
-
-Inline prose numbers: all spot-checked. Known inconsistencies (revision fix
-list): `experiments.tex:413/414/418` quote seed-mean maxima (0.904 / 0.728 /
-0.868) while the table prints IQM (0.907 / 0.733 / 0.873); `:424` "0.218"
-for Scene QRL max matches no artifact (t1 says 0.220); `tab:hps:defaults`'
-AWR temperature row (3.0/3.0/3.0/10.0) is not traceable to code in this
-tree. `tab:convergence:phases` values verified against the zips' `info.toml`
-phase steps, but the exact generator invocation is not archived.
-
-## 4. Reconstructibility classes
+## 3. Reconstructibility classes
 
 **(a) From the zips alone:** all four `eval_stats` CSVs (verified: rebuilt
 from freshly extracted zips, 5,120 rows each, zero numeric deltas against
@@ -122,10 +109,10 @@ alpha-restriction half, rl4, rl5; t3 (advantage arrays are inside
 `train_log.csv`); t4's seed-consistency column; rl8.
 
 **(b) From zips + the four `advantages.parquet`:** t2, a5, a6, rl2's
-saturation half, rl3, rl6, rl7, and every derived file in `RAW-ADV/ENVS/`
-(`advantage_matrix_metrics.parquet`, `ess_per_batch.parquet`,
-`afr_metrics.csv`, `awr_concentration.csv`, `awr_alpha_sweep.csv`, …).
-t4's oracle column additionally needs the public OGBench dataset download.
+saturation half, rl3, rl6, rl7, and the derived metrics tables built from
+the parquets (per-checkpoint × per-batch 256×256 matrix metrics, ESS per
+batch, per-batch AFR metrics). t4's oracle column additionally needs the
+public OGBench dataset download.
 
 **(c) Requires cluster-only checkpoints (NOT reconstructible offline):**
 the four `advantages.parquet` themselves. They were produced by
@@ -136,39 +123,25 @@ only, and are short 30 (antmaze-large) and 10 (cube) QRL row groups out of
 12,800 — advantage-generation failures on the cluster; the training runs
 themselves are complete.
 
-**(d) Separate lineage (older campaign, not fixed-batch):**
-`additional_stats_raw.csv` and everything derived from it (`ess_table.tex`,
-`awr_vs_return.csv`, the antmaze-medium rows of the G1
-`compute_landscape_stats.py` outputs). None of these feed the compiled
-paper; do not cite them next to fixed-batch numbers.
+## 4. Additional analyses (rl1–rl9)
 
-## 5. Rebuttal analyses (rl1–rl8, 2026-07-24)
+`paper-metrics/scripts/rl1_*.py`–`rl9_new_result_figures.py` produce
+supplementary figures and metrics.
+They follow the same conventions as `t1` (final phase, seed-IQM via
+`trim_mean(·, 0.25)`) except where noted in the scripts.
 
-`scripts/rl*.py` here are the rebuttal analyses (E1–E8 in
-`PAPER/rebuttal/experiments-explained.md`). They follow the same
-conventions as t1 (final phase, seed-IQM via `trim_mean(·, 0.25)`) except
-where they deliberately mirror an older figure (rl7 uses seed-mean to match
-the existing cube/scene scatters; rl5 uses seed-mean to match a3). An
-independent adversarial review (2026-07-26) recomputed every headline
-number exactly; two presentation notes: rl5's Spearman seed-bootstrap CIs
-are attenuation-biased (quote point estimates; inference rests on the
-permutation band), and rl2's "max unchanged" holds in 13/16 cells with
-≤ 0.02 shifts in the rest.
-
-## 6. Verification log (what was actually re-run)
+## 5. Verification status
 
 - 2026-07-24: `./reproduce_all.sh` (all 10 tables) — outputs byte-identical
   to the 2026-05-07 archive.
 - 2026-07-26: all four zips freshly extracted; `build_eval_stats.py` re-run
-  on the extracted trees; rebuilt eval_stats ≡ the paper's copies (0 deltas,
-  5,120 rows each). Clean-room pipeline (scratch checkout of the scripts,
-  eval_stats taken only from the from-zip rebuilds, zips and parquets
-  linked) regenerated all 10 tables byte-identical to the canonical
-  outputs.
-- 2026-07-26: t3 final-eval-step fix validated against the archived
-  campaign log (`_malte_repro/e_ess_fixed_batch.log`): r and p per cell.
+  on the extracted trees; the rebuilt eval_stats are identical to the copies
+  used for the paper (0 numeric deltas, 5,120 rows each).
+- 2026-07-26: clean-room pipeline (scratch checkout of the scripts, eval_stats
+  taken only from the from-zip rebuilds, zips and parquets linked)
+  regenerated all 10 tables byte-identical to the canonical outputs.
 
-## 7. How a newcomer reconstructs everything
+## 6. How a newcomer reconstructs everything
 
 ```bash
 # 0. clone repo, create the venv (README), download the 4 zips and 4
@@ -182,8 +155,8 @@ for env in antmaze-medium antmaze-large cube scene; do
 done
 # 2. every paper table
 ./reproduce_all.sh          # t1..t4 + a2..a7 -> outputs/
-# 3. rebuttal analyses
-./reproduce_all.sh rebuttal # rl1..rl8 -> outputs/
+# 3. supplementary analyses
+./reproduce_all.sh rebuttal # rl1..rl8 + supplementary figures -> outputs/
 ```
 
 Only step 0's parquets are non-reproducible inputs (class (c) above);

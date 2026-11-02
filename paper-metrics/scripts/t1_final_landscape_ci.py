@@ -1,4 +1,4 @@
-"""Reproduce `tab:final_landscape_ci` from `PAPER/experiments.tex`.
+"""Reproduce `tab:final_landscape_ci` (derivation: `PROVENANCE.md` §2).
 
 Per (env, agent) row reports:
   - Max success      = max over configs of (per-config IQM seed-aggregated success)

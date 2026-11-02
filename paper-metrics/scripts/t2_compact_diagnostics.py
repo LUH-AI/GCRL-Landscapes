@@ -1,4 +1,4 @@
-"""Reproduce `tab:compact_diagnostics` from `PAPER/experiments.tex`.
+"""Reproduce `tab:compact_diagnostics` (derivation: `PROVENANCE.md` §2).
 
 Per (env, agent) row reports:
   - FR-AUC              = mean over off-diagonal pairs of (A_plus[i] - M[i,j] > 0)

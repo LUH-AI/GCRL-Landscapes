@@ -279,7 +279,7 @@ No flags. Reads `analysis/best_checkpoints.json` and writes
 
 | Flag | Type | Default | Meaning |
 | ---- | ---- | ------- | ------- |
-| `--out` | Path | `icrl-resubmission/plots/<figure id>` | Output directory for the generated PNG/PDF panels |
+| `--out` | Path | `icrl-resubmission/plots/a1-straight-vs-phased` (a1), `…/a3-ddpgbc-cube` (a3), `…/a8-stitch-vs-navigate` (a8); `REPO_ROOT`-relative | Output directory for the generated PNG/PDF panels |
 
 The input trees are constants at the top of each script
 (`cluster-mount/SSRL-Landscapes`, `cluster-mount/GCRL-Landscapes`) and are not
@@ -310,8 +310,14 @@ No flags. Writes `figures/approach-overview.svg` and
 | `sbatch collect_advantages.sh [LOGDIR]` | Catalog → advantages → AFR metrics; env overrides `LOGDIR`, `CHUNK_SIZE` (default 8), `NUM_BATCHES` (10), `NUM_WORKERS` (4) |
 | `bash profiling_sample.sh` | `setup` plus `cProfile -m gcrl_landscapes.main run` for one configuration |
 
-All of them source `configs/cluster/${CLUSTER:-luh}.sh`; see the README
-section [“`CLUSTER` and `configs/cluster/`”](../README.md#cluster-and-configscluster).
+All eight root scripts (`submit_train_all.sh`, `train_all.sh`, `hpo.sh`,
+`hpo_single.sh`, `convergence.sh`, `zip_and_plot.sh`, `collect_advantages.sh`,
+`profiling_sample.sh`) source `configs/cluster/${CLUSTER:-luh}.sh`. The
+`sbatch` and `submit` calls that the drivers make themselves pass the
+`CLUSTER_*` partition and reservation; a script you submit yourself with
+`sbatch` takes them from your `sbatch` command line, because no script has a
+`#SBATCH --partition` line. See the README section
+[“`CLUSTER` and `configs/cluster/`”](../README.md#cluster-and-configscluster).
 
 ---
 

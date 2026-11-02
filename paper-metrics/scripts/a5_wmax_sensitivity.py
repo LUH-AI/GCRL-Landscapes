@@ -1,4 +1,4 @@
-"""Reproduce `tab:wmax_sensitivity` from `PAPER/APPENDIX/robustness.tex`.
+"""Reproduce `tab:wmax_sensitivity` (derivation: `PROVENANCE.md` §2).
 
 Per (env, algo, w_max) reports ESS and Top-5% mass on the diagonal advantages,
 clipped at w_max ∈ {20, 50, 100, 200}, then averaged over configs. The paper

@@ -7,8 +7,9 @@ data from `data/` and writes a CSV to `outputs/`. A single bash driver,
 
 The numbers in this directory are produced from the **fixed-batch** evaluation
 zips (one per environment), the same artefacts the published tables are based
-on. Reproducing the paper does *not* require the cluster — the data here is
-the canonical input.
+on. Reproducing the paper does *not* require the cluster — the data under
+`data/` is the canonical input. That input is **not** shipped with this
+repository, however; see *Data availability* below before running anything.
 
 ---
 
@@ -36,16 +37,18 @@ loader) — not a table.
 
 ```
 paper-metrics/
-├── README.md                  this file
-├── reproduce_all.sh           run every script, write outputs/*.csv
+├── .gitignore                      ignores the large inputs and generated CSVs
+├── README.md                       this file
+├── PROVENANCE.md                   how every artefact is derived
+├── reproduce_all.sh                run every script, write outputs/*.csv
 ├── data/
-│   ├── zips/                  fixed-batch eval zips, one per env
-│   ├── parquets/<env>/advantages.parquet
-│   ├── eval_stats/<env>.csv   per-(algo, env, config, seed, phase) success
-│   └── configurations/        (reserved; alphas are read from the zips)
+│   ├── manifest.json               campaign registry (zips, eval stats, parquets)
+│   ├── zips/                       fixed-batch eval zips, one per env (contents not checked in)
+│   ├── parquets/<env>/             advantages.parquet per env (contents not checked in)
+│   └── eval_stats/                 <env>.csv success tables (contents not checked in)
 ├── scripts/
-│   ├── _common.py             shared helpers
-│   ├── build_eval_stats.py    helper: builds data/eval_stats/<env>.csv from a zip
+│   ├── _common.py                  shared helpers
+│   ├── build_eval_stats.py         helper: builds data/eval_stats/<env>.csv from a zip
 │   ├── t1_final_landscape_ci.py
 │   ├── t2_compact_diagnostics.py
 │   ├── t3_antmaze_ess.py
@@ -55,21 +58,55 @@ paper-metrics/
 │   ├── a4_subsample_stability.py
 │   ├── a5_wmax_sensitivity.py
 │   ├── a6_adv_norm_sensitivity.py
-│   └── a7_sensitivity_summary.py
-└── outputs/                   regenerated CSVs land here
+│   ├── a7_sensitivity_summary.py
+│   ├── rl1_abs_breadth.py
+│   ├── rl2_restricted_domain.py
+│   ├── rl3_realized_selectivity.py
+│   ├── rl4_eps_sensitivity.py
+│   ├── rl5_phase_mobility_null.py
+│   ├── rl6_filtered_fr.py
+│   ├── rl7_diagnostic_scatter_antmaze.py
+│   ├── rl8_lagged_partial_ess.py
+│   ├── rl9_new_result_figures.py   figure-only, not called by the driver
+│   └── rl_supplementary_figures.py additional-analysis figures
+└── outputs/                        regenerated CSVs land here (created at runtime)
 ```
 
-`data/` ships empty: the four zips (~6 GB total), four parquets (~17 GB
-total), and four eval-stats CSVs are not checked in — fetch them from the
-cluster as described below.
+The `data/` subdirectories ship empty (only `.gitkeep` files): the four zips
+(~6 GB total), four parquets (~17 GB total), and four eval-stats CSVs are not
+checked in — see *Data availability* below.
+
+---
+
+## Data availability
+
+The **fixed-batch zips and the advantage parquets are not included** in this
+repository (they total ~23 GB). Steps 1–2 below expect them under
+`data/zips/` and `data/parquets/` with the filenames listed in
+`data/manifest.json`. The commands further down only *copy* those files from a
+location that you must supply yourself.
+
+No public archive (DOI, Zenodo, Hugging Face dataset) is advertised for these
+artefacts. If you do not have your own copy of the training campaign, request
+them from the authors — open an issue in the project repository or write to the
+maintainer address listed in `pyproject.toml`.
+
+Only the derived `data/eval_stats/<env>.csv` tables are small (~400 KB each);
+step 3 rebuilds them from the zips.
 
 ---
 
 ## Fetching the data from the cluster
 
-Everything under `data/` originates from one project directory on the training
-cluster. If you cloned the repo on a fresh host, fetch the inputs as below;
-total transfer is ~23 GB (≈6 GB zips + ~17 GB parquets).
+Everything under `data/` originates from one project directory of the training
+campaign, which is not part of this repository. If you have access to such a
+copy, fetch the inputs as below; total transfer is ~23 GB (≈6 GB zips + ~17 GB
+parquets). Otherwise see *Data availability* above.
+
+The commands below use `user@cluster` and `${CLUSTER_PROJECT_DIR}` as
+placeholders — set them to the host and directory that hold your copy of the
+campaign artefacts. `${CLUSTER_SCRATCH_DIR}` (mentioned further down) is an
+open placeholder as well.
 
 **Canonical location on the cluster (`${CLUSTER_PROJECT_DIR}`):**
 
@@ -173,17 +210,26 @@ The scripts read through symlinks transparently. Only the *names* under
 cd paper-metrics
 
 # reproduce everything (≈10 min; the RF fits in a7 dominate)
-./reproduce_all.sh
+./reproduce_all.sh          # or: ./reproduce_all.sh all
 
-# only the main-paper tables
+# only the main-paper tables (t1..t4)
 ./reproduce_all.sh main
 
-# only the robustness-appendix tables
+# only the robustness-appendix tables (a2..a7)
 ./reproduce_all.sh appendix
+
+# additional analyses (rl1..rl8 plus the supplementary figures)
+./reproduce_all.sh rebuttal
 
 # run an individual script
 .venv/bin/python scripts/t1_final_landscape_ci.py
 ```
+
+`reproduce_all.sh` accepts exactly four modes: `all` (the default), `main`,
+`appendix` and `rebuttal`. The script names the last one `rebuttal`; it covers
+the additional analyses rather than the main tables and runs `rl1`–`rl8` plus
+`rl_supplementary_figures.py`. `rl9` is figure-only and must be called
+directly.
 
 The driver picks up `PAPER_METRICS_PYTHON` if set, else uses `python3` from
 `PATH`. Point it at a venv that has the `gcrl_landscapes` package installed.
@@ -208,9 +254,9 @@ script's docstring tells you which columns map to which paper cells.
 The scripts import from the project venv. From the repo root:
 
 ```bash
-uv pip install -e GCRL-Landscapes
+uv pip install -e .
 uv pip install pyarrow scikit-learn scipy pandas numpy
-# transitive (already pulled in by GCRL-Landscapes' install):
+# transitive (already pulled in by the editable install):
 #   flax, ml_collections, ogbench, tomli/tomllib, tqdm
 ```
 
@@ -257,13 +303,12 @@ The fixed-batch zips are the artefacts that produced the paper. They are:
 
 `advantages.parquet` for each env was generated on the training cluster by
 `analysis/generate_advantages.py` from the `params_*.pkl` checkpoints in the
-unzipped training tree (`${CLUSTER_SCRATCH_DIR}/...`). The zips
-themselves contain NO checkpoints (verified: zero `.pkl` entries), so the
-parquets are primary released data that cannot be regenerated offline — see
-PROVENANCE.md for the full derivation chain and audit. The eval-stats CSVs in `data/eval_stats/` are the per-step
-success-rate dumps used by `t1` and `a7`; they are derived from the same
-zips. (The `_malte_repro/eval_stats_v2/` versions of the medium CSV were
-copied here unchanged.)
+unzipped training tree. The zips themselves contain NO checkpoints (verified:
+zero `.pkl` entries), so the parquets are primary data that cannot be
+regenerated offline. See `PROVENANCE.md` for the full derivation chain.
+
+The eval-stats CSVs in `data/eval_stats/` are the per-step success-rate dumps
+used by `t1` and `a7`; they are derived from the same zips.
 
 If a CSV under `outputs/` disagrees with the paper:
 
@@ -282,9 +327,6 @@ If a CSV under `outputs/` disagrees with the paper:
 - `g_spearman.py --top-k` has a latent bug (filters `adv_data` but the
   analysis loop reads `merged_training_df` directly). `t4_adv_corr.py` works
   around this by not relying on `--top-k` filtering.
-- `compute_ess_table.py` is incompatible with newer pandas (uses
-  `include_groups`). `t3_antmaze_ess.py` does not use it; it computes ESS
-  directly via `compute_merged_df`.
 
 ## Extending the benchmark to incoming results
 

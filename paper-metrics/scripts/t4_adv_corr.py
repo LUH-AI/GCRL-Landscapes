@@ -1,4 +1,4 @@
-"""Reproduce `tab:adv_corr` from `PAPER/experiments.tex`.
+"""Reproduce `tab:adv_corr` (derivation: `PROVENANCE.md` §2).
 
 Per agent reports two numbers at the final phase (AntMaze-medium only):
   - Seed Spearman r: pairwise rank correlation of the per-step training
