@@ -9,10 +9,10 @@ the best checkpoint of the previous phase), evaluates every
 computes cross-goal advantage matrices from the trained checkpoints. Agents,
 environments and datasets come from [OGBench](https://github.com/seohongpark/ogbench).
 
+<!-- TODO: add the venue once the camera-ready version is submitted. -->
 > **Paper:** *Beyond Success Rates: Trainability and Extractability for Offline
-> GCRL* — Jan Malte Töpperwien, Aditya Mohan, Marius Lindauer. NeurIPS 2026.
-> [`CITATION.cff`](CITATION.cff) describes the software (title, authors, version,
-> license), not the publication.
+> GCRL* — Jan Malte Töpperwien, Aditya Mohan, Marius Lindauer.
+> To cite this software, cite the paper (see [Citation](#citation)).
 
 ## Installation
 
@@ -528,23 +528,12 @@ commit message (conventional commits via `git-conventional-commits.yaml`).
 
 ## Citation
 
-<!-- TODO: add the paper BibTeX (and `preferred-citation` in CITATION.cff)
+If you use this software, please cite the accompanying paper.
+
+<!-- TODO: add the paper BibTeX here (and `preferred-citation` in CITATION.cff)
      once the camera-ready version is submitted. -->
-> **TODO:** a citation entry for the paper will follow with the camera-ready
+> **TODO:** the BibTeX entry for the paper will follow with the camera-ready
 > version.
-
-If you use this software, please cite it as described in
-[`CITATION.cff`](CITATION.cff):
-
-```bibtex
-@software{gcrl_landscapes,
-  title  = {GCRL-Landscapes},
-  author = {Töpperwien, Jan Malte and Mohan, Aditya},
-  year   = {2026},
-  url    = {https://github.com/LUH-AI/GCRL-Landscapes},
-  note   = {Institute of AI, Leibniz University Hannover}
-}
-```
 
 ## License
 

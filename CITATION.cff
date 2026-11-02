@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it using the metadata below."
+message: "If you use this software, please cite the accompanying paper."
 type: software
 title: "GCRL-Landscapes"
 abstract: >-
@@ -19,8 +19,9 @@ authors:
     email: a.mohan@ai.uni-hannover.de
     affiliation: "Institute of AI, Leibniz University Hannover"
 version: 1.0.0
-# TODO: add date-released and a preferred-citation for the paper together with
-# the camera-ready submission.
+# TODO: with the camera-ready submission, add date-released and a
+# preferred-citation (type: conference-paper) for the paper. The paper is the
+# citation for this software; the fields above only describe the code.
 license: MIT
 repository-code: "https://github.com/LUH-AI/GCRL-Landscapes"
 url: "https://github.com/LUH-AI/GCRL-Landscapes"
