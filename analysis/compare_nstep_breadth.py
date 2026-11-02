@@ -6,9 +6,9 @@ the peak success, mean success, and the breadth measures the paper reports,
 computed at the deepest phase available in each tree.
 
 The n=1 baseline comes from the published fixed-batch campaign; n=3 and n=5
-come from the rebuttal arms, which reuse the published (lr, alpha) design via
-analysis/inject_reference_configs.py. Configuration i therefore denotes the
-same hyperparameters in every arm, so the comparison is paired.
+come from the rebuttal arms, which reuse the published (lr, alpha) design.
+Configuration i therefore denotes the same hyperparameters in every arm, so
+the comparison is paired.
 
 Conventions follow paper-metrics/README.md:
   - seed reduction by IQM, scipy.stats.trim_mean(v, 0.25)

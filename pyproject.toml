@@ -78,7 +78,7 @@ Issues = "https://github.com/LUH-AI/GCRL-Landscapes/issues"
 Source = "https://github.com/LUH-AI/GCRL-Landscapes"
 
 [tool.uv.sources]
-ogbench = { git = "https://github.com/CrunchyFlakes/ogbench", branch = "master" }
+ogbench = { git = "https://github.com/CrunchyFlakes/ogbench", rev = "c47fbd928a2f11632554d4748bcf0d849369f154" }
 smac = { git = "https://github.com/automl/SMAC3", branch = "v2.4.0" }
 
 [tool.hatch.metadata]

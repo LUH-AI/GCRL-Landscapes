@@ -100,6 +100,17 @@ All scripts live in `paper-metrics/scripts/`; outputs land in
 (paths from `data/manifest.json`, alpha lookup from the zip
 `configurations/`, eval-stats loader) and produces no table.
 
+### Aggregation conventions
+
+- `t1` reduces seeds per configuration by IQM (`trim_mean(·, 0.25)`) and
+  reports the maximum, mean and ρ over the 64 configurations.
+- `t2` averages each per-matrix diagnostic over all configurations, seeds and
+  validation batches. It selects no single checkpoint; the `Max Success`
+  column is taken from `t1`.
+- `t3`, `a5` and `a6` recompute AWR weights post hoc from the advantage
+  arrays with the per-configuration alpha read from the zip, and never
+  retrain.
+
 ## 3. Reconstructibility classes
 
 **(a) From the zips alone:** all four `eval_stats` CSVs (verified: rebuilt
