@@ -10,7 +10,7 @@ byte-for-byte; this was verified end to end (see §6).
 
 ## 1. The primary data: four "fixed-batch" zips
 
-One zip per environment, produced by the training campaign on the LUIS
+One zip per environment, produced by the training campaign on the training
 cluster (April–May 2026):
 
 | Zip | Environment | Entries | Uncompressed |
@@ -47,7 +47,7 @@ Two important facts:
 
 - **The zips contain no model checkpoints.** Zero `.pkl` entries in all
   four (verified). The `params_{step}.pkl` checkpoints stayed in the
-  unzipped trees on the cluster (`/bigwork/nhwptoem/gcrl/code/...`) and are
+  unzipped trees on the cluster (`${CLUSTER_SCRATCH_DIR}/...`) and are
   the one input that cannot be re-derived offline (see §4).
 - The antmaze-large zip additionally carries three derived files at its
   root (`advantages.parquet`, a per-batch `afr_metrics.csv`,

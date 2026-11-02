@@ -65,16 +65,16 @@ cluster as described below.
 
 ---
 
-## Fetching the data from Luis
+## Fetching the data from the cluster
 
-Everything under `data/` originates from one project directory on the LUIS
+Everything under `data/` originates from one project directory on the training
 cluster. If you cloned the repo on a fresh host, fetch the inputs as below;
 total transfer is ~23 GB (≈6 GB zips + ~17 GB parquets).
 
-**Canonical location on luis:**
+**Canonical location on the cluster (`${CLUSTER_PROJECT_DIR}`):**
 
 ```
-/project/NHWP25179/SSRL-Landscapes/
+${CLUSTER_PROJECT_DIR}/
 ├── 2026-04-26-logs-advantage-antmaze-medium-fixed-batch.zip          ( 696 MB)
 ├── 2026-04-27-logs-advantage-cube-single-fixed-batch.zip             ( 687 MB)
 ├── 2026-04-30-logs-advantage-antmaze-large-single-fixed-batch.zip    (4.2 GB)
@@ -94,10 +94,10 @@ You need: 4 zips, 4 `advantages.parquet`, and per-env `eval_stats/<env>.csv`
 cd paper-metrics
 mkdir -p data/zips
 rsync -avhP \
-  luis:/project/NHWP25179/SSRL-Landscapes/2026-04-26-logs-advantage-antmaze-medium-fixed-batch.zip \
-  luis:/project/NHWP25179/SSRL-Landscapes/2026-04-27-logs-advantage-cube-single-fixed-batch.zip \
-  luis:/project/NHWP25179/SSRL-Landscapes/2026-04-30-logs-advantage-antmaze-large-single-fixed-batch.zip \
-  luis:/project/NHWP25179/SSRL-Landscapes/2026-05-03-logs-advantage-scene-single-fixed-batch.zip \
+  user@cluster:${CLUSTER_PROJECT_DIR}/2026-04-26-logs-advantage-antmaze-medium-fixed-batch.zip \
+  user@cluster:${CLUSTER_PROJECT_DIR}/2026-04-27-logs-advantage-cube-single-fixed-batch.zip \
+  user@cluster:${CLUSTER_PROJECT_DIR}/2026-04-30-logs-advantage-antmaze-large-single-fixed-batch.zip \
+  user@cluster:${CLUSTER_PROJECT_DIR}/2026-05-03-logs-advantage-scene-single-fixed-batch.zip \
   data/zips/
 ```
 
@@ -108,10 +108,10 @@ The filenames must match `_common.py::ZIP_NAMES` exactly — don't rename.
 ```bash
 mkdir -p data/parquets/{antmaze-medium,antmaze-large,cube,scene}
 
-rsync -avhP luis:/project/NHWP25179/SSRL-Landscapes/logs-advantage-antmaze-medium-fixed-batch/advantages.parquet      data/parquets/antmaze-medium/
-rsync -avhP luis:/project/NHWP25179/SSRL-Landscapes/logs-advantage-antmaze-large-single-fixed-batch/advantages.parquet data/parquets/antmaze-large/
-rsync -avhP luis:/project/NHWP25179/SSRL-Landscapes/logs-advantage-cube-single-fixed-batch/advantages.parquet         data/parquets/cube/
-rsync -avhP luis:/project/NHWP25179/SSRL-Landscapes/logs-advantage-scene-single-fixed-batch/advantages.parquet        data/parquets/scene/
+rsync -avhP user@cluster:${CLUSTER_PROJECT_DIR}/logs-advantage-antmaze-medium-fixed-batch/advantages.parquet      data/parquets/antmaze-medium/
+rsync -avhP user@cluster:${CLUSTER_PROJECT_DIR}/logs-advantage-antmaze-large-single-fixed-batch/advantages.parquet data/parquets/antmaze-large/
+rsync -avhP user@cluster:${CLUSTER_PROJECT_DIR}/logs-advantage-cube-single-fixed-batch/advantages.parquet         data/parquets/cube/
+rsync -avhP user@cluster:${CLUSTER_PROJECT_DIR}/logs-advantage-scene-single-fixed-batch/advantages.parquet        data/parquets/scene/
 ```
 
 These four parquets are the cross-goal 256×256 advantage matrices used by
@@ -185,8 +185,8 @@ cd paper-metrics
 .venv/bin/python scripts/t1_final_landscape_ci.py
 ```
 
-The driver picks up `PAPER_METRICS_PYTHON` if set, else uses the project venv
-at `GCRL-Landscapes/.venv/bin/python`.
+The driver picks up `PAPER_METRICS_PYTHON` if set, else uses `python3` from
+`PATH`. Point it at a venv that has the `gcrl_landscapes` package installed.
 
 After a run, `outputs/` looks like:
 
@@ -255,9 +255,9 @@ The fixed-batch zips are the artefacts that produced the paper. They are:
 2026-05-03-logs-advantage-scene-single-fixed-batch.zip
 ```
 
-`advantages.parquet` for each env was generated on the LUIS cluster by
+`advantages.parquet` for each env was generated on the training cluster by
 `analysis/generate_advantages.py` from the `params_*.pkl` checkpoints in the
-unzipped training tree (`/bigwork/nhwptoem/gcrl/code/...`). The zips
+unzipped training tree (`${CLUSTER_SCRATCH_DIR}/...`). The zips
 themselves contain NO checkpoints (verified: zero `.pkl` entries), so the
 parquets are primary released data that cannot be regenerated offline — see
 PROVENANCE.md for the full derivation chain and audit. The eval-stats CSVs in `data/eval_stats/` are the per-step

@@ -6,7 +6,6 @@
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=32
 #SBATCH --mem-per-cpu=10G
-#SBATCH --mail-user=m.toepperwien@ai.uni-hannover.de
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 

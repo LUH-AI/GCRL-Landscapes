@@ -1,4 +1,4 @@
-# Inputs (rsynced from luis — see README.md "Fetching the data from Luis")
+# Inputs (rsynced from the cluster — see README.md "Fetching the data from the cluster")
 data/zips/*.zip
 data/parquets/**/*.parquet
 data/eval_stats/*.csv

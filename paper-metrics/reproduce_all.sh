@@ -23,10 +23,10 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${SCRIPT_DIR}"
 
-# Path to the project venv. Override via PAPER_METRICS_PYTHON if needed.
-PYTHON="${PAPER_METRICS_PYTHON:-/Users/adityamohan/git/GCRL/GCRL-Landscapes/.venv/bin/python}"
-if [[ ! -x "${PYTHON}" ]]; then
-    echo "Python interpreter not found at ${PYTHON}." >&2
+# Python interpreter for the scripts below. Override via PAPER_METRICS_PYTHON.
+PYTHON="${PAPER_METRICS_PYTHON:-python3}"
+if ! command -v "${PYTHON}" >/dev/null 2>&1; then
+    echo "Python interpreter not found: ${PYTHON}." >&2
     echo "Set PAPER_METRICS_PYTHON to a venv that has the gcrl_landscapes package + pyarrow + sklearn + scipy." >&2
     exit 1
 fi

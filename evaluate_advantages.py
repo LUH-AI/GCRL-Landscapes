@@ -6,13 +6,9 @@ from pathlib import Path
 import argparse
 
 _p = argparse.ArgumentParser()
-_p.add_argument("--zipfiles", nargs="+", type=Path)
+_p.add_argument("--zipfiles", nargs="+", type=Path, required=True)
 _args, _ = _p.parse_known_args()
-zipfiles = _args.zipfiles or [
-    Path(
-        "/home/mtoepperwien/Documents/gcrl/gcrl_results/2026-04-19-logs-antmaze.zip"
-    )
-]  # <- edit this
+zipfiles = _args.zipfiles
 plot_dir = Path("plots") / zipfiles[0].name / "advantages"
 
 # %%

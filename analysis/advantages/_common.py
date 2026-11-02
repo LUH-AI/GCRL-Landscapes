@@ -18,14 +18,16 @@ def parse_args():
     import argparse
 
     _p = argparse.ArgumentParser()
-    _p.add_argument("--zipfiles", nargs="+", type=Path)
+    _p.add_argument(
+        "--zipfiles",
+        nargs="+",
+        type=Path,
+        required=True,
+        help="One or more evaluation zip archives to analyse",
+    )
     _p.add_argument("--top-k", type=int, default=None)
     _args, _ = _p.parse_known_args()
-    zipfiles = _args.zipfiles or [
-        Path(
-            "/home/mtoepperwien/Documents/gcrl/gcrl_results/2026-04-19-logs-antmaze.zip"
-        )
-    ]
+    zipfiles = _args.zipfiles
     plot_dir = Path("plots") / zipfiles[0].name / "advantages"
     return zipfiles, plot_dir, _args.top_k
 

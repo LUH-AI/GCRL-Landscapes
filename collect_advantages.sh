@@ -18,7 +18,6 @@
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=64G
 #SBATCH --gpus=1
-#SBATCH --mail-user=m.toepperwien@ai.uni-hannover.de
 #SBATCH --mail-type=END,FAIL
 #SBATCH --get-user-env
 #SBATCH --output=collect_advantages_%j.log

@@ -24,9 +24,9 @@ Usage
     python analysis/compare_nstep_breadth.py --out outputs/nstep_breadth.csv
 
 Note: PUBLISHED_ROOT / REBUTTAL_ROOT below point at this machine's local
-mounts of /project/NHWP25179/{SSRL,GCRL}-Landscapes (see icrl-resubmission/).
-Original script (coauthor's tree) used /project/NHWP25179/SSRL-Landscapes and
-/bigwork/nhwpmoha/GCRL-Landscapes.
+mounts of the {SSRL,GCRL}-Landscapes project directories (see
+icrl-resubmission/). Original script (coauthor's tree) used the SSRL-Landscapes
+project directory and a GCRL-Landscapes directory on cluster scratch.
 """
 
 from __future__ import annotations

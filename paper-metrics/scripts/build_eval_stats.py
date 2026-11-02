@@ -21,13 +21,13 @@ Usage
 -----
     # antmaze-large
     python ANALYSIS/build_eval_stats.py \
-        --logs /Users/adityamohan/git/GCRL/plots/new-plots/raw-data/logs-antmaze-large \
+        --logs /path/to/logs-antmaze-large \
         --env antmaze-large-navigate-v0 \
         --out ENVS/antmaze-large/eval_stats.csv
 
     # cube
     python ANALYSIS/build_eval_stats.py \
-        --logs /Users/adityamohan/git/GCRL/plots/new-plots/raw-data/logs-cube \
+        --logs /path/to/logs-cube \
         --env cube-single-play-v0 \
         --out ENVS/cube/eval_stats.csv
 """
