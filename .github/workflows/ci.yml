@@ -31,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # uv sync honours uv.lock and [tool.uv.sources], which pins ogbench to
-      # CrunchyFlakes/ogbench@master and smac to automl/SMAC3@v2.4.0. A plain
+      # CrunchyFlakes/ogbench@c47fbd9 and smac to automl/SMAC3@v2.4.0. A plain
       # `pip install -e ".[dev]"` silently ignores those sources.
       - uses: astral-sh/setup-uv@v5
         with:
