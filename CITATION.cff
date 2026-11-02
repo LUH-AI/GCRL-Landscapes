@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+type: software
+title: "GCRL-Landscapes"
+abstract: >-
+  GCRL-Landscapes is a framework for exploring how the hyperparameter
+  landscape of offline goal-conditioned reinforcement learning agents evolves
+  during training. It samples hyperparameter configurations, trains them in
+  consecutive phases, evaluates every run, and provides GP-based landscape
+  fitting, cross-goal advantage computation and the complete reproduction
+  pipeline for the associated paper's tables.
+authors:
+  - family-names: Töpperwien
+    given-names: Jan Malte
+    email: m.toepperwien@ai.uni-hannover.de
+    affiliation: "Institute of AI, Leibniz University Hannover"
+  - family-names: Mohan
+    given-names: Aditya
+    affiliation: "Institute of AI, Leibniz University Hannover"
+version: 1.0.0
+date-released: 2026-10-30
+license: MIT
+repository-code: "https://github.com/LUH-AI/GCRL-Landscapes"
+url: "https://github.com/LUH-AI/GCRL-Landscapes"
+keywords:
+  - offline reinforcement learning
+  - goal-conditioned reinforcement learning
+  - hyperparameter landscape
+  - optimality landscape
+  - benchmark
