@@ -14,9 +14,6 @@ environments and datasets come from [OGBench](https://github.com/seohongpark/ogb
 > [`CITATION.cff`](CITATION.cff) describes the software (title, authors, version,
 > license), not the publication.
 
-**License:** MIT — see [`LICENSE`](LICENSE) (Copyright (c) 2026 Institute of AI
-at Leibniz University Hannover).
-
 ## Installation
 
 **Python 3.10 only** — `pyproject.toml` pins `requires-python = ">=3.10, <3.11"`.
@@ -25,7 +22,8 @@ Training runs on **JAX/Flax with CUDA 12** (`jax[cuda12] >= 0.6.2, < 0.7.0` and
 [`CrunchyFlakes/ogbench`](https://github.com/CrunchyFlakes/ogbench) fork and
 `smac` from `automl/SMAC3` branch `v2.4.0` (see `[tool.uv.sources]`).
 
-With [uv](https://docs.astral.sh/uv/) (a lockfile, `uv.lock`, is tracked):
+Install with [uv](https://docs.astral.sh/uv/). `uv sync` installs the locked
+versions from `uv.lock` (the same set that CI tests) and the git sources above:
 
 ```bash
 uv venv --python 3.10
@@ -33,13 +31,9 @@ source .venv/bin/activate
 uv sync --extra dev
 ```
 
-With pip:
-
-```bash
-python3.10 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
+Do not use plain `pip install -e .`: pip ignores `[tool.uv.sources]` and
+installs `ogbench` from PyPI, which does not contain the `ogbench.impls`
+agents that this package imports.
 
 Then install the git hooks:
 
@@ -458,7 +452,7 @@ writes one CSV per table to `paper-metrics/outputs/`.
 
 ```bash
 cd paper-metrics
-./reproduce_all.sh            # all scripts
+./reproduce_all.sh            # main + appendix (t1..t4, a2..a7)
 ./reproduce_all.sh main       # t1..t4 only
 ./reproduce_all.sh appendix   # a2..a7 only
 ./reproduce_all.sh rebuttal   # rl1..rl8 + supplementary figures
@@ -481,8 +475,9 @@ ruff check src tests analysis paper-metrics/scripts
 ```
 
 `ruff check` and `pytest` are the enforced gates: CI runs
-`ruff check src tests analysis paper-metrics/scripts` and `pytest -q` on
-Python 3.10 — see [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+`ruff check src tests analysis paper-metrics/scripts` (ruff 0.12.12) and, after
+`uv sync --extra dev` from `uv.lock`, `uv run pytest -q` on Python 3.10 — see
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 `tests/` contains `test_catalog_checkpoints.py` (checkpoint discovery on
 synthetic trees), `test_extract_training_log.py` (optimised CSV extraction in
@@ -532,6 +527,11 @@ commit message (conventional commits via `git-conventional-commits.yaml`).
 - [`CHANGELOG.md`](CHANGELOG.md) — release history.
 
 ## Citation
+
+<!-- TODO: add the paper BibTeX (and `preferred-citation` in CITATION.cff)
+     once the camera-ready version is submitted. -->
+> **TODO:** a citation entry for the paper will follow with the camera-ready
+> version.
 
 If you use this software, please cite it as described in
 [`CITATION.cff`](CITATION.cff):

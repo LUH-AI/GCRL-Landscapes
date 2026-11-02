@@ -347,7 +347,7 @@ positional mode:
 
 ```bash
 cd paper-metrics
-./reproduce_all.sh            # all scripts
+./reproduce_all.sh            # main + appendix (t1..t4, a2..a7)
 ./reproduce_all.sh main       # t1..t4
 ./reproduce_all.sh appendix   # a2..a7
 ./reproduce_all.sh rebuttal   # rl1..rl8 + supplementary figures

@@ -17,9 +17,8 @@ Pick a smaller `--final_phase` if you just want to see the pipeline move.
 python -c "import jax; print(jax.__version__, jax.default_backend())"   # expect: 0.6.x gpu
 ```
 
-Installation (Python 3.10, JAX/CUDA 12, `pip install -e ".[dev]"` or
-`uv sync --extra dev`) is described in the
-[README installation section](../README.md#installation).
+Installation (Python 3.10, JAX/CUDA 12, `uv sync --extra dev`) is described in
+the [README installation section](../README.md#installation).
 
 Use a directory whose top-level name starts with `logs`: the evaluation step
 below zips it, and the zip reader expects `logs*/<experiment>/info.toml`
