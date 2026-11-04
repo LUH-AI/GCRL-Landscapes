@@ -1,0 +1,458 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beyond Success Rates</title>
+<meta name="description" content="Beyond Success Rates: Trainability and Extractability for Offline GCRL. Project page with landscapes, diagnostics and results.">
+<meta property="og:title" content="Beyond Success Rates: Trainability and Extractability for Offline GCRL">
+<meta property="og:description" content="A best-tuned success rate tells you what a method can reach, not how easy it is to get there.">
+<meta property="og:image" content="https://amsks.github.io/beyond-success-rates/static/gif/antmaze-medium_wide.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
+<script>
+  window.MathJax = { tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] }, svg: { fontCache: 'global' } };
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-svg.js"></script>
+<style>
+  :root {
+    color-scheme: light;
+    --ink: #1d1d1f;
+    --muted: #5b5b66;
+    --rule: #e3e3e8;
+    --bg: #ffffff;
+    --panel: #f6f6f8;
+    --accent: #21918c;
+    --link: #17706c;
+    --off: #a9a9b3;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Source Serif 4", Georgia, serif; font-size: 18px; line-height: 1.6;
+  }
+  main { max-width: 960px; margin: 0 auto; padding: 0 16px 64px; }
+  h1, h2, h3, .sans { font-family: Inter, system-ui, sans-serif; }
+  header { text-align: center; padding: 56px 0 20px; }
+  header h1 { font-size: clamp(1.7rem, 4vw, 2.5rem); line-height: 1.2; margin: 0 0 8px; font-weight: 600; letter-spacing: -0.01em; }
+  header .name { color: var(--link); }
+  .authors { font-family: Inter, sans-serif; color: var(--muted); font-size: 1rem; margin: 16px 0 4px; }
+  .venue { font-family: Inter, sans-serif; color: var(--muted); font-size: 0.95rem; }
+  .buttons { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 22px 0 0; }
+  .btn {
+    font-family: Inter, sans-serif; font-size: 0.92rem; font-weight: 500;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 18px; border-radius: 999px; background: var(--ink); color: #fff; text-decoration: none;
+  }
+  .claim { font-size: clamp(1.2rem, 2.6vw, 1.5rem); line-height: 1.35; text-align: center; max-width: 760px; margin: 28px auto 8px; }
+  h2 { font-size: 1.45rem; font-weight: 600; margin: 56px 0 12px; padding-top: 12px; border-top: 1px solid var(--rule); }
+  h3 { font-size: 1.1rem; font-weight: 600; margin: 32px 0 8px; }
+  p { margin: 0 0 14px; }
+  a { color: var(--link); }
+  code { font-family: "JetBrains Mono", monospace; font-size: 0.85em; }
+  figure { margin: 24px 0; }
+  figure img { display: block; width: 100%; max-width: 100%; height: auto; }
+  .wide { width: min(1200px, calc(100vw - 32px)); margin-left: 50%; transform: translateX(-50%); }
+  figcaption { font-size: 0.92rem; color: var(--muted); margin-top: 10px; line-height: 1.5; }
+  figcaption b { color: var(--ink); }
+  .row { display: grid; gap: 14px; align-items: start; }
+  .row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .row > * { min-width: 0; }
+  ul.overview { padding-left: 22px; margin: 0 0 14px; }
+  ul.overview li { margin: 8px 0; }
+  .eq { overflow-x: auto; padding: 4px 0; }
+
+  .tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 12px; }
+  .tab {
+    font-family: Inter, sans-serif; font-size: 0.86rem; font-weight: 500; cursor: pointer;
+    padding: 6px 14px; border-radius: 999px; border: 1px solid var(--rule); background: var(--bg); color: var(--muted);
+  }
+  .tab[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .tab:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* Offsets line the four columns up with the panels of the wide GIF. */
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0 14px; padding: 8px 1.5% 0 4.6%; font-family: Inter, sans-serif; font-size: 0.82rem; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .stats div { text-align: center; }
+  .stats b { color: var(--ink); font-weight: 600; }
+
+  .chart-title { font-family: Inter, sans-serif; font-size: 0.95rem; font-weight: 600; margin: 0 0 4px; }
+  .chart-title span { font-weight: 400; color: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-family: Inter, sans-serif; font-size: 0.82rem; color: var(--muted); margin: 16px 0 10px; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; }
+  .chart { position: relative; }
+  .chart svg { display: block; width: 100%; height: auto; font-family: Inter, sans-serif; }
+  .chart .tick { font-size: 11px; fill: var(--muted); }
+  .chart .axis { font-size: 12px; fill: var(--muted); }
+  .chart .grid { stroke: var(--rule); stroke-width: 1; }
+  .chart .hit { fill: transparent; cursor: default; }
+  .tip {
+    position: absolute; pointer-events: none; display: none; z-index: 5; white-space: nowrap;
+    font-family: Inter, sans-serif; font-size: 0.78rem; line-height: 1.4; font-variant-numeric: tabular-nums;
+    background: var(--ink); color: #fff; padding: 5px 9px; border-radius: 4px;
+  }
+  details { font-family: Inter, sans-serif; font-size: 0.85rem; color: var(--muted); margin-top: 10px; }
+  summary { cursor: pointer; }
+  details .row { margin-top: 10px; }
+
+  .table-wrap { overflow-x: auto; margin: 16px 0; }
+  table { border-collapse: collapse; width: 100%; font-family: Inter, sans-serif; font-size: 0.82rem; font-variant-numeric: tabular-nums; }
+  th, td { padding: 6px 8px; text-align: right; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  table.text td, table.text th { text-align: left; white-space: normal; }
+  thead th { border-bottom: 2px solid var(--ink); font-weight: 600; }
+  thead tr.span th { border-bottom: 1px solid var(--rule); text-align: center; }
+  tbody tr.group td { font-weight: 600; background: var(--panel); border-top: 1px solid var(--rule); }
+  tbody tr.sub td:first-child { padding-left: 18px; }
+  td.best { font-weight: 700; }
+  td.neg { color: #a02c2c; }
+
+  pre { background: var(--panel); padding: 16px; border-radius: 4px; overflow-x: auto; font-family: "JetBrains Mono", monospace; font-size: 0.8rem; line-height: 1.5; }
+  footer { font-family: Inter, sans-serif; font-size: 0.8rem; color: var(--muted); text-align: center; margin-top: 64px; }
+  @media (max-width: 720px) {
+    body { font-size: 16.5px; }
+    .row.two { grid-template-columns: 1fr; }
+    .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; padding: 8px 0 0; }
+  }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1><span class="name">Beyond Success Rates</span>: Trainability and Extractability for Offline GCRL</h1>
+  <div class="authors">
+    Jan Malte T&ouml;pperwien<sup>*,1</sup>, Aditya Mohan<sup>*,1</sup>, Marius Lindauer<sup>1,2</sup>
+  </div>
+  <div class="venue">
+    <sup>1</sup>Institute of Artificial Intelligence (LUH|AI), Leibniz University Hannover &nbsp; <sup>2</sup>L3S Research Center &nbsp; <sup>*</sup>Equal authorship
+  </div>
+  <div class="venue">NeurIPS 2026, Evaluations &amp; Datasets Track</div>
+  <div class="buttons">
+    <a class="btn" href="https://arxiv.org/abs/2602.05459">arXiv</a>
+    <a class="btn" href="https://github.com/LUH-AI/GCRL-Landscapes">Code</a>
+    <a class="btn" href="#bibtex">BibTeX</a>
+  </div>
+</header>
+
+<p class="claim">A best-tuned success rate tells you what a method can reach, not how easy it is to get there.</p>
+
+<figure class="wide" id="lead">
+  <div class="tabs" role="group" aria-label="Task">
+    <button class="tab" type="button" data-task="antmaze-medium">AntMaze-M</button>
+    <button class="tab" type="button" data-task="antmaze-large">AntMaze-L</button>
+    <button class="tab" type="button" data-task="cube">Cube</button>
+    <button class="tab" type="button" data-task="scene">Scene</button>
+  </div>
+  <picture>
+    <source id="src-still-narrow" media="(prefers-reduced-motion: reduce) and (max-width: 720px)">
+    <source id="src-still-wide" media="(prefers-reduced-motion: reduce)">
+    <source id="src-gif-narrow" media="(max-width: 720px)">
+    <img id="landscape" width="1664" height="455" alt="">
+  </picture>
+  <div class="stats" id="landscape-stats"></div>
+  <figcaption>
+    <b id="landscape-title"></b> <span id="landscape-note"></span>
+    Each frame is one training phase, showing where a method stays within 80% of its best in that phase. Dashed lines show earlier phases.
+    Phase 1 trains from scratch and phases 2 to 4 fine-tune one shared checkpoint, so this is not one policy's learning curve.
+    Regions come from a GP fit on goal-distance return, for visualization only. The numbers under each panel are raw final-phase success and can disagree with the picture.
+  </figcaption>
+</figure>
+
+<h2 id="overview">Overview</h2>
+<ul class="overview">
+  <li>Offline GCRL methods are usually compared by their best tuned success rate. That score leaves open whether success spans many hyperparameter settings or sits at one narrow, hard-to-find configuration.</li>
+  <li>We fix one policy extractor, advantage-weighted regression (AWR), and give it the advantages learned by GCIQL, GCIVL, QRL and CRL. Sweeping learning rate and AWR temperature gives a trainability landscape for each (signal, extractor) pair on AntMaze, Cube and Scene.</li>
+  <li>Peak success hides large differences in breadth. Diagnostics of the learned signal separate the regimes on AntMaze, where future goals follow physical progress. On Cube and Scene, goal ranking and control come apart. Offline GCRL evaluation should report success together with breadth, signal diagnostics, and the extractor they were measured under.</li>
+</ul>
+
+<h2 id="peak">Similar peaks, different breadth</h2>
+<p>
+On AntMaze-M, GCIQL and GCIVL peak four points apart. Tuned to their best setting, they look almost interchangeable.
+Look at the 64 configurations behind those peaks and they are not: 47 of GCIVL's reach 0.5 success, against 3 of GCIQL's.
+</p>
+<div class="legend" aria-hidden="true">
+  <span><i style="background:var(--accent)"></i>success at least 0.5</span>
+  <span><i style="border:1.5px solid var(--off)"></i>success below 0.5</span>
+  <span><i style="background:var(--accent);box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--ink)"></i>&nbsp;best configuration</span>
+</div>
+<div class="row two">
+  <div>
+    <p class="chart-title">GCIQL <span>peak 0.70, 3 of 64 configurations at 0.5 or above</span></p>
+    <div class="chart" id="dots-GCIQL"></div>
+  </div>
+  <div>
+    <p class="chart-title">GCIVL <span>peak 0.74, 47 of 64 configurations at 0.5 or above</span></p>
+    <div class="chart" id="dots-GCIVL"></div>
+  </div>
+</div>
+<figure style="margin-top:6px">
+  <figcaption>
+    <b>Raw configurations, no smoothing.</b> Final-phase success on <code>antmaze-medium-navigate-v0</code>; each dot is one configuration, with five seeds aggregated by the interquartile mean.
+    The threshold is absolute, so this is $\rho_{\mathrm{abs}}(0.5)$: 0.05 for GCIQL and 0.73 for GCIVL. Hover a dot for its values.
+    This compares a pair of methods on one task under AWR, and does not rank GCIVL above GCIQL in general: on Scene, GCIQL has the higher peak (0.87 against 0.73) and more of its configurations near that peak.
+  </figcaption>
+  <details>
+    <summary>Show all 64 configurations as a table</summary>
+    <div class="row two" id="dots-tables"></div>
+  </details>
+</figure>
+
+<h2 id="setup">Setup</h2>
+<p>
+AWR trains the actor by weighted behavioral cloning, so a policy only learns from what the advantage signal puts weight on.
+The temperature $\alpha$ sets how selective that weighting is:
+</p>
+<div class="eq">
+$$ \mathcal{L}_{\mathrm{AWR}}(\pi) = -\mathbb{E}_{(s,a,g)}\big[ w_\alpha(s,a,g)\log\pi(a\mid s,g) \big], \qquad w_\alpha(s,a,g) = \min\{e^{\alpha A_{\mathrm{alg}}(s,a,g)},\, w_{\max}\}. $$
+</div>
+<p>The extractor is shared; the signal $A_{\mathrm{alg}}$ is what changes.</p>
+<div class="table-wrap">
+<table class="text">
+  <thead><tr><th>Method</th><th>Advantage signal</th><th>Meaning</th></tr></thead>
+  <tbody>
+    <tr><td>GCIQL</td><td>$Q(s,a,g)-V(s,g)$</td><td>Action value above the state-goal baseline</td></tr>
+    <tr><td>GCIVL</td><td>$V(s',g)-V(s,g)$</td><td>One-step value progress</td></tr>
+    <tr><td>QRL</td><td>$d_\phi(s,g)-d_\phi(s',g)$</td><td>One-step distance reduction</td></tr>
+    <tr><td>CRL</td><td>$f_\theta(s,a,g)-f_\theta^V(s,g)$</td><td>Action-conditioned reachability increase</td></tr>
+  </tbody>
+</table>
+</div>
+<p>
+For each method and task we sample 64 $(\eta, \alpha)$ configurations with a scrambled Sobol sequence and run each for five seeds.
+Training splits into four phases. At each boundary every configuration is evaluated, and the next phase starts from the checkpoint of the best one.
+Breadth is the share of sampled configurations that clear a bar, either relative to the method's own best or absolute:
+</p>
+<div class="eq">
+$$ \rho_{\varepsilon}(t) = \frac{1}{|C|} \sum_{\lambda\in C} \mathbf{1}\Big[ \bar S_t(\lambda) \ge \varepsilon \max_{\lambda'\in C}\bar S_t(\lambda') \Big], \qquad \rho_{\mathrm{abs}}(c) = \frac{1}{|C|} \sum_{\lambda\in C} \mathbf{1}\big[ \bar S_t(\lambda) \ge c \big]. $$
+</div>
+<p>
+We report both, because a method can have a wide relative basin under a low ceiling.
+</p>
+
+<h2 id="landscapes">Landscape breadth</h2>
+<p>
+Final-phase success and breadth over 64 configurations. Bold marks the highest peak on each task.
+</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Task / method</th><th>Max</th><th>Mean</th><th>$\rho_{0.9}$</th><th>$\rho_{0.8}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>$\rho_{\mathrm{abs}}(0.5)$</th></tr></thead>
+  <tbody id="breadth"></tbody>
+</table>
+</div>
+<p>
+GCIQL on AntMaze-M is a narrow peak: most configurations reach moderate success ($\rho_{\mathrm{abs}}(0.25)=0.83$), but few get near its best ($\rho_{0.9}=0.03$).
+CRL on Scene shows why relative breadth needs the absolute view: $\rho_{0.8}=0.25$ looks like a basin, but its peak is 0.19, so no configuration reaches 0.25 success.
+</p>
+
+<h2 id="diagnostics">Diagnostics</h2>
+<p>
+Landscapes are expensive, so we also read the signal directly from trained checkpoints.
+We pair each anchor transition with its matched future goal and 255 random goals, then ask whether the advantage scores the matched goal higher.
+FR-AUC is how often it does, Gap is by how much, and MRR is the reciprocal rank of the matched goal among all 256 (random gives about 0.024).
+These describe the learned signal, not the policy. Effective sample size (ESS) separately describes how concentrated the AWR update is.
+</p>
+<div class="table-wrap">
+<table>
+  <thead><tr><th>Task / method</th><th>FR-AUC</th><th>Gap</th><th>MRR</th><th>Max success</th></tr></thead>
+  <tbody id="diag"></tbody>
+</table>
+</div>
+<h3>AntMaze: diagnostics separate the regimes</h3>
+<p>
+Goals are positions, so future goals line up with physical progress.
+On AntMaze-M, QRL and GCIVL give positive future-association signals and comparatively diffuse AWR weights (ESS 0.543 and 0.468).
+GCIQL is the exception: a negative gap and weak alignment with a maze-distance oracle, consistent with its narrow near-peak landscape.
+These are correlations, and we do not read them causally.
+</p>
+<h3>Cube and Scene: ranking and control come apart</h3>
+<p>
+The goal names an object or scene target, but the policy acts through robot state and contact. A transition can prepare a grasp before the object moves any closer to the goal.
+On Scene, GCIQL reaches 0.87 success with FR-AUC 0.411 and a negative gap, while QRL ranks matched goals well (MRR 0.115) and peaks at 0.22.
+GCIVL is the most consistent signal across both tasks. A goal-ranking score alone cannot predict manipulation success here.
+</p>
+
+<h2 id="transfer">Beyond the shared AWR setup</h2>
+<p>
+These claims are conditional on the extractor, so we tested which survive when the setup changes. The table swaps AWR for DDPG+BC, again with 64 configurations and five seeds.
+Budget is DDPG+BC's training budget relative to AWR. GCIVL has no action-conditioned critic for DDPG+BC to use.
+</p>
+<div class="table-wrap">
+<table>
+  <thead>
+    <tr class="span"><th></th><th></th><th colspan="4">AntMaze-M</th><th colspan="4">Cube</th></tr>
+    <tr><th>Method</th><th style="text-align:left">Extractor</th><th>Max</th><th>$\rho_{0.9}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>Budget</th><th>Max</th><th>$\rho_{0.9}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>Budget</th></tr>
+  </thead>
+  <tbody id="ddpg"></tbody>
+</table>
+</div>
+<ul class="overview">
+  <li><b>Holds:</b> on navigation, configuration orderings survive changes in action selection and critic settings, and GCIQL stays narrow near its peak across extractors, frozen critics and training protocols.</li>
+  <li><b>Depends on the setup:</b> absolute levels, some breadth classes (QRL's $\rho_{0.9}$ falls from 0.59 to 0.02 under DDPG+BC), and orderings after checkpoint selection or on the harder stitch dataset.</li>
+  <li><b>Diagnostics are not a monotone proxy:</b> for GCIVL on Cube, multi-step targets ($n\in\{3,5\}$) raise FR-AUC, MRR and gap while mean success falls from 0.70 to 0.49 and 0.45.</li>
+</ul>
+
+<h2 id="report">What to report</h2>
+<p>
+Report success together with relative and absolute breadth, diagnostics of the learned signal, and the extractor under which they were measured.
+The evidence here is diagnostic and correlational. The main study uses one flat extractor and does not cover hierarchical extractors such as HIQL, action chunking or test-time planning; it also leaves out longer-horizon and humanoid tasks. Method-specific hyperparameters stay at OGBench reference settings, and the transfer controls cover only AntMaze-M and Cube, most of them with fewer seeds.
+</p>
+
+<h2 id="bibtex">BibTeX</h2>
+<pre>@article{toepperwien2026beyond,
+  title   = {Beyond Success Rates: Trainability and Extractability for Offline GCRL},
+  author  = {T{\"o}pperwien, Jan Malte and Mohan, Aditya and Lindauer, Marius},
+  journal = {arXiv preprint arXiv:2602.05459},
+  year    = {2026}
+}</pre>
+
+<footer>Built on <a href="https://github.com/seohongpark/ogbench">OGBench</a>. Landscape framework from Mohan et al., AutoML Conference 2023.</footer>
+</main>
+
+<script>
+  // Final-phase numbers from the paper's tables.
+  // [method, max, mean, rho_0.9, rho_0.8, rho_abs(0.25), rho_abs(0.5)]
+  const breadth = {
+    "AntMaze-M": [["GCIQL",0.70,0.34,0.03,0.05,0.83,0.05],["GCIVL",0.74,0.49,0.03,0.28,0.86,0.73],["CRL",0.83,0.67,0.66,0.80,0.89,0.84],["QRL",0.84,0.66,0.59,0.70,0.91,0.83]],
+    "AntMaze-L": [["GCIQL",0.24,0.16,0.14,0.39,0.00,0.00],["GCIVL",0.17,0.09,0.02,0.12,0.00,0.00],["CRL",0.54,0.36,0.17,0.59,0.75,0.14],["QRL",0.55,0.38,0.23,0.59,0.81,0.23]],
+    "Cube": [["GCIQL",0.77,0.53,0.28,0.56,0.78,0.77],["GCIVL",0.91,0.70,0.56,0.67,0.88,0.84],["CRL",0.28,0.12,0.08,0.17,0.08,0.00],["QRL",0.18,0.07,0.02,0.06,0.00,0.00]],
+    "Scene": [["GCIQL",0.87,0.64,0.47,0.66,0.83,0.81],["GCIVL",0.73,0.55,0.41,0.64,0.88,0.77],["CRL",0.19,0.10,0.03,0.25,0.00,0.00],["QRL",0.22,0.13,0.08,0.19,0.00,0.00]],
+  };
+  // [method, FR-AUC, gap, MRR, max success]
+  const diag = {
+    "AntMaze-M": [["GCIQL",0.471,-0.102,0.045,0.70],["GCIVL",0.564,0.143,0.078,0.74],["CRL",0.530,0.169,0.022,0.83],["QRL",0.546,0.358,0.072,0.84]],
+    "AntMaze-L": [["GCIQL",0.472,-0.101,0.042,0.24],["GCIVL",0.575,0.136,0.084,0.17],["CRL",0.527,0.174,0.019,0.54],["QRL",0.582,0.680,0.080,0.55]],
+    "Cube": [["GCIQL",0.531,-0.039,0.040,0.77],["GCIVL",0.644,0.160,0.064,0.91],["CRL",0.562,0.875,0.022,0.28],["QRL",0.523,0.167,0.092,0.18]],
+    "Scene": [["GCIQL",0.411,-0.192,0.041,0.87],["GCIVL",0.672,0.185,0.134,0.73],["CRL",0.555,0.695,0.022,0.19],["QRL",0.580,0.379,0.115,0.22]],
+  };
+  // [method, extractor, AntMaze-M: max, rho_0.9, rho_abs(0.25), budget, Cube: same]
+  const ddpg = [
+    ["GCIQL","AWR",0.70,0.03,0.83,"",0.77,0.28,0.78,""],
+    ["","DDPG+BC",0.80,0.14,0.89,"1.0&times;",0.92,0.09,0.77,"0.9&times;"],
+    ["CRL","AWR",0.83,0.66,0.89,"",0.28,0.08,0.08,""],
+    ["","DDPG+BC",1.00,0.84,0.92,"3.5&times;",0.35,0.06,0.20,"3.2&times;"],
+    ["QRL","AWR",0.84,0.59,0.91,"",0.18,0.02,0.00,""],
+    ["","DDPG+BC",0.87,0.02,0.88,"2.1&times;",0.12,0.03,0.00,"1.1&times;"],
+  ];
+  // Final-phase [learning rate, alpha, IQM success] on antmaze-medium-navigate-v0;
+  // scripts/export_configs.py writes this from the raw evaluation stats.
+  const configs = {"GCIQL":[[9.02e-05,9.59,0.34],[0.00139,26.03,0.293],[8.04e-06,18.08,0.42],[0.000164,2.53,0.34],[2.29e-06,5.84,0.473],[0.000354,22.27,0.347],[2.05e-05,29.33,0.407],[0.0042,13.77,0.0],[3.41e-06,11.84,0.44],[0.000221,27.52,0.373],[4.04e-05,20.46,0.373],[0.00198,3.9,0.153],[1.34e-05,0.59,0.7],[0.00869,16.27,0.0],[1.58e-06,24.21,0.46],[0.000774,7.66,0.26],[1.14e-06,8.62,0.487],[0.000737,23.24,0.373],[1.3e-05,15.24,0.36],[0.00636,1.61,0.0],[4.48e-05,4.87,0.347],[0.0029,19.5,0.24],[5.1e-06,26.5,0.46],[0.000249,12.87,0.347],[2.8e-05,14.69,0.373],[0.00433,28.43,0.0],[2.4e-06,21.42,0.447],[0.000492,6.69,0.32],[7.12e-06,3.43,0.487],[0.00011,17.17,0.353],[6.15e-05,25.17,0.373],[0.00126,10.43,0.353],[9.02e-06,11.22,0.413],[0.000139,24.38,0.333],[8.04e-05,17.37,0.333],[0.00164,3.23,0.187],[2.29e-05,7.48,0.42],[0.00354,20.63,0.0],[2.05e-06,28.63,0.453],[0.000419,14.48,0.313],[3.41e-05,12.55,0.353],[0.00221,26.82,0.273],[4.04e-06,18.82,0.44],[0.000198,5.55,0.28],[1.34e-06,1.29,0.64],[0.000869,15.56,0.273],[1.58e-05,22.56,0.413],[0.00774,9.29,0.0],[1.14e-05,8.39,0.387],[0.00737,23.48,0.0],[1.3e-06,16.42,0.467],[0.000636,0.45,0.6],[4.48e-06,4.63,0.467],[0.00029,19.72,0.4],[5.1e-05,27.66,0.393],[0.0025,11.69,0.253],[2.8e-06,13.51,0.467],[0.000433,29.59,0.373],[2.4e-05,21.65,0.367],[0.00492,6.45,0.0],[7.12e-05,2.27,0.38],[0.0011,18.35,0.34],[6.15e-06,25.41,0.427],[0.000126,10.21,0.333]],"GCIVL":[[3.15e-05,26.3,0.6],[0.00361,8.66,0.22],[1.49e-06,7.5,0.533],[0.000735,17.62,0.6],[7.58e-06,22.0,0.533],[0.000116,2.12,0.553],[4.96e-05,11.74,0.547],[0.00184,24.09,0.527],[1.89e-06,25.1,0.6],[0.000522,14.94,0.58],[1.21e-05,1.13,0.587],[0.00783,18.75,0.0],[6.99e-05,16.63,0.553],[0.00146,4.25,0.387],[3.5e-06,9.65,0.52],[0.000302,29.51,0.667],[5.41e-06,29.03,0.573],[0.000195,11.03,0.607],[8.11e-05,4.71,0.453],[0.00126,15.19,0.513],[1.41e-05,20.21,0.6],[0.00675,0.68,0.0],[2.92e-06,13.59,0.567],[0.000337,25.59,0.633],[3.24e-05,22.72,0.607],[0.00283,12.22,0.307],[6.59e-06,3.57,0.48],[0.000134,21.53,0.607],[1.3e-06,18.06,0.527],[0.000845,6.04,0.44],[2.05e-05,8.16,0.56],[0.00553,27.66,0.0],[1.57e-06,27.63,0.593],[0.000582,7.78,0.473],[2.39e-05,6.12,0.5],[0.00368,18.51,0.187],[4.71e-05,20.63,0.6],[0.00232,3.01,0.227],[9.94e-06,13.07,0.56],[0.000114,23.22,0.613],[1.1e-05,25.97,0.627],[0.00955,13.62,0.0],[2.21e-06,0.25,0.74],[0.00046,20.12,0.647],[3.83e-06,15.74,0.56],[0.000247,5.62,0.52],[5.95e-05,10.53,0.547],[0.00165,28.18,0.573],[9.21e-05,29.53,0.587],[0.00107,10.04,0.52],[4.44e-06,4.16,0.487],[0.000213,16.19,0.633],[2.56e-06,19.66,0.58],[0.000397,1.69,0.527],[1.71e-05,14.1,0.573],[0.00617,24.6,0.0],[6.49e-06,23.71,0.613],[0.000175,11.71,0.567],[4.1e-05,2.56,0.533],[0.00267,22.09,0.407],[2.08e-05,17.06,0.52],[0.00423,6.59,0.073],[1.02e-06,9.15,0.54],[0.000892,27.16,0.66]]};
+
+  const tasks = {
+    "antmaze-medium": { label: "AntMaze-M", title: "Four methods on AntMaze-M.",
+      note: "From phase 2 on, CRL and QRL hold still, while GCIQL moves again and breaks into pieces." },
+    "antmaze-large": { label: "AntMaze-L", title: "Four methods on AntMaze-L.",
+      note: "GCIQL and GCIVL look broad here, but only relative to their own low peaks: neither has a configuration at 0.25 success." },
+    "cube": { label: "Cube", title: "Four methods on Cube.",
+      note: "After phase 1, GCIQL and GCIVL turn broad and stable. CRL and QRL collapse to a sliver at the lowest learning rates, below low peaks." },
+    "scene": { label: "Scene", title: "Four methods on Scene.",
+      note: "After phase 1, GCIQL and GCIVL turn broad. CRL and QRL have goal-distance return near zero in every phase, so no region is drawn; their success numbers below are low as well." },
+  };
+
+  const f2 = (x) => x.toFixed(2);
+  const f3 = (x) => x.toFixed(3);
+  const neg = (x, fmt) => x < 0 ? `&minus;${fmt(-x)}` : fmt(x);
+
+  function selectTask(task) {
+    const base = `static/gif/${task}`;
+    document.getElementById("src-still-narrow").srcset = `${base}_narrow.png`;
+    document.getElementById("src-still-wide").srcset = `${base}_wide.png`;
+    document.getElementById("src-gif-narrow").srcset = `${base}_narrow.gif`;
+    const t = tasks[task];
+    const img = document.getElementById("landscape");
+    img.src = `${base}_wide.gif`;
+    img.alt = `Landscapes on ${t.label} for GCIQL, GCIVL, CRL and QRL over learning rate and AWR temperature, one frame per training phase. ${t.note}`;
+    document.getElementById("landscape-title").textContent = t.title;
+    document.getElementById("landscape-note").textContent = t.note;
+    document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.task === task)));
+    document.getElementById("landscape-stats").innerHTML = breadth[t.label]
+      .map((r) => `<div><b>${r[0]}</b> peak ${f2(r[1])}, ρ<sub>0.8</sub> ${f2(r[4])}</div>`).join("");
+  }
+  document.querySelectorAll(".tab").forEach((b) => b.addEventListener("click", () => selectTask(b.dataset.task)));
+  selectTask("antmaze-medium");
+
+  function fillBreadth() {
+    const tb = document.getElementById("breadth");
+    for (const [task, rows] of Object.entries(breadth)) {
+      tb.insertAdjacentHTML("beforeend", `<tr class="group"><td colspan="7">${task}</td></tr>`);
+      const top = Math.max(...rows.map((r) => r[1]));
+      for (const r of rows) {
+        const cells = r.slice(1).map((v, i) => `<td class="${i === 0 && v === top ? "best" : ""}">${f2(v)}</td>`).join("");
+        tb.insertAdjacentHTML("beforeend", `<tr class="sub"><td>${r[0]}</td>${cells}</tr>`);
+      }
+    }
+  }
+  function fillDiag() {
+    const tb = document.getElementById("diag");
+    for (const [task, rows] of Object.entries(diag)) {
+      tb.insertAdjacentHTML("beforeend", `<tr class="group"><td colspan="5">${task}</td></tr>`);
+      for (const [m, auc, gap, mrr, s] of rows) {
+        tb.insertAdjacentHTML("beforeend", `<tr class="sub"><td>${m}</td><td>${f3(auc)}</td><td class="${gap < 0 ? "neg" : ""}">${neg(gap, f3)}</td><td>${f3(mrr)}</td><td>${f2(s)}</td></tr>`);
+      }
+    }
+  }
+  function fillDdpg() {
+    const tb = document.getElementById("ddpg");
+    for (const r of ddpg) {
+      const cells = r.slice(2).map((v) => `<td>${typeof v === "number" ? f2(v) : v}</td>`).join("");
+      tb.insertAdjacentHTML("beforeend", `<tr><td><b>${r[0]}</b></td><td style="text-align:left">${r[1]}</td>${cells}</tr>`);
+    }
+  }
+
+  // Dot chart: one panel per method on the paper's (log lr, linear alpha) axes.
+  function dotChart(method) {
+    const W = 460, H = 310, m = { l: 46, r: 12, t: 10, b: 46 };
+    const x = (lr) => m.l + (Math.log10(lr) + 6) / 4 * (W - m.l - m.r);
+    const y = (a) => H - m.b - a / 30 * (H - m.t - m.b);
+    const rows = configs[method];
+    const best = Math.max(...rows.map((r) => r[2]));
+    let s = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${method}: 64 configurations by learning rate and AWR temperature; the table below lists every value.">`;
+    for (const a of [0, 10, 20, 30]) {
+      s += `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${y(a)}" y2="${y(a)}"/><text class="tick" x="${m.l - 8}" y="${y(a) + 4}" text-anchor="end">${a}</text>`;
+    }
+    for (const e of [-6, -5, -4, -3, -2]) {
+      s += `<text class="tick" x="${x(10 ** e)}" y="${H - m.b + 18}" text-anchor="middle">1e${e}</text>`;
+    }
+    s += `<text class="axis" x="${(m.l + W - m.r) / 2}" y="${H - 8}" text-anchor="middle">Learning rate</text>`;
+    s += `<text class="axis" transform="translate(13 ${(m.t + H - m.b) / 2}) rotate(-90)" text-anchor="middle">AWR temperature</text>`;
+    const ordered = [...rows].sort((a, b) => a[2] - b[2]);
+    for (const [lr, a, v] of ordered) {
+      const cx = x(lr).toFixed(1), cy = y(a).toFixed(1);
+      if (v === best) {
+        s += `<circle cx="${cx}" cy="${cy}" r="9" fill="#fff" stroke="var(--ink)" stroke-width="1.5"/>`;
+      }
+      s += v >= 0.5
+        ? `<circle cx="${cx}" cy="${cy}" r="5.5" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/>`
+        : `<circle cx="${cx}" cy="${cy}" r="4.5" fill="#fff" stroke="var(--off)" stroke-width="1.5"/>`;
+    }
+    for (const [lr, a, v] of ordered) {
+      s += `<circle class="hit" cx="${x(lr).toFixed(1)}" cy="${y(a).toFixed(1)}" r="11" data-t="success ${v.toFixed(2)}<br>learning rate ${lr.toExponential(1)}<br>temperature ${a.toFixed(1)}"/>`;
+    }
+    s += "</svg><div class=\"tip\"></div>";
+    const box = document.getElementById(`dots-${method}`);
+    box.innerHTML = s;
+    const tip = box.querySelector(".tip");
+    box.querySelectorAll(".hit").forEach((c) => {
+      c.addEventListener("pointerenter", () => { tip.innerHTML = c.dataset.t; tip.style.display = "block"; });
+      c.addEventListener("pointerleave", () => { tip.style.display = "none"; });
+      c.addEventListener("pointermove", (ev) => {
+        const r = box.getBoundingClientRect();
+        const px = ev.clientX - r.left;
+        tip.style.left = `${Math.min(px + 12, r.width - tip.offsetWidth - 2)}px`;
+        tip.style.top = `${ev.clientY - r.top - tip.offsetHeight - 10}px`;
+      });
+    });
+    const body = [...rows].sort((a, b) => b[2] - a[2])
+      .map(([lr, a, v]) => `<tr><td>${v.toFixed(3)}</td><td>${lr.toExponential(2)}</td><td>${a.toFixed(2)}</td></tr>`).join("");
+    document.getElementById("dots-tables").insertAdjacentHTML("beforeend",
+      `<div class="table-wrap"><table><caption class="chart-title" style="text-align:left">${method}</caption><thead><tr><th>Success</th><th>Learning rate</th><th>Temperature</th></tr></thead><tbody>${body}</tbody></table></div>`);
+  }
+
+  fillBreadth();
+  fillDiag();
+  fillDdpg();
+  dotChart("GCIQL");
+  dotChart("GCIVL");
+</script>
+</body>
+</html>
