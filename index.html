@@ -6,7 +6,7 @@
 <title>Beyond Success Rates</title>
 <meta name="description" content="Beyond Success Rates: Trainability and Extractability for Offline GCRL. Project page with landscapes, diagnostics and results.">
 <meta property="og:title" content="Beyond Success Rates: Trainability and Extractability for Offline GCRL">
-<meta property="og:description" content="A best-tuned success rate tells you what a method can reach, not how easy it is to get there.">
+<meta property="og:description" content="A study of how hard it is to find hyperparameters that make an offline goal-conditioned RL method work, which a best tuned success rate does not show.">
 <meta property="og:image" content="https://amsks.github.io/beyond-success-rates/static/gif/antmaze-medium_wide.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap" rel="stylesheet">
@@ -45,7 +45,7 @@
     display: inline-flex; align-items: center; gap: 6px;
     padding: 8px 18px; border-radius: 999px; background: var(--ink); color: #fff; text-decoration: none;
   }
-  .claim { font-size: clamp(1.2rem, 2.6vw, 1.5rem); line-height: 1.35; text-align: center; max-width: 760px; margin: 28px auto 8px; }
+  .claim { font-size: clamp(1.1rem, 2.2vw, 1.3rem); line-height: 1.45; text-align: center; max-width: 760px; margin: 28px auto 8px; }
   h2 { font-size: 1.45rem; font-weight: 600; margin: 56px 0 12px; padding-top: 12px; border-top: 1px solid var(--rule); }
   h3 { font-size: 1.1rem; font-weight: 600; margin: 32px 0 8px; }
   p { margin: 0 0 14px; }
@@ -107,12 +107,26 @@
   td.best { font-weight: 700; }
   td.neg { color: #a02c2c; }
 
+  .steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; align-items: start; margin-top: 16px; margin-bottom: 8px; }
+  .steps figure { margin: 0; min-width: 0; }
+  .step-title { font-family: Inter, sans-serif; font-size: 0.92rem; font-weight: 600; margin-top: 8px; }
+  .steps figcaption { margin-top: 4px; }
+  .scale { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 8px; font-size: 0.8rem; color: var(--muted); margin: 8px 0 24px; font-variant-numeric: tabular-nums; }
+  .scale i { display: inline-block; width: 140px; height: 8px; border-radius: 4px; background: linear-gradient(90deg, #eaf5f4, #21918c, #0d3f3d); }
+  .schematic svg { display: block; width: 100%; height: auto; font-family: Inter, sans-serif; }
+  .schematic text { font-size: 12px; fill: var(--muted); }
+  .schematic .name { font-size: 14px; font-weight: 600; fill: var(--ink); }
+  details > .table-wrap { margin-top: 10px; }
   pre { background: var(--panel); padding: 16px; border-radius: 4px; overflow-x: auto; font-family: "JetBrains Mono", monospace; font-size: 0.8rem; line-height: 1.5; }
   footer { font-family: Inter, sans-serif; font-size: 0.8rem; color: var(--muted); text-align: center; margin-top: 64px; }
   @media (max-width: 720px) {
     body { font-size: 16.5px; }
     .row.two { grid-template-columns: 1fr; }
+    .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; padding: 8px 0 0; }
+  }
+  @media (max-width: 520px) {
+    .steps { grid-template-columns: 1fr; }
   }
 </style>
 </head>
@@ -131,11 +145,11 @@
   <div class="buttons">
     <a class="btn" href="https://arxiv.org/abs/2602.05459">arXiv</a>
     <a class="btn" href="https://github.com/LUH-AI/GCRL-Landscapes">Code</a>
-    <a class="btn" href="#bibtex">BibTeX</a>
+    <a class="btn" href="#bibtex">Citation</a>
   </div>
 </header>
 
-<p class="claim">A best-tuned success rate tells you what a method can reach, not how easy it is to get there.</p>
+<p class="claim">Beyond Success Rates is a study of how hard it is to find hyperparameters that make an offline goal-conditioned RL method work, which a best tuned success rate does not show.</p>
 
 <figure class="wide" id="lead">
   <div class="tabs" role="group" aria-label="Task">
@@ -152,64 +166,37 @@
   </picture>
   <div class="stats" id="landscape-stats"></div>
   <figcaption>
-    <b id="landscape-title"></b> <span id="landscape-note"></span>
-    Each frame is one training phase, showing where a method stays within 80% of its best in that phase. Dashed lines show earlier phases.
-    Phase 1 trains from scratch and phases 2 to 4 fine-tune one shared checkpoint, so this is not one policy's learning curve.
-    Regions come from a GP fit on goal-distance return, for visualization only. The numbers under each panel are raw final-phase success and can disagree with the picture.
+    Landscapes of four methods over learning rate and AWR temperature. Each frame shows one training phase, and the shaded area is where a method is within 80% of its best in that phase (<a href="#pipeline">see below</a> for how we build these). <span id="landscape-note"></span>
+    The shaded areas are smoothed from goal-distance return, and the numbers under them are final-phase success rates from the raw evaluations, so the two may not always agree.
   </figcaption>
 </figure>
 
-<h2 id="overview">Overview</h2>
-<ul class="overview">
-  <li>Offline GCRL methods are usually compared by their best tuned success rate. That score leaves open whether success spans many hyperparameter settings or sits at one narrow, hard-to-find configuration.</li>
-  <li>We fix one policy extractor, advantage-weighted regression (AWR), and give it the advantages learned by GCIQL, GCIVL, QRL and CRL. Sweeping learning rate and AWR temperature gives a trainability landscape for each (signal, extractor) pair on AntMaze, Cube and Scene.</li>
-  <li>Peak success hides large differences in breadth. Diagnostics of the learned signal separate the regimes on AntMaze, where future goals follow physical progress. On Cube and Scene, goal ranking and control come apart. Offline GCRL evaluation should report success together with breadth, signal diagnostics, and the extractor they were measured under.</li>
-</ul>
-
-<h2 id="peak">Similar peaks, different breadth</h2>
+<h2 id="landscapes">What is a hyperparameter landscape?</h2>
 <p>
-On AntMaze-M, GCIQL and GCIVL peak four points apart. Tuned to their best setting, they look almost interchangeable.
-Look at the 64 configurations behind those peaks and they are not: 47 of GCIVL's reach 0.5 success, against 3 of GCIQL's.
+RL results can depend heavily on hyperparameters, but papers usually show only the result for the best setting. A hyperparameter landscape shows the other settings too.
+If we train an agent with a hyperparameter configuration $\lambda$ and measure its performance, we get a single value $f(\lambda)$, and if we do this for many configurations, we get a surface $f$ over the hyperparameter space. This surface is the landscape.
 </p>
-<div class="legend" aria-hidden="true">
-  <span><i style="background:var(--accent)"></i>success at least 0.5</span>
-  <span><i style="border:1.5px solid var(--off)"></i>success below 0.5</span>
-  <span><i style="background:var(--accent);box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--ink)"></i>&nbsp;best configuration</span>
-</div>
-<div class="row two">
-  <div>
-    <p class="chart-title">GCIQL <span>peak 0.70, 3 of 64 configurations at 0.5 or above</span></p>
-    <div class="chart" id="dots-GCIQL"></div>
-  </div>
-  <div>
-    <p class="chart-title">GCIVL <span>peak 0.74, 47 of 64 configurations at 0.5 or above</span></p>
-    <div class="chart" id="dots-GCIVL"></div>
-  </div>
-</div>
+<p>
+Benchmark tables report the maximum of this surface, $\max_\lambda f(\lambda)$, which says nothing about its shape.
+The sketch below shows two methods with the same maximum. Method A works only in a small range of hyperparameters, and Method B works in a wide range, so Method B should be much easier to use on a new problem, even though a benchmark table would give them the same score.
+</p>
+<div class="row two" id="schematic"></div>
 <figure style="margin-top:6px">
-  <figcaption>
-    <b>Raw configurations, no smoothing.</b> Final-phase success on <code>antmaze-medium-navigate-v0</code>; each dot is one configuration, with five seeds aggregated by the interquartile mean.
-    The threshold is absolute, so this is $\rho_{\mathrm{abs}}(0.5)$: 0.05 for GCIQL and 0.73 for GCIVL. Hover a dot for its values.
-    This compares a pair of methods on one task under AWR, and does not rank GCIVL above GCIQL in general: on Scene, GCIQL has the higher peak (0.87 against 0.73) and more of its configurations near that peak.
-  </figcaption>
-  <details>
-    <summary>Show all 64 configurations as a table</summary>
-    <div class="row two" id="dots-tables"></div>
-  </details>
+  <figcaption>A schematic, not real data. The shaded area is where each method is within 80% of its maximum.</figcaption>
 </figure>
-
-<h2 id="setup">Setup</h2>
 <p>
-AWR trains the actor by weighted behavioral cloning, so a policy only learns from what the advantage signal puts weight on.
-The temperature $\alpha$ sets how selective that weighting is:
+Landscapes also change during training, since a learning rate that works well early on may not work as well later. For this reason, we measure a separate landscape $f_t$ at several points during training.
 </p>
-<div class="eq">
-$$ \mathcal{L}_{\mathrm{AWR}}(\pi) = -\mathbb{E}_{(s,a,g)}\big[ w_\alpha(s,a,g)\log\pi(a\mid s,g) \big], \qquad w_\alpha(s,a,g) = \min\{e^{\alpha A_{\mathrm{alg}}(s,a,g)},\, w_{\max}\}. $$
-</div>
-<p>The extractor is shared; the signal $A_{\mathrm{alg}}$ is what changes.</p>
+
+<h2 id="pipeline">How do we build a landscape?</h2>
+<p>
+We want to compare what different offline goal-conditioned RL methods learn, so we use the same policy extraction method for all of them.
+This method is advantage-weighted regression (AWR), which trains the actor with weighted behavioral cloning, where each transition has weight $w = \min\{e^{\alpha A},\, w_{\max}\}$.
+The four methods differ in the advantage $A$ that they pass to AWR:
+</p>
 <div class="table-wrap">
 <table class="text">
-  <thead><tr><th>Method</th><th>Advantage signal</th><th>Meaning</th></tr></thead>
+  <thead><tr><th>Method</th><th>Advantage $A(s,a,g)$</th><th>Meaning</th></tr></thead>
   <tbody>
     <tr><td>GCIQL</td><td>$Q(s,a,g)-V(s,g)$</td><td>Action value above the state-goal baseline</td></tr>
     <tr><td>GCIVL</td><td>$V(s',g)-V(s,g)$</td><td>One-step value progress</td></tr>
@@ -219,86 +206,139 @@ $$ \mathcal{L}_{\mathrm{AWR}}(\pi) = -\mathbb{E}_{(s,a,g)}\big[ w_\alpha(s,a,g)\
 </table>
 </div>
 <p>
-For each method and task we sample 64 $(\eta, \alpha)$ configurations with a scrambled Sobol sequence and run each for five seeds.
-Training splits into four phases. At each boundary every configuration is evaluated, and the next phase starts from the checkpoint of the best one.
-Breadth is the share of sampled configurations that clear a bar, either relative to the method's own best or absolute:
+We sweep two hyperparameters that all four methods share: the learning rate $\eta$, which affects both value learning and the actor, and the AWR temperature $\alpha$, which controls how selectively the actor imitates high-advantage transitions.
+The figures below show each step of the process for GCIQL on AntMaze-M in the final phase.
 </p>
-<div class="eq">
-$$ \rho_{\varepsilon}(t) = \frac{1}{|C|} \sum_{\lambda\in C} \mathbf{1}\Big[ \bar S_t(\lambda) \ge \varepsilon \max_{\lambda'\in C}\bar S_t(\lambda') \Big], \qquad \rho_{\mathrm{abs}}(c) = \frac{1}{|C|} \sum_{\lambda\in C} \mathbf{1}\big[ \bar S_t(\lambda) \ge c \big]. $$
+<div class="wide steps">
+  <figure>
+    <img src="static/img/step1.png" width="780" height="640" alt="64 unfilled points spread evenly over learning rate and AWR temperature.">
+    <div class="step-title">1. Sampling</div>
+    <figcaption>We sample 64 configurations with a scrambled Sobol sequence, which covers the space more evenly than random search and needs far fewer points than a grid.</figcaption>
+  </figure>
+  <figure>
+    <img src="static/img/step2.png" width="780" height="640" alt="The same 64 points, colored by measured goal-distance return.">
+    <div class="step-title">2. Training</div>
+    <figcaption>We train each configuration with 5 seeds and evaluate it. The color shows goal-distance return, with seeds aggregated by the interquartile mean.</figcaption>
+  </figure>
+  <figure>
+    <img src="static/img/step3.png" width="780" height="640" alt="A smooth response surface fit through the 64 points.">
+    <div class="step-title">3. Response surface</div>
+    <figcaption>We fit a Gaussian process to these points to draw a smooth surface, and the white line marks 80% of its maximum. We use the surface only for visualization, and we compute all reported metrics from the raw points.</figcaption>
+  </figure>
+  <figure>
+    <img src="static/img/step4.png" width="780" height="640" alt="The region of the plane within 80 percent of the best value, drawn as a contour.">
+    <div class="step-title">4. Near-optimal region</div>
+    <figcaption>We plot the area inside this line with a kernel density estimate, which is why its shape differs a little from the line. This gives one panel of one frame in the animation at the top of the page.</figcaption>
+  </figure>
 </div>
+<div class="scale sans" aria-hidden="true"><span>Steps 2 and 3: goal-distance return</span><span>0.35 or below</span><i></i><span>0.71</span></div>
 <p>
-We report both, because a method can have a wide relative basin under a low ceiling.
+We repeat this process over four training phases. At the end of each phase, we evaluate all 64 configurations, and the next phase starts from the checkpoint of the best one.
+This means that only phase 1 trains from scratch, and phases 2 to 4 show how well each configuration fine-tunes a shared checkpoint. Hence, the animation should not be read as the learning curve of a single policy.
 </p>
-
-<h2 id="landscapes">Landscape breadth</h2>
-<p>
-Final-phase success and breadth over 64 configurations. Bold marks the highest peak on each task.
-</p>
-<div class="table-wrap">
-<table>
-  <thead><tr><th>Task / method</th><th>Max</th><th>Mean</th><th>$\rho_{0.9}$</th><th>$\rho_{0.8}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>$\rho_{\mathrm{abs}}(0.5)$</th></tr></thead>
-  <tbody id="breadth"></tbody>
-</table>
-</div>
-<p>
-GCIQL on AntMaze-M is a narrow peak: most configurations reach moderate success ($\rho_{\mathrm{abs}}(0.25)=0.83$), but few get near its best ($\rho_{0.9}=0.03$).
-CRL on Scene shows why relative breadth needs the absolute view: $\rho_{0.8}=0.25$ looks like a basin, but its peak is 0.19, so no configuration reaches 0.25 success.
-</p>
-
-<h2 id="diagnostics">Diagnostics</h2>
-<p>
-Landscapes are expensive, so we also read the signal directly from trained checkpoints.
-We pair each anchor transition with its matched future goal and 255 random goals, then ask whether the advantage scores the matched goal higher.
-FR-AUC is how often it does, Gap is by how much, and MRR is the reciprocal rank of the matched goal among all 256 (random gives about 0.024).
-These describe the learned signal, not the policy. Effective sample size (ESS) separately describes how concentrated the AWR update is.
-</p>
-<div class="table-wrap">
-<table>
-  <thead><tr><th>Task / method</th><th>FR-AUC</th><th>Gap</th><th>MRR</th><th>Max success</th></tr></thead>
-  <tbody id="diag"></tbody>
-</table>
-</div>
-<h3>AntMaze: diagnostics separate the regimes</h3>
-<p>
-Goals are positions, so future goals line up with physical progress.
-On AntMaze-M, QRL and GCIVL give positive future-association signals and comparatively diffuse AWR weights (ESS 0.543 and 0.468).
-GCIQL is the exception: a negative gap and weak alignment with a maze-distance oracle, consistent with its narrow near-peak landscape.
-These are correlations, and we do not read them causally.
-</p>
-<h3>Cube and Scene: ranking and control come apart</h3>
-<p>
-The goal names an object or scene target, but the policy acts through robot state and contact. A transition can prepare a grasp before the object moves any closer to the goal.
-On Scene, GCIQL reaches 0.87 success with FR-AUC 0.411 and a negative gap, while QRL ranks matched goals well (MRR 0.115) and peaks at 0.22.
-GCIVL is the most consistent signal across both tasks. A goal-ranking score alone cannot predict manipulation success here.
-</p>
-
-<h2 id="transfer">Beyond the shared AWR setup</h2>
-<p>
-These claims are conditional on the extractor, so we tested which survive when the setup changes. The table swaps AWR for DDPG+BC, again with 64 configurations and five seeds.
-Budget is DDPG+BC's training budget relative to AWR. GCIVL has no action-conditioned critic for DDPG+BC to use.
-</p>
-<div class="table-wrap">
-<table>
-  <thead>
-    <tr class="span"><th></th><th></th><th colspan="4">AntMaze-M</th><th colspan="4">Cube</th></tr>
-    <tr><th>Method</th><th style="text-align:left">Extractor</th><th>Max</th><th>$\rho_{0.9}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>Budget</th><th>Max</th><th>$\rho_{0.9}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>Budget</th></tr>
-  </thead>
-  <tbody id="ddpg"></tbody>
-</table>
-</div>
+<p>In total, this study uses:</p>
 <ul class="overview">
-  <li><b>Holds:</b> on navigation, configuration orderings survive changes in action selection and critic settings, and GCIQL stays narrow near its peak across extractors, frozen critics and training protocols.</li>
-  <li><b>Depends on the setup:</b> absolute levels, some breadth classes (QRL's $\rho_{0.9}$ falls from 0.59 to 0.02 under DDPG+BC), and orderings after checkpoint selection or on the harder stitch dataset.</li>
-  <li><b>Diagnostics are not a monotone proxy:</b> for GCIVL on Cube, multi-step targets ($n\in\{3,5\}$) raise FR-AUC, MRR and gap while mean success falls from 0.70 to 0.49 and 0.45.</li>
+  <li>4 offline goal-conditioned RL methods (GCIQL, GCIVL, QRL, and CRL) with a shared AWR extractor.</li>
+  <li>4 OGBench tasks: <code>antmaze-medium-navigate</code>, <code>antmaze-large-navigate</code>, <code>cube-single-play</code>, and <code>scene-play</code>.</li>
+  <li>64 configurations, 5 seeds, and 4 phases for each method and task, which gives 20,480 evaluations.</li>
+  <li>About 10,000 GPU-hours for the main study, and about 31,500 more for the controls with other extractors, critics, and datasets.</li>
 </ul>
 
-<h2 id="report">What to report</h2>
+<h2 id="results">What do we find?</h2>
+
+<h3>Peak success and breadth</h3>
 <p>
-Report success together with relative and absolute breadth, diagnostics of the learned signal, and the extractor under which they were measured.
-The evidence here is diagnostic and correlational. The main study uses one flat extractor and does not cover hierarchical extractors such as HIQL, action chunking or test-time planning; it also leaves out longer-horizon and humanoid tasks. Method-specific hyperparameters stay at OGBench reference settings, and the transfer controls cover only AntMaze-M and Cube, most of them with fewer seeds.
+On AntMaze-M, GCIQL and GCIVL have similar peak success rates (0.70 and 0.74). However, only 3 of GCIQL's 64 configurations reach a success rate of 0.5, whereas 47 of GCIVL's do. Each dot below is one configuration.
+</p>
+<div class="legend" aria-hidden="true">
+  <span><i style="background:var(--accent)"></i>success at least 0.5</span>
+  <span><i style="border:1.5px solid var(--off)"></i>success below 0.5</span>
+  <span><i style="background:var(--accent);box-shadow:0 0 0 2px #fff,0 0 0 3.5px var(--ink)"></i>&nbsp;best configuration</span>
+</div>
+<div class="row two">
+  <div>
+    <p class="chart-title">GCIQL <span>peak 0.70, 3 of 64 at 0.5 or above</span></p>
+    <div class="chart" id="dots-GCIQL"></div>
+  </div>
+  <div>
+    <p class="chart-title">GCIVL <span>peak 0.74, 47 of 64 at 0.5 or above</span></p>
+    <div class="chart" id="dots-GCIVL"></div>
+  </div>
+</div>
+<figure style="margin-top:6px">
+  <figcaption>
+    Final-phase success rates on <code>antmaze-medium-navigate-v0</code>, from the raw evaluations with no smoothing. This is only one pair of methods on one task. For example, GCIQL has a higher peak than GCIVL on Scene (0.87 and 0.73).
+  </figcaption>
+  <details>
+    <summary>All 64 configurations as a table</summary>
+    <div class="row two" id="dots-tables"></div>
+  </details>
+</figure>
+
+<h3>Relative and absolute breadth</h3>
+<p>
+We report two measures of breadth. $\rho_\varepsilon$ is the fraction of configurations that reach a fraction $\varepsilon$ of the method's best success rate, and $\rho_{\mathrm{abs}}(c)$ is the fraction that reach a success rate of $c$.
+We need both because a method's best can itself be low. For example, CRL on Scene has $\rho_{0.8}=0.25$, but since its peak is only 0.19, none of its configurations reach a success rate of 0.25.
+</p>
+<details>
+  <summary>Breadth for all methods and tasks</summary>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Task / method</th><th>Max</th><th>Mean</th><th>$\rho_{0.9}$</th><th>$\rho_{0.8}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>$\rho_{\mathrm{abs}}(0.5)$</th></tr></thead>
+    <tbody id="breadth"></tbody>
+  </table>
+  </div>
+</details>
+
+<h3>Diagnostics</h3>
+<p>
+Landscapes are expensive to build, so we also compute cheaper diagnostics from trained checkpoints, such as whether the advantage scores a future goal from the same trajectory above random goals.
+On AntMaze, where goals are positions and future goals line up with physical progress, these diagnostics distinguish the landscape regimes. For GCIQL, the future goal scores below random goals on average (gap $-0.102$ on AntMaze-M), which is consistent with its narrow near-peak landscape.
+</p>
+<p>
+Cube and Scene behave differently, since a transition can prepare a grasp before the object moves any closer to the goal. On Scene, GCIQL reaches a success rate of 0.87 even though it ranks future goals below random goals (FR-AUC 0.411), and QRL ranks goals well (MRR 0.115) but only reaches 0.22.
+These are correlations, and we do not claim that they explain the results causally.
+</p>
+<details>
+  <summary>Diagnostics for all methods and tasks</summary>
+  <p style="margin-top:10px">FR-AUC is how often the future goal scores above a random goal, Gap is the mean score difference, and MRR is the mean reciprocal rank of the future goal among 256 goals (about 0.024 for a random ranking).</p>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Task / method</th><th>FR-AUC</th><th>Gap</th><th>MRR</th><th>Max success</th></tr></thead>
+    <tbody id="diag"></tbody>
+  </table>
+  </div>
+</details>
+
+<h3>Other extractors</h3>
+<p>
+Since all of these results use AWR, we also tested other setups. GCIQL's landscape stays narrow near its peak with DDPG+BC, with frozen critics, and with uninterrupted training, and configuration orderings on navigation tasks mostly stay the same when we change action selection or critic settings.
+However, absolute performance changes, and so do some breadth results: for example, QRL's $\rho_{0.9}$ drops from 0.59 to 0.02 with DDPG+BC. Hence, our claims are specific to the extractor that we measured them with.
+</p>
+<details>
+  <summary>AWR and DDPG+BC</summary>
+  <p style="margin-top:10px">Each cell uses 64 configurations and 5 seeds. Budget is the training budget of DDPG+BC relative to AWR. We do not run DDPG+BC with GCIVL, since GCIVL has no action-conditioned critic.</p>
+  <div class="table-wrap">
+  <table>
+    <thead>
+      <tr class="span"><th></th><th></th><th colspan="4">AntMaze-M</th><th colspan="4">Cube</th></tr>
+      <tr><th>Method</th><th style="text-align:left">Extractor</th><th>Max</th><th>$\rho_{0.9}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>Budget</th><th>Max</th><th>$\rho_{0.9}$</th><th>$\rho_{\mathrm{abs}}(0.25)$</th><th>Budget</th></tr>
+    </thead>
+    <tbody id="ddpg"></tbody>
+  </table>
+  </div>
+</details>
+
+<h2 id="report">What should we report?</h2>
+<p>
+We recommend that offline goal-conditioned RL papers report success rates along with relative and absolute breadth, diagnostics of the learned signal, and the extractor used to measure them.
+</p>
+<p>
+Our study has limitations. Our evidence is correlational, the main study uses a single flat extractor, and we do not cover hierarchical methods such as HIQL, action chunking, test-time planning, or longer-horizon and humanoid tasks.
+Do the same patterns hold for these methods and tasks? We hope that future work will answer this question, and that our code makes it easier to build landscapes for new methods!
 </p>
 
-<h2 id="bibtex">BibTeX</h2>
+<h2 id="bibtex">Citation</h2>
 <pre>@article{toepperwien2026beyond,
   title   = {Beyond Success Rates: Trainability and Extractability for Offline GCRL},
   author  = {T{\"o}pperwien, Jan Malte and Mohan, Aditya and Lindauer, Marius},
@@ -306,7 +346,7 @@ The evidence here is diagnostic and correlational. The main study uses one flat 
   year    = {2026}
 }</pre>
 
-<footer>Built on <a href="https://github.com/seohongpark/ogbench">OGBench</a>. Landscape framework from Mohan et al., AutoML Conference 2023.</footer>
+<footer>We use the tasks and reference implementations from <a href="https://github.com/seohongpark/ogbench">OGBench</a>. The landscape framework is from Mohan et al. (AutoML Conference 2023).</footer>
 </main>
 
 <script>
@@ -339,14 +379,14 @@ The evidence here is diagnostic and correlational. The main study uses one flat 
   const configs = {"GCIQL":[[9.02e-05,9.59,0.34],[0.00139,26.03,0.293],[8.04e-06,18.08,0.42],[0.000164,2.53,0.34],[2.29e-06,5.84,0.473],[0.000354,22.27,0.347],[2.05e-05,29.33,0.407],[0.0042,13.77,0.0],[3.41e-06,11.84,0.44],[0.000221,27.52,0.373],[4.04e-05,20.46,0.373],[0.00198,3.9,0.153],[1.34e-05,0.59,0.7],[0.00869,16.27,0.0],[1.58e-06,24.21,0.46],[0.000774,7.66,0.26],[1.14e-06,8.62,0.487],[0.000737,23.24,0.373],[1.3e-05,15.24,0.36],[0.00636,1.61,0.0],[4.48e-05,4.87,0.347],[0.0029,19.5,0.24],[5.1e-06,26.5,0.46],[0.000249,12.87,0.347],[2.8e-05,14.69,0.373],[0.00433,28.43,0.0],[2.4e-06,21.42,0.447],[0.000492,6.69,0.32],[7.12e-06,3.43,0.487],[0.00011,17.17,0.353],[6.15e-05,25.17,0.373],[0.00126,10.43,0.353],[9.02e-06,11.22,0.413],[0.000139,24.38,0.333],[8.04e-05,17.37,0.333],[0.00164,3.23,0.187],[2.29e-05,7.48,0.42],[0.00354,20.63,0.0],[2.05e-06,28.63,0.453],[0.000419,14.48,0.313],[3.41e-05,12.55,0.353],[0.00221,26.82,0.273],[4.04e-06,18.82,0.44],[0.000198,5.55,0.28],[1.34e-06,1.29,0.64],[0.000869,15.56,0.273],[1.58e-05,22.56,0.413],[0.00774,9.29,0.0],[1.14e-05,8.39,0.387],[0.00737,23.48,0.0],[1.3e-06,16.42,0.467],[0.000636,0.45,0.6],[4.48e-06,4.63,0.467],[0.00029,19.72,0.4],[5.1e-05,27.66,0.393],[0.0025,11.69,0.253],[2.8e-06,13.51,0.467],[0.000433,29.59,0.373],[2.4e-05,21.65,0.367],[0.00492,6.45,0.0],[7.12e-05,2.27,0.38],[0.0011,18.35,0.34],[6.15e-06,25.41,0.427],[0.000126,10.21,0.333]],"GCIVL":[[3.15e-05,26.3,0.6],[0.00361,8.66,0.22],[1.49e-06,7.5,0.533],[0.000735,17.62,0.6],[7.58e-06,22.0,0.533],[0.000116,2.12,0.553],[4.96e-05,11.74,0.547],[0.00184,24.09,0.527],[1.89e-06,25.1,0.6],[0.000522,14.94,0.58],[1.21e-05,1.13,0.587],[0.00783,18.75,0.0],[6.99e-05,16.63,0.553],[0.00146,4.25,0.387],[3.5e-06,9.65,0.52],[0.000302,29.51,0.667],[5.41e-06,29.03,0.573],[0.000195,11.03,0.607],[8.11e-05,4.71,0.453],[0.00126,15.19,0.513],[1.41e-05,20.21,0.6],[0.00675,0.68,0.0],[2.92e-06,13.59,0.567],[0.000337,25.59,0.633],[3.24e-05,22.72,0.607],[0.00283,12.22,0.307],[6.59e-06,3.57,0.48],[0.000134,21.53,0.607],[1.3e-06,18.06,0.527],[0.000845,6.04,0.44],[2.05e-05,8.16,0.56],[0.00553,27.66,0.0],[1.57e-06,27.63,0.593],[0.000582,7.78,0.473],[2.39e-05,6.12,0.5],[0.00368,18.51,0.187],[4.71e-05,20.63,0.6],[0.00232,3.01,0.227],[9.94e-06,13.07,0.56],[0.000114,23.22,0.613],[1.1e-05,25.97,0.627],[0.00955,13.62,0.0],[2.21e-06,0.25,0.74],[0.00046,20.12,0.647],[3.83e-06,15.74,0.56],[0.000247,5.62,0.52],[5.95e-05,10.53,0.547],[0.00165,28.18,0.573],[9.21e-05,29.53,0.587],[0.00107,10.04,0.52],[4.44e-06,4.16,0.487],[0.000213,16.19,0.633],[2.56e-06,19.66,0.58],[0.000397,1.69,0.527],[1.71e-05,14.1,0.573],[0.00617,24.6,0.0],[6.49e-06,23.71,0.613],[0.000175,11.71,0.567],[4.1e-05,2.56,0.533],[0.00267,22.09,0.407],[2.08e-05,17.06,0.52],[0.00423,6.59,0.073],[1.02e-06,9.15,0.54],[0.000892,27.16,0.66]]};
 
   const tasks = {
-    "antmaze-medium": { label: "AntMaze-M", title: "Four methods on AntMaze-M.",
-      note: "From phase 2 on, CRL and QRL hold still, while GCIQL moves again and breaks into pieces." },
-    "antmaze-large": { label: "AntMaze-L", title: "Four methods on AntMaze-L.",
-      note: "GCIQL and GCIVL look broad here, but only relative to their own low peaks: neither has a configuration at 0.25 success." },
-    "cube": { label: "Cube", title: "Four methods on Cube.",
-      note: "After phase 1, GCIQL and GCIVL turn broad and stable. CRL and QRL collapse to a sliver at the lowest learning rates, below low peaks." },
-    "scene": { label: "Scene", title: "Four methods on Scene.",
-      note: "After phase 1, GCIQL and GCIVL turn broad. CRL and QRL have goal-distance return near zero in every phase, so no region is drawn; their success numbers below are low as well." },
+    "antmaze-medium": { label: "AntMaze-M",
+      note: "After phase 1, the regions of CRL and QRL barely move, while the region of GCIQL moves again and splits up." },
+    "antmaze-large": { label: "AntMaze-L",
+      note: "GCIQL and GCIVL look broad here because the regions are relative to each method's best, which is low on this task. Neither method has a configuration that reaches a success rate of 0.25." },
+    "cube": { label: "Cube",
+      note: "After phase 1, GCIQL and GCIVL are broad and stable. CRL and QRL are confined to the lowest learning rates and have low peaks." },
+    "scene": { label: "Scene",
+      note: "After phase 1, GCIQL and GCIVL are broad. CRL and QRL have a goal-distance return near zero in every phase, so we do not draw a region for them." },
   };
 
   const f2 = (x) => x.toFixed(2);
@@ -362,7 +402,6 @@ The evidence here is diagnostic and correlational. The main study uses one flat 
     const img = document.getElementById("landscape");
     img.src = `${base}_wide.gif`;
     img.alt = `Landscapes on ${t.label} for GCIQL, GCIVL, CRL and QRL over learning rate and AWR temperature, one frame per training phase. ${t.note}`;
-    document.getElementById("landscape-title").textContent = t.title;
     document.getElementById("landscape-note").textContent = t.note;
     document.querySelectorAll(".tab").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.task === task)));
     document.getElementById("landscape-stats").innerHTML = breadth[t.label]
@@ -447,6 +486,28 @@ The evidence here is diagnostic and correlational. The main study uses one flat 
     document.getElementById("dots-tables").insertAdjacentHTML("beforeend",
       `<div class="table-wrap"><table><caption class="chart-title" style="text-align:left">${method}</caption><thead><tr><th>Success</th><th>Learning rate</th><th>Temperature</th></tr></thead><tbody>${body}</tbody></table></div>`);
   }
+
+  // Schematic for section 1: same peak, different width. Illustrative, not data.
+  function schematic(id, name, note, width) {
+    const W = 460, H = 200, l = 14, r = 14, top = 46, base = 164;
+    const x = (u) => l + u * (W - l - r);
+    const y = (v) => base - v * (base - top);
+    const curve = (u) => Math.exp(-((u - 0.5) ** 2) / (2 * width * width));
+    const pts = Array.from({ length: 121 }, (_, i) => i / 120);
+    const line = pts.map((u) => `${x(u).toFixed(1)},${y(curve(u)).toFixed(1)}`).join(" ");
+    const near = pts.filter((u) => curve(u) >= 0.8);
+    const area = [`${x(near[0]).toFixed(1)},${base}`, ...near.map((u) => `${x(u).toFixed(1)},${y(curve(u)).toFixed(1)}`), `${x(near[near.length - 1]).toFixed(1)},${base}`].join(" ");
+    document.getElementById("schematic").insertAdjacentHTML("beforeend", `<div class="schematic"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${name}: ${note}">
+      <text class="name" x="${l}" y="16">${name}</text><text x="${W - r}" y="16" text-anchor="end">${note}</text>
+      <line x1="${l}" x2="${W - r}" y1="${top}" y2="${top}" stroke="var(--off)" stroke-dasharray="3 4"/>
+      <text x="${W - r}" y="${top - 6}" text-anchor="end">tuned score</text>
+      <polygon points="${area}" fill="var(--accent)" fill-opacity="0.22"/>
+      <polyline points="${line}" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round"/>
+      <line x1="${l}" x2="${W - r}" y1="${base}" y2="${base}" stroke="var(--ink)"/>
+      <text x="${(l + W - r) / 2}" y="${base + 20}" text-anchor="middle">hyperparameter value</text></svg></div>`);
+  }
+  schematic("schematic", "Method A", "narrow", 0.035);
+  schematic("schematic", "Method B", "broad", 0.2);
 
   fillBreadth();
   fillDiag();
